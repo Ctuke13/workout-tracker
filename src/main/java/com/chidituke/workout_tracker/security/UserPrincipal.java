@@ -9,13 +9,14 @@ import java.security.Principal;
 import java.util.Collection;
 import java.util.Collections;
 
+@Getter
 public class UserPrincipal implements UserDetails {
     private Long id;
     private String username;
     private String email;
     private String password;
 
-    @Getter
+
     public UserPrincipal(Long id, String username, String email, String password) {
         this.id = id;
         this.username = username;

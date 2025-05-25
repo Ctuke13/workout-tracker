@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 public interface WorkoutRepository extends JpaRepository<Workout, Long> {
-    List<Workout> findByCategory(String category);
+    List<Workout> findByWorkoutType(String category);
     List<Workout> findByNameContainingIgnoreCase(String name);
     List<Workout> findByIsCardio(Boolean isCardio);
 }

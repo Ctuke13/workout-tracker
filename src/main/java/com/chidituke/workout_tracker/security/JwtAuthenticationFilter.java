@@ -9,11 +9,19 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+// ONLY responsible for:
+// ✅ Intercepting HTTP requests
+// ✅ Extracting tokens from headers
+// ✅ Setting up Spring Security context
+// ✅ Managing the request/response cycle
+
+@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Autowired
@@ -27,19 +35,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = getJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && tokenProvider.validateJwtToken(jwt)) {
-                String username = tokenProvider.getUsernameFromJwtToken(jwt);
+            // Only try to validate and authenticate if we have a token
+            if (StringUtils.hasText(jwt)) {
+                try {
+                    if (tokenProvider.validateJwtToken(jwt)) {
+                        String username = tokenProvider.getUsernameFromJwtToken(jwt);
 
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
+                } catch (Exception e) {
+                    // Pass the exception object itself
+                    logger.error("Invalid JWT token", e);
+                }
             }
         } catch (Exception ex) {
-            System.err.println("Could not set user authentication in security context: " + ex.getMessage());
+            // Pass the exception object itself
+            logger.error("Failed to process JWT authentication", ex);
         }
 
+        // Always continue to the next filter
         filterChain.doFilter(request, response);
     }
 

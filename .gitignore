@@ -31,3 +31,60 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Operating System Files ###
+# Windows
+Thumbs.db
+*.tmp
+*.temp
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+
+### Security - DO NOT COMMIT ###
+JWT_tokens.txt
+*.env
+.env
+.env.local
+.env.production
+.env.staging
+application-prod.properties
+application-secrets.properties
+*.key
+*.pem
+*.p12
+*.jks
+
+### Docker ###
+postgres-data/
+docker-compose.override.yml
+
+### Application Logs ###
+*.log
+logs/
+application.log
+
+### Frontend (for future React app) ###
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+
+### Temporary Files ###
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+### Generated Documentation ###
+/docs/build/

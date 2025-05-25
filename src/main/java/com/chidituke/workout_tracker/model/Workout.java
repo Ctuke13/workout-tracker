@@ -12,16 +12,16 @@ public class Workout {
     private Long id;
 
     @Column(nullable = false)
-    private String name;
+    private String workoutName;
 
     @Column(columnDefinition = "TEXT")
-    private String description;
+    private String workoutDescription;
 
     @Column(nullable = false)
-    private String category;
+    private String workoutType;
 
     @Column(name = "image_url")
-    private String imageUrl;
+    private String workoutImageUrl;
 
     @Column(name = "is_cardio")
     private boolean isCardio = false;

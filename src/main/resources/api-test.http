@@ -1,34 +1,128 @@
+Updated api-tests.http for JWT Authentication Testing
+Here's your improved api-tests.http file with better organization and comprehensive JWT testing:
+Updated api-tests.http:
+http### =================
+### JWT AUTHENTICATION TESTS (Run these first)
 ### =================
-### BASIC API TESTS
-### =================
 
-### 1. Status Check
-GET http://localhost:8080/api/test/status
-
-### 2. Create Sample Data
-POST http://localhost:8080/api/test/create-sample-data
-
-### 3. Get Count
-GET http://localhost:8080/api/test/count
-
-### 4. Get All Users
-GET http://localhost:8080/api/test/users
-
-### 5. Get All Workouts
-GET http://localhost:8080/api/test/workouts
-
-### 6. Create Custom User (via test endpoint)
-POST http://localhost:8080/api/test/user
+### 1. Register a new user
+POST http://localhost:8080/api/auth/register
 Content-Type: application/json
 
 {
-  "username": "john_doe",
-  "email": "john@example.com",
-  "password": "mypassword"
+  "username": "johndoe",
+  "email": "john.doe@example.com",
+  "password": "password123"
 }
 
-### 7. Create Custom Workout
+### 2. Login with the registered user (Copy the token from response!)
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "johndoe",
+  "password": "password123"
+}
+
+### 3. Register another user for testing
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "janedoe",
+  "email": "jane.doe@example.com",
+  "password": "password456"
+}
+
+### 4. Login with second user
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "janedoe",
+  "password": "password456"
+}
+
+### =================
+### ERROR SCENARIOS
+### =================
+
+### 5. Try to register with existing username (should fail)
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "johndoe",
+  "email": "different@example.com",
+  "password": "password789"
+}
+
+### 6. Try to register with existing email (should fail)
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "differentuser",
+  "email": "john.doe@example.com",
+  "password": "password789"
+}
+
+### 7. Login with wrong password (should fail)
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "johndoe",
+  "password": "wrongpassword"
+}
+
+### 8. Login with non-existent user (should fail)
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "nonexistentuser",
+  "password": "password123"
+}
+
+### =================
+### PROTECTED ENDPOINTS - WITH VALID JWT TOKEN
+### =================
+### IMPORTANT: Copy JWT token from test #2 login response and paste below
+
+### 9. Test Status (public endpoint - should work without token)
+GET http://localhost:8080/api/test/status
+
+### 10. Get All Users (protected - requires valid token)
+GET http://localhost:8080/api/test/users
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ3NzA4ODU0LCJleHAiOjE3NDc3OTUyNTR9.5iBXj9GvVZGRSalxhMhX_4hfNbEACAeorDEo5ar0HUXL_iJVMENGSnJ8xebrjM2q7nup_Qb6BdencAP5tTF_Cg
+
+### 11. Get Count (protected - requires valid token)
+GET http://localhost:8080/api/test/count
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ3NzA4ODU0LCJleHAiOjE3NDc3OTUyNTR9.5iBXj9GvVZGRSalxhMhX_4hfNbEACAeorDEo5ar0HUXL_iJVMENGSnJ8xebrjM2q7nup_Qb6BdencAP5tTF_Cg
+
+### 12. Get All Workouts (protected - requires valid token)
+GET http://localhost:8080/api/test/workouts
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ3NzA4ODU0LCJleHAiOjE3NDc3OTUyNTR9.5iBXj9GvVZGRSalxhMhX_4hfNbEACAeorDEo5ar0HUXL_iJVMENGSnJ8xebrjM2q7nup_Qb6BdencAP5tTF_Cg
+
+### 13. Create Sample Data (protected - requires valid token)
+POST http://localhost:8080/api/test/create-sample-data
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ3NzA4ODU0LCJleHAiOjE3NDc3OTUyNTR9.5iBXj9GvVZGRSalxhMhX_4hfNbEACAeorDEo5ar0HUXL_iJVMENGSnJ8xebrjM2q7nup_Qb6BdencAP5tTF_Cg
+
+### 14. Create Custom User via Test Endpoint (protected - requires valid token)
+POST http://localhost:8080/api/test/user
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ3NzA4ODU0LCJleHAiOjE3NDc3OTUyNTR9.5iBXj9GvVZGRSalxhMhX_4hfNbEACAeorDEo5ar0HUXL_iJVMENGSnJ8xebrjM2q7nup_Qb6BdencAP5tTF_Cg
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "testpassword"
+}
+
+### 15. Create Custom Workout (protected - requires valid token)
 POST http://localhost:8080/api/test/workout
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ3NzA4ODU0LCJleHAiOjE3NDc3OTUyNTR9.5iBXj9GvVZGRSalxhMhX_4hfNbEACAeorDEo5ar0HUXL_iJVMENGSnJ8xebrjM2q7nup_Qb6BdencAP5tTF_Cg
 Content-Type: application/json
 
 {
@@ -39,73 +133,97 @@ Content-Type: application/json
 }
 
 ### =================
-### JWT AUTHENTICATION TESTS
+### PROTECTED ENDPOINTS - WITHOUT TOKEN (Should all return 401)
 ### =================
 
-### 8. Register a new user (via auth endpoint)
+### 16. Try to get users without token (should return 401)
+GET http://localhost:8080/api/test/users
+
+### 17. Try to get count without token (should return 401)
+GET http://localhost:8080/api/test/count
+
+### 18. Try to create workout without token (should return 401)
+POST http://localhost:8080/api/test/workout
+Content-Type: application/json
+
+{
+  "name": "Unauthorized Workout",
+  "description": "This should fail",
+  "category": "Test",
+  "cardio": false
+}
+
+### =================
+### INVALID TOKEN TESTS (Should all return 401)
+### =================
+
+### 19. Test with completely invalid token
+GET http://localhost:8080/api/test/users
+Authorization: Bearer invalid.jwt.token.here
+
+### 20. Test with malformed token
+GET http://localhost:8080/api/test/users
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.INVALID.SIGNATURE
+
+### 21. Test with Bearer prefix missing
+GET http://localhost:8080/api/test/users
+Authorization: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ3NzA4ODU0LCJleHAiOjE3NDc3OTUyNTR9.5iBXj9GvVZGRSalxhMhX_4hfNbEACAeorDEo5ar0HUXL_iJVMENGSnJ8xebrjM2q7nup_Qb6BdencAP5tTF_Cg
+
+### 22. Test with wrong authorization header
+GET http://localhost:8080/api/test/users
+Authorization: Basic dGVzdDp0ZXN0
+
+### =================
+### VALIDATION TESTS
+### =================
+
+### 23. Register with invalid email (should fail)
 POST http://localhost:8080/api/auth/register
 Content-Type: application/json
 
 {
-  "username": "johndoe",
-  "email": "john.doe@example.com",
+  "username": "validuser",
+  "email": "notanemail",
   "password": "password123"
 }
 
-### 9. Try to register with same username (should fail)
+### 24. Register with too short password (should fail)
 POST http://localhost:8080/api/auth/register
 Content-Type: application/json
 
 {
-  "username": "johndoe",
-  "email": "different@example.com",
-  "password": "password456"
+  "username": "validuser2",
+  "email": "valid@email.com",
+  "password": "123"
 }
 
-### 10. Login with the registered user
+### 25. Register with missing username (should fail)
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "missing@username.com",
+  "password": "password123"
+}
+
+### 26. Login with missing fields (should fail)
 POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
 {
-  "username": "johndoe",
-  "password": "password123"
+  "username": "johndoe"
 }
 
-### 11. Login with wrong password (should fail)
-POST http://localhost:8080/api/auth/login
-Content-Type: application/json
+### Test if auth controller is accessible
+GET http://localhost:8080/api/auth/test
 
-{
-  "username": "johndoe",
-  "password": "wrongpassword"
-}
+### Test without a token
+GET http://localhost:8080/api/workouts
 
-### 12. Test protected endpoint without token (should return 401)
-GET http://localhost:8080/api/test/users
+### Protected endpoint with valid JWT:
+GET http://localhost:8080/api/workouts
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ3NzA4ODU0LCJleHAiOjE3NDc3OTUyNTR9.5iBXj9GvVZGRSalxhMhX_4hfNbEACAeorDEo5ar0HUXL_iJVMENGSnJ8xebrjM2q7nup_Qb6BdencAP5tTF_Cg
 
-### 13. Test protected endpoint with JWT token
-# First run test #10 to get a token, then copy it below
-# GET http://localhost:8080/api/test/users
-# Authorization: Bearer YOUR_JWT_TOKEN_HERE
-
-### =================
-### ADDITIONAL JWT TESTS
-### =================
-
-### 14. Register another user
-POST http://localhost:8080/api/auth/register
-Content-Type: application/json
-
-{
-  "username": "janedoe",
-  "email": "jane.doe@example.com",
-  "password": "password456"
-}
-
-### 15. Test with invalid token
-GET http://localhost:8080/api/test/users
-Authorization: Bearer invalid.jwt.token
-
-### 16. Test with expired token (you can manually create one later)
-# GET http://localhost:8080/api/test/users
-# Authorization: Bearer expired.jwt.token
+### Invalid JWT Test
+GET http://localhost:8080/api/workouts
+Authorization: Bearer invalid.token.here

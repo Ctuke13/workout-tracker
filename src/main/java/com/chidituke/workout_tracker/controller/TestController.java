@@ -51,52 +51,59 @@ public class TestController {
 
     @PostMapping("/create-sample-data")
     public String createSampleData() {
-        // Create a sample user
-        User user = new User();
-        user.setUsername("testuser");
-        user.setEmail("test@email.com");
-        user.setPassword("password123");
-        user = userRepository.save(user);
+        try {
+            // Create a sample user with timestamp to ensure uniqueness
+            User user = new User();
+            user.setUsername("testuser" + System.currentTimeMillis());
+            user.setEmail("test" + System.currentTimeMillis() + "@email.com");
+            user.setPassword("password123");
+            user = userRepository.save(user);
 
-        // Create sample workouts
-        Workout benchPress = new Workout();
-        benchPress.setName("Bench Press");
-        benchPress.setDescription("Classic chest exercise");
-        benchPress.setCategory("Strength");
-        benchPress.setCardio(false);
-        benchPress = workoutRepository.save(benchPress);
+            // Create sample workouts
+            Workout benchPress = new Workout();
+            benchPress.setName("Bench Press");
+            benchPress.setDescription("Classic chest exercise");
+            benchPress.setCategory("Strength");
+            benchPress.setCardio(false);
+            benchPress = workoutRepository.save(benchPress);
 
-        Workout running = new Workout();
-        running.setName("Running");
-        running.setDescription("Cardiovascular exercise");
-        running.setCategory("Cardio");
-        running.setCardio(true);
-        running = workoutRepository.save(running);
+            Workout running = new Workout();
+            running.setName("Running");
+            running.setDescription("Cardiovascular exercise");
+            running.setCategory("Cardio");
+            running.setCardio(true);
+            running = workoutRepository.save(running);
 
-        // Create a workout log
-        WorkoutLog workoutLog = new WorkoutLog();
-        workoutLog.setUser(user);
-        workoutLog.setWorkout(benchPress);
-        workoutLog.setDate(LocalDate.now());
-        workoutLog.setNotes("Good session");
-        workoutLog = workoutLogRepository.save(workoutLog);
+            // Create a workout log
+            WorkoutLog workoutLog = new WorkoutLog();
+            workoutLog.setUser(user);
+            workoutLog.setWorkout(benchPress);
+            workoutLog.setDate(LocalDate.now());
+            workoutLog.setNotes("Good session");
+            workoutLog = workoutLogRepository.save(workoutLog);
 
-        // Create performance records
-        PerformanceRecord set1 = new PerformanceRecord();
-        set1.setWorkoutLog(workoutLog);
-        set1.setSetNumber(1);
-        set1.setReps(10);
-        set1.setWeight(135.0);
-        performanceRecordRepository.save(set1);
+            // Create performance records
+            PerformanceRecord set1 = new PerformanceRecord();
+            set1.setWorkoutLog(workoutLog);
+            set1.setSetNumber(1);
+            set1.setReps(10);
+            set1.setWeight(135.0);
+            performanceRecordRepository.save(set1);
 
-        PerformanceRecord set2 = new PerformanceRecord();
-        set2.setWorkoutLog(workoutLog);
-        set2.setSetNumber(2);
-        set2.setReps(8);
-        set2.setWeight(135.0);
-        performanceRecordRepository.save(set2);
+            PerformanceRecord set2 = new PerformanceRecord();
+            set2.setWorkoutLog(workoutLog);
+            set2.setSetNumber(2);
+            set2.setReps(8);
+            set2.setWeight(135.0);
+            performanceRecordRepository.save(set2);
 
-        return "Sample data created successfully!";
+            return "Sample data created successfully!";
+        } catch (Exception e) {
+            // Log the error
+            System.err.println("Error creating sample data: " + e.getMessage());
+            e.printStackTrace();
+            return "Error creating sample data: " + e.getMessage();
+        }
     }
 
     @GetMapping("/count")

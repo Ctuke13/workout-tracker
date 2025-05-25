@@ -11,6 +11,12 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 
+// ONLY responsible for:
+// ✅ Creating JWT tokens
+// ✅ Validating JWT tokens
+// ✅ Parsing JWT tokens
+// ✅ Token expiration logic
+
 @Component
 public class JwtTokenProvider {
 

@@ -15,7 +15,7 @@ public class WorkoutRequest {
     private String workoutDescription;
 
     @NotBlank(message = "Category is required")
-    private String workoutType;
+    private String workoutCategory;
 
     private String imageUrl;
 

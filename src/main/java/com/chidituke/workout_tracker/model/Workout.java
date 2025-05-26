@@ -18,7 +18,7 @@ public class Workout {
     private String workoutDescription;
 
     @Column(nullable = false)
-    private String workoutType;
+    private String workoutCategory;
 
     @Column(name = "image_url")
     private String workoutImageUrl;

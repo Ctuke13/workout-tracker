@@ -48,16 +48,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers("/api/auth/**").permitAll();
                     auth.requestMatchers("/api/test/**").permitAll();
+                    auth.requestMatchers("/api/workouts/**").authenticated();
                     auth.anyRequest().authenticated();
                 })
-                // Add this configuration for proper 401 responses
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getWriter().write("Unauthorized: Authentication required");
-                            response.getWriter().flush();
-                        })
-                )
+//                .exceptionHandling(ex -> ex
+//                        .authenticationEntryPoint((request, response, authException) -> {
+//                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+//                            response.getWriter().write("Unauthorized: Authentication required");
+//                            response.getWriter().flush();
+//                        })
+//                )
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

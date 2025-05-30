@@ -10,6 +10,7 @@ public class WorkoutLogRequest {
     @NotNull
     private Long workoutId;
 
+    @NotNull
     private LocalDate date = LocalDate.now();
 
     private String notes;

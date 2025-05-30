@@ -22,6 +22,9 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, Long> {
     // Find workout logs within a date range
     List<WorkoutLog> findByUserAndDateBetween(User user, LocalDate start, LocalDate end);
 
+    // Count total workouts for a user
+    long countByUser(User user);
+
     // Count workouts in a date range
     @Query("SELECT COUNT(wl) FROM WorkoutLog wl WHERE wl.user = :user AND wl.date BETWEEN :startDate AND :endDate")
     Long countByUserAndDateRange(@Param("user") User user, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);

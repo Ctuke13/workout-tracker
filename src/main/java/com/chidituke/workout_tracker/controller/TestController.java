@@ -61,16 +61,16 @@ public class TestController {
 
             // Create sample workouts
             Workout benchPress = new Workout();
-            benchPress.setName("Bench Press");
-            benchPress.setDescription("Classic chest exercise");
-            benchPress.setCategory("Strength");
+            benchPress.setWorkoutName("Bench Press");
+            benchPress.setWorkoutDescription("Classic chest exercise");
+            benchPress.setWorkoutCategory("Strength");
             benchPress.setCardio(false);
             benchPress = workoutRepository.save(benchPress);
 
             Workout running = new Workout();
-            running.setName("Running");
-            running.setDescription("Cardiovascular exercise");
-            running.setCategory("Cardio");
+            running.setWorkoutName("Running");
+            running.setWorkoutDescription("Cardiovascular exercise");
+            running.setWorkoutCategory("Cardio");
             running.setCardio(true);
             running = workoutRepository.save(running);
 

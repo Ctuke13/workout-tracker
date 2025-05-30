@@ -1,208 +1,195 @@
-# Workout Progress Tracker
+# Workout Tracker Application
 
-A comprehensive web application for tracking and visualizing workout progress, built with Spring Boot and PostgreSQL. Users can log their workouts, track performance metrics, and visualize their fitness journey through interactive charts and graphs.
+A comprehensive fitness tracking web application built with Java Spring Boot and PostgreSQL, designed to help users monitor their workout progress and fitness improvements over time.
 
-## 🚀 Features
+## 🎯 Project Vision
 
-- **User Authentication** - Secure user registration and login
-- **Exercise Library** - Pre-defined workouts with categories and images
-- **Workout Logging** - Track daily workout sessions
-- **Performance Tracking** - Record sets, reps, weights for strength training
-- **Cardio Monitoring** - Track duration, distance, and calories for cardio exercises
-- **Progress Visualization** - Generate graphs showing improvement over time
-- **Flexible Exercise Support** - Handle both strength training and cardio workouts
+This application enables users to:
+- **Secure Login** - User authentication with persistent sessions
+- **Browse Workouts** - Search and explore exercises with visual images  
+- **Track Sessions** - Click workout images to start logging sessions
+- **Record Performance** - Input sets, reps, weights for strength training
+- **Log Cardio** - Track time, distance, and calories for cardio exercises
+- **Monitor Progress** - View graphs showing improvement day-to-day
+- **Data Persistence** - All workout data saved and accessible between sessions
 
-## 🛠️ Tech Stack
+## 🛠️ Technology Stack
 
-### Backend
-- **Java 17+** - Programming language
-- **Spring Boot 3.4.5** - Application framework
-- **Spring Data JPA** - Data persistence
-- **Spring Security** - Authentication & authorization
-- **PostgreSQL 16** - Primary database
-- **Docker** - Containerization
-- **Maven** - Dependency management
-- **Lombok** - Code generation
+- **Backend:** Java Spring Boot 3.x
+- **Database:** PostgreSQL
+- **Security:** Spring Security with JWT Authentication
+- **API:** RESTful architecture with comprehensive endpoints
+- **Build Tool:** Maven
+- **Frontend:** HTML/CSS/JavaScript *(planned)*
 
-### Planned Frontend
-- **React.js** - User interface
-- **Chart.js** - Data visualization
-- **Axios** - HTTP client
+## 📊 Development Status
 
-## 📋 Prerequisites
+### ✅ **Backend Complete (95%)**
 
-- **Java 17+** installed
-- **Docker** and Docker Desktop running
-- **Maven** (or use included wrapper)
-- **Git** for version control
+**🔐 Authentication & Security**
+- [x] User registration and login system
+- [x] JWT token-based authentication
+- [x] Secure password handling with BCrypt
+- [x] Role-based access control
 
-## ⚡ Quick Start
+**💪 Workout Management**
+- [x] Full CRUD operations for workout exercises
+- [x] Category-based organization (Chest, Legs, Cardio, etc.)
+- [x] Search functionality by name and category
+- [x] Support for both strength and cardio workouts
+- [x] Image URL support for workout visualization
 
-### 1. Clone the Repository
+**📝 Workout Session Tracking**
+- [x] Start and manage workout sessions
+- [x] Historical workout data retrieval
+- [x] Recent workouts with pagination
+- [x] User-specific workout statistics
+
+**📈 Performance Analytics**
+- [x] Detailed set/rep/weight recording for strength training
+- [x] Time/distance/calories tracking for cardio
+- [x] Progress analytics (max weight, total volume)
+- [x] Date-range performance analysis
+- [x] Personal record tracking
+
+**🔒 Security & Data Integrity**
+- [x] All endpoints secured with JWT authentication
+- [x] User ownership verification on all operations
+- [x] Input validation and comprehensive error handling
+- [x] Comprehensive API testing suite
+
+### 🚧 **In Progress**
+- [ ] PostgreSQL database configuration
+- [ ] Frontend user interface development
+- [ ] Progress visualization charts
+- [ ] End-to-end integration testing
+
+### 📋 **Next Steps**
+1. **Database Setup** - Configure PostgreSQL connection and schema
+2. **Frontend Development** - Create responsive user interface
+3. **Progress Charts** - Implement data visualization
+4. **Deployment** - Production-ready configuration
+
+## 🏗️ Architecture Overview
+
+```
+📦 Backend Architecture
+├── 🎮 Controllers
+│   ├── AuthController - User authentication
+│   ├── WorkoutController - Exercise management
+│   ├── WorkoutLogController - Session tracking
+│   └── PerformanceController - Performance analytics
+├── 🔧 Services
+│   ├── UserService - User management logic
+│   ├── WorkoutService - Workout business logic
+│   ├── WorkoutLogService - Session management
+│   └── PerformanceService - Analytics and tracking
+├── 📊 Models/Entities
+│   ├── User - User account information
+│   ├── Workout - Exercise definitions
+│   ├── WorkoutLog - Individual workout sessions
+│   └── PerformanceRecord - Detailed performance data
+├── 🗄️ Repositories
+│   └── JPA repositories with custom queries
+└── 🔐 Security
+    ├── JWT token provider and validation
+    ├── Spring Security configuration
+    └── Custom authentication filters
+```
+
+## 🚀 API Endpoints
+
+### 🔐 Authentication
+```
+POST /api/auth/register    # Register new user
+POST /api/auth/login       # User login (returns JWT)
+```
+
+### 💪 Workouts
+```
+GET    /api/workouts                  # Get all workouts
+POST   /api/workouts                  # Create new workout
+GET    /api/workouts/{id}            # Get workout by ID
+PUT    /api/workouts/{id}            # Update workout
+DELETE /api/workouts/{id}            # Delete workout
+GET    /api/workouts/search          # Search workouts by name
+GET    /api/workouts/category/{cat}  # Get workouts by category
+GET    /api/workouts/type            # Filter by cardio/strength
+```
+
+### 📝 Workout Sessions
+```
+POST   /api/workout-logs           # Start new workout session
+GET    /api/workout-logs           # Get workout history
+GET    /api/workout-logs/recent    # Get recent workouts
+GET    /api/workout-logs/{id}      # Get specific workout session
+PUT    /api/workout-logs/{id}      # Update workout session
+DELETE /api/workout-logs/{id}      # Delete workout session
+GET    /api/workout-logs/stats     # Get workout statistics
+```
+
+### 📈 Performance Tracking
+```
+POST   /api/performance                           # Create performance record
+GET    /api/performance/workout-log/{id}          # Get performance by session
+GET    /api/performance/workout/{id}              # Get performance history
+PUT    /api/performance/{id}                      # Update performance record
+DELETE /api/performance/{id}                      # Delete performance record
+GET    /api/performance/analytics/max-weight/{id} # Get max weight for exercise
+GET    /api/performance/analytics/volume          # Get total volume by date range
+```
+
+## 💻 Getting Started
+
+### Prerequisites
+- Java 17+
+- Maven 3.6+
+- PostgreSQL 12+
+
+### Installation
+
+1. **Clone the repository**
 ```bash
-git clone <your-repo-url>
+git clone <repository-url>
 cd workout-tracker
 ```
 
-### 2. Start PostgreSQL Database
-```bash# Start PostgreSQL container
-docker run -d --name workout-tracker-db \
-  -e POSTGRES_DB=workout_tracker \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 postgres:16
- ```
+2. **Configure database** (application.properties)
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/workout_tracker
+spring.datasource.username=your_username
+spring.datasource.password=your_password
+```
 
-### 3. Run the Application
-```bash# Using Maven wrapper (recommended)
+3. **Run the application**
+```bash
 ./mvnw spring-boot:run
-
-
-# Or using Maven directly
-mvn spring-boot:run
 ```
 
-### 4. Verify Installation
+4. **Test the API**
+- Use the provided `api-test.http` file for comprehensive endpoint testing
+- API will be available at `http://localhost:8080`
 
-- API Status: http://localhost:8080/api/test/status
-- Create sample data: POST http://localhost:8080/api/test/create-sample-data
+## 🧪 Testing
 
-### 📁 Project Structure
+The project includes comprehensive API tests in `src/main/resources/api-test.http` covering:
+- Authentication flows (registration, login, token validation)
+- All CRUD operations for workouts, sessions, and performance
+- Error scenarios and validation testing
+- Security testing with invalid tokens
 
-```
-src/
-├── main/
-│   ├── java/com/chidituke/workout_tracker/
-│   │   ├── model/              # Entity models
-│   │   │   ├── User.java
-│   │   │   ├── Workout.java
-│   │   │   ├── WorkoutLog.java
-│   │   │   └── PerformanceRecord.java
-│   │   ├── repository/         # Data access layer
-│   │   ├── service/            # Business logic (planned)
-│   │   ├── controller/         # REST controllers
-│   │   │   └── TestController.java
-│   │   └── WorkoutTrackerApplication.java
-│   └── resources/
-│       └── application.properties
-├── docker-compose.yml          # Database container config
-└── pom.xml                     # Maven dependencies
-```
+## 🎯 Portfolio Highlights
 
-### 🗄️ Database Schema
-**Users Table**
-- id - Primary key
-- username - Unique username
-- password - Encrypted password
-- email - Unique email
-- created_at - Registration timestamp
+This project demonstrates:
+- **Enterprise Java Development** - Spring Boot, Spring Security, JPA
+- **Database Design** - Proper entity relationships and constraints
+- **RESTful API Design** - Following industry best practices
+- **Security Implementation** - JWT authentication and authorization
+- **Scalable Architecture** - Service layer pattern and dependency injection
+- **Comprehensive Testing** - Full API coverage with realistic scenarios
 
-**Workouts Table** (Exercise Library)
-- id - Primary key
-- name - Exercise name (e.g., "Bench Press")
-- description - Exercise details
-- category - Exercise category (e.g., "Chest", "Cardio")
-- image_url - Exercise image path
-- is_cardio - Boolean flag for cardio exercises
+Perfect showcase for full-stack developer positions requiring Java expertise!
 
-**Workout Logs Table** (Daily Sessions)
-- id - Primary key
-- user_id - Foreign key to users
-- workout_id - Foreign key to workouts
-- date - Session date
-- notes - Optional session notes
+## 📄 License
 
-**Performance Records Table** (Individual Sets/Sessions)
-- id - Primary key
-- workout_log_id - Foreign key to workout_logs
-- set_number - Set number (for strength) or session number (for cardio)
-- reps - Repetitions (strength training)
-- weight - Weight used (strength training)
-- duration_minutes - Exercise duration (cardio)
-- duration_seconds - Precise timing (sprints, intervals)
-- distance_km - Distance covered (cardio)
-- calories_burned - Estimated calories
-- notes - Performance notes
-
-### 🔌 API Endpoints (Current)
-**Test Endpoints**
-- GET /api/test/status - API health check
-- GET /api/test/users - List all users
-- POST /api/test/user - Create new user
-- GET /api/test/workouts - List all workouts
-- POST /api/test/workout - Create new workout
-- POST /api/test/create-sample-data - Generate test data
-
-### 🚧 Upcoming Features
-
- User authentication with JWT tokens
- Workout search and filtering
- Progress analytics and insights
- React.js frontend application
- Exercise image gallery
- Social sharing capabilities
- Export functionality (PDF, CSV)
- Mobile responsive design
- Workout recommendations
- Achievements and gamification
-
-### 🧪 Testing
-```bash# Run all tests
-./mvnw test
-
-# Check database connection
-docker exec -it workout-tracker-db psql -U postgres -d workout_tracker
-```
-
-### 🐳 Docker Commands
-```bash# Start database
-docker run -d --name workout-tracker-db \
-  -e POSTGRES_DB=workout_tracker \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 postgres:16
-
-
-# View running containers
-docker ps
-
-# Stop database
-docker stop workout-tracker-db
-
-# Remove container
-docker rm workout-tracker-db
-
-# View database logs
-docker logs workout-tracker-db
-```
-
-### 📊 Data Model Relationships
-```
-User (1) ←→ (Many) WorkoutLog ←→ (Many) Workout
-                     ↓
-              (Many) PerformanceRecord
-```
-
-**Example Flow:**
-
-1. User "John" logs in
-2. Selects "Bench Press" from workout library
-3. Creates a WorkoutLog for today's session
-4. Records multiple PerformanceRecords (Set 1: 10 reps @ 135lbs, Set 2: 8 reps @ 135lbs)
-5. Data is stored and available for progress tracking
-
-### 🤝 Contributing
-This is a portfolio project by Chidi Tuke. Suggestions and feedback are welcome!
-
-### 📝 License
 This project is for educational and portfolio purposes.
-
-### 📧 Contact
-**Chidi Tuke**
-
-**GitHub:** https://github.com/Ctuke13
-**Email:** chidituke@gmail.com
-**LinkedIn:** https://www.linkedin.com/in/ctuke/
-
-
-Last Updated: May 2025

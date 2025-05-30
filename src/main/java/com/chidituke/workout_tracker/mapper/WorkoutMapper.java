@@ -11,7 +11,7 @@ public class WorkoutMapper {
     public void mapRequestToEntity(WorkoutRequest request, Workout workout) {
         workout.setWorkoutName(request.getWorkoutName());
         workout.setWorkoutDescription(request.getWorkoutDescription());
-        workout.setWorkoutType(request.getWorkoutCategory());
+        workout.setWorkoutCategory(request.getWorkoutCategory());
         workout.setWorkoutImageUrl(request.getImageUrl());
         workout.setCardio(request.getIsCardio());
     }

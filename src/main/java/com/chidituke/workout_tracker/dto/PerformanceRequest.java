@@ -30,7 +30,7 @@ public class PerformanceRequest {
 
     // Additional metrics
     @Positive(message = "Calories must be positive")
-    private Double caloriesBurned;
+    private Integer caloriesBurned;
 
     private String notes;
 }

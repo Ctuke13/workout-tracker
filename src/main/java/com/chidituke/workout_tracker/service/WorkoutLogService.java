@@ -32,7 +32,7 @@ public class WorkoutLogService {
     @Autowired
     private WorkoutLogMapper workoutLogMapper;
 
-    public List<WorkoutLogResponse> getUserWorkLogs(String username) {
+    public List<WorkoutLogResponse> getUserWorkoutHistory(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
@@ -78,19 +78,17 @@ public class WorkoutLogService {
         Workout workout = workoutRepository.findById(workoutLogRequest.getWorkoutId())
                 .orElseThrow(() -> new RuntimeException("Workout not found: " + workoutLogRequest.getWorkoutId()));
 
-        WorkoutLog workoutLog = new WorkoutLog();
-
         WorkoutLog newWorkoutLog = new WorkoutLog();
         newWorkoutLog.setUser(user);
-        workoutLog.setWorkout(workout);
+        newWorkoutLog.setWorkout(workout);
 
         workoutLogMapper.mapRequestToEntity(workoutLogRequest, newWorkoutLog);
 
-        WorkoutLog savedLog = workoutLogRepository.save(workoutLog);
+        WorkoutLog savedLog = workoutLogRepository.save(newWorkoutLog);
         return workoutLogMapper.mapEntityToResponse(savedLog);
     };
 
-    public Optional<WorkoutLogResponse> updateWorkoutLogById(Long id, String username, WorkoutLogRequest workoutLogRequest) {
+    public Optional<WorkoutLogResponse> updateWorkoutLog(Long id, String username, WorkoutLogRequest workoutLogRequest) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
@@ -104,7 +102,7 @@ public class WorkoutLogService {
                 });
     }
 
-    public boolean deleteWorkoutLogById(Long id, String username) {
+    public boolean deleteWorkoutLog(Long id, String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
@@ -115,6 +113,28 @@ public class WorkoutLogService {
         }
         return false;
     };
+
+    public WorkoutLogResponse startWorkoutSession(String username, WorkoutLogRequest workoutLogRequest) {
+        return createWorkoutLog(username, workoutLogRequest);
+    }
+
+    public List<WorkoutLogResponse> getRecentWorkoutLogs(String username, int limit) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+
+        return workoutLogRepository.findByUserOrderByDateDesc(user)
+                .stream()
+                .limit(limit)
+                .map(workoutLogMapper::mapEntityToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public long getTotalWorkoutCount(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+
+        return workoutLogRepository.countByUser(user);
+    }
 
     public Long getWorkoutCountForUser(String username, LocalDate startDate, LocalDate endDate) {
         User user = userRepository.findByUsername(username)

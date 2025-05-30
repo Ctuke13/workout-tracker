@@ -4,10 +4,9 @@ import lombok.Data;
 
 import java.time.LocalDate;
 
-public class PerformanceResponse {
 
-    @Data
-    public class PerformanceResponse {
+@Data
+public class PerformanceResponse {
         private Long id;
         private Long workoutLogId;
         private LocalDate date;
@@ -50,5 +49,5 @@ public class PerformanceResponse {
             this.caloriesBurned = caloriesBurned;
             this.notes = notes;
         }
-    }
 }
+

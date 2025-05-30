@@ -18,6 +18,7 @@ public class WorkoutService {
     @Autowired
     private WorkoutRepository workoutRepository;
 
+    @Autowired
     private WorkoutMapper workoutMapper;
 
     public List<WorkoutResponse> getAllWorkouts() {
@@ -32,15 +33,15 @@ public class WorkoutService {
                 .map(workoutMapper::mapEntityToResponse);
     };
 
-    public List<WorkoutResponse> getWorkoutsByWorkoutType(String workoutType) {
-        return workoutRepository.findByWorkoutType(workoutType)
+    public List<WorkoutResponse> getWorkoutsByWorkoutCategory(String workoutType) {
+        return workoutRepository.findByWorkoutCategory(workoutType)
                 .stream()
                 .map(workoutMapper::mapEntityToResponse)
                 .collect(Collectors.toList());
     };
 
     public List<WorkoutResponse> searchWorkoutsByName(String workoutName) {
-        return workoutRepository.findByNameContainingIgnoreCase(workoutName)
+        return workoutRepository.findByWorkoutNameContainingIgnoreCase(workoutName)
                 .stream()
                 .map(workoutMapper::mapEntityToResponse)
                 .collect(Collectors.toList());

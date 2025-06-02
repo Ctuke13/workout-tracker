@@ -435,3 +435,18 @@ Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ4N
 GET http://localhost:8080/api/performance/analytics/volume?startDate=2024-01-01&endDate=2024-01-31
 Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ4NTQ5NTg0LCJleHAiOjE3NDg2MzU5ODR9.65R6qSdKSESSpjaVUD2ZiVEzLW93hISfk9i6CYt4WIb3TfLVg8Uo9YdOAzUALsjOkrRNJlKSn30x-45O2ZLxIw
 
+### =================
+### SUBSCRIPTION GATING TESTS (Add these to your existing file)
+### =================
+
+### Test subscription status
+GET http://localhost:8080/api/subscriptions/test/1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ4ODAzMzgxLCJleHAiOjE3NDg4ODk3ODF9.QEX5zWm1dYmbvr9sL3JWkpe6HIhWVSDHSLf0qPOsKWOOW29h0BochJuCBE8TxzKC2kuck5LrpAdpCMe_yWd7Rg
+
+### Test analytics endpoint (should be BLOCKED for FREE user)
+GET http://localhost:8080/api/performance/analytics/max-weight/1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ4ODAzMzgxLCJleHAiOjE3NDg4ODk3ODF9.QEX5zWm1dYmbvr9sL3JWkpe6HIhWVSDHSLf0qPOsKWOOW29h0BochJuCBE8TxzKC2kuck5LrpAdpCMe_yWd7Rg
+
+### Test volume analytics (should also be BLOCKED for FREE user)
+GET http://localhost:8080/api/performance/analytics/volume?startDate=2024-01-01&endDate=2024-01-31
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huZG9lIiwiaWF0IjoxNzQ4ODAzMzgxLCJleHAiOjE3NDg4ODk3ODF9.QEX5zWm1dYmbvr9sL3JWkpe6HIhWVSDHSLf0qPOsKWOOW29h0BochJuCBE8TxzKC2kuck5LrpAdpCMe_yWd7Rg

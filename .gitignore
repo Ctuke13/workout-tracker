@@ -1,8 +1,23 @@
-HELP.md
-target/
-!.mvn/wrapper/maven-wrapper.jar
+### Backend (Spring Boot) ###
+backend/HELP.md
+backend/target/
+!backend/.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+
+### Frontend (React) ###
+frontend/node_modules/
+frontend/build/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.npm
+frontend/.yarn
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
 
 ### STS ###
 .apt_generated
@@ -49,14 +64,14 @@ Thumbs.db
 *~
 
 ### Security - DO NOT COMMIT ###
-JWT_tokens.txt
+backend/JWT_tokens.txt
 *.env
 .env
 .env.local
 .env.production
 .env.staging
-application-prod.properties
-application-secrets.properties
+backend/application-prod.properties
+backend/application-secrets.properties
 *.key
 *.pem
 *.p12
@@ -71,13 +86,21 @@ docker-compose.override.yml
 logs/
 application.log
 
-### Frontend (for future React app) ###
+### Claude Artifacts (Optional) ###
+.claude/
+
+### Package Managers ###
+# npm
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .npm
 .yarn
+
+# Maven
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.properties
 
 ### Temporary Files ###
 *.tmp
@@ -88,3 +111,17 @@ yarn-error.log*
 
 ### Generated Documentation ###
 /docs/build/
+
+### React Specific ###
+# Production builds
+/build
+/dist
+
+# Coverage reports
+/coverage
+
+# ESLint cache
+.eslintcache
+
+# Optional: Storybook build outputs
+/storybook-static

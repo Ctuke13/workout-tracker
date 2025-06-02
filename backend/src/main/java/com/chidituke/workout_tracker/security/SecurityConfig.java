@@ -51,6 +51,7 @@ public class SecurityConfig {
                     auth.requestMatchers("/error").permitAll();
                     auth.requestMatchers("/api/workouts/**").authenticated();
                     auth.requestMatchers("/api/subscriptions/test/**").permitAll();
+                    auth.requestMatchers("/api/workouts/**").authenticated();
                     auth.anyRequest().authenticated();
                 })
 //                .exceptionHandling(ex -> ex

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@mui/material';
 
 const Navigation = () => {
+    const navigate = useNavigate();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const scrollToSection = (sectionId) => {
@@ -12,13 +14,21 @@ const Navigation = () => {
         setIsMenuOpen(false);
     };
 
+    const goToExercises = () => {
+        navigate('/exercises');
+        setIsMenuOpen(false);
+    };
+
     return (
         <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-light-border shadow-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     {/* Logo */}
                     <div className="flex items-center">
-                        <span className="text-2xl font-bold text-electric-blue hover:text-electric-blue-dark transition-colors cursor-pointer">
+                        <span
+                            onClick={() => navigate('/')}
+                            className="text-2xl font-bold text-electric-blue hover:text-electric-blue-dark transition-colors cursor-pointer"
+                        >
                             💪 WorkoutTracker
                         </span>
                         <span className="ml-3 px-3 py-1 text-xs bg-gradient-to-r from-orange-gradient-start to-orange-gradient-end text-white rounded-full font-semibold animate-pulse">
@@ -36,18 +46,20 @@ const Navigation = () => {
                             <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-electric-blue transition-all duration-300 group-hover:w-3/4 transform -translate-x-1/2"></span>
                         </button>
                         <button
-                            onClick={() => scrollToSection('exercises')}
-                            className="relative px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-light-bg-secondary hover:font-bold transition-all duration-300 rounded-lg group"
-                        >
-                            Exercise Library
-                            <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-electric-blue transition-all duration-300 group-hover:w-3/4 transform -translate-x-1/2"></span>
-                        </button>
-                        <button
                             onClick={() => scrollToSection('pricing')}
                             className="relative px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-light-bg-secondary hover:font-bold transition-all duration-300 rounded-lg group"
                         >
                             Pricing
                             <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-electric-blue transition-all duration-300 group-hover:w-3/4 transform -translate-x-1/2"></span>
+                        </button>
+                        {/* Direct Exercise Library Link */}
+                        <button
+                            onClick={goToExercises}
+                            className="relative px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-light-bg-secondary hover:font-bold transition-all duration-300 rounded-lg group flex items-center space-x-1"
+                        >
+                            <span>📚</span>
+                            <span>Exercise Library</span>
+                            <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-neon-green transition-all duration-300 group-hover:w-3/4 transform -translate-x-1/2"></span>
                         </button>
                         <button
                             onClick={() => scrollToSection('beta')}
@@ -110,13 +122,17 @@ const Navigation = () => {
                                 <span className="w-2 h-2 bg-electric-blue rounded-full mr-3 opacity-0 hover:opacity-100 transition-opacity"></span>
                                 Why We Built This
                             </button>
+
+                            {/* Direct Exercise Library Link for Mobile */}
                             <button
-                                onClick={() => scrollToSection('exercises')}
+                                onClick={goToExercises}
                                 className="text-left px-4 py-3 text-text-secondary hover:text-text-primary hover:bg-light-card-hover rounded-lg transition-all duration-200 flex items-center"
                             >
-                                <span className="w-2 h-2 bg-electric-blue rounded-full mr-3 opacity-0 hover:opacity-100 transition-opacity"></span>
+                                <span className="w-2 h-2 bg-neon-green rounded-full mr-3 opacity-0 hover:opacity-100 transition-opacity"></span>
+                                <span className="mr-2">📚</span>
                                 Exercise Library
                             </button>
+
                             <button
                                 onClick={() => scrollToSection('pricing')}
                                 className="text-left px-4 py-3 text-text-secondary hover:text-text-primary hover:bg-light-card-hover rounded-lg transition-all duration-200 flex items-center"

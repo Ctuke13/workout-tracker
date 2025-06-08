@@ -5,6 +5,7 @@ import { CssBaseline } from '@mui/material';
 import theme from './theme';
 import LandingPage from './pages/LandingPage';
 import './index.css';
+import ExercisesPage from "./pages/ExercisesPage";
 
 function App() {
     return (
@@ -14,6 +15,7 @@ function App() {
                 <div className="font-inter bg-light-bg text-text-primary min-h-screen">
                     <Routes>
                         <Route path="/" element={<LandingPage />} />
+                        <Route path="/exercises" element={<ExercisesPage/>}/>
                         {/* Add more routes later for auth, dashboard, etc. */}
                     </Routes>
                 </div>

@@ -39,7 +39,7 @@ const SolutionSection = () => {
     ];
 
     return (
-        <section className="py-12 md:py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-50 to-blue-50 animate-on-scroll">
+        <section className="py-4 md:py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-50 to-blue-50 animate-on-scroll">
             <div className="max-w-7xl mx-auto">
 
                 {/* Section Header */}

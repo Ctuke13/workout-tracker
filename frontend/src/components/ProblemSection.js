@@ -25,7 +25,7 @@ const ProblemSection = () => {
   ];
 
   return (
-      <section id="problem" className="py-8 md:py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-red-50 via-orange-50 to-light-bg-secondary animate-on-scroll">
+      <section id="problem" className="py-4 md:py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-red-50 via-orange-50 to-light-bg-secondary animate-on-scroll">
         <div className="max-w-7xl mx-auto">
 
           {/* Section Header */}

@@ -45,7 +45,7 @@ const BetaAccess = () => {
 
     if (isSubmitted) {
         return (
-            <section id="beta" className="py-12 md:py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-electric-blue/5 via-light-bg-secondary to-neon-green/5 animate-on-scroll">
+            <section id="beta" className="py-4 md:py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-electric-blue/5 via-light-bg-secondary to-neon-green/5 animate-on-scroll">
                 <div className="max-w-4xl mx-auto text-center">
                     <div className="bg-gradient-to-r from-neon-green/20 to-electric-blue/20 border border-neon-green/30 rounded-2xl p-12">
                         <div className="text-6xl mb-6">🎉</div>
@@ -77,7 +77,7 @@ const BetaAccess = () => {
     }
 
     return (
-        <section id="beta" className="py-16 md:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-light-bg-secondary via-light-bg-secondary to-electric-blue animate-on-scroll">
+        <section id="beta" className="py-4 md:py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-light-bg-secondary via-light-bg-secondary to-electric-blue animate-on-scroll">
             <div className="max-w-7xl mx-auto">
 
                 {/* Section Header */}

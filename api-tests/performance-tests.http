@@ -1,0 +1,53 @@
+### =================
+### PERFORMANCE CONTROLLER TESTS
+### =================
+
+### 1. Create a performance record
+POST http://localhost:8080/api/performance
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "workoutLogId": 1,
+  "setNumber": 1,
+  "reps": 12,
+  "weight": 50.5,
+  "durationMinutes": 30,
+  "durationSeconds": 1800.0,
+  "distanceKm": 5.0,
+  "caloriesBurned": 300,
+  "notes": "Good form maintained throughout"
+}
+
+### 2. Get all performance records for user
+GET http://localhost:8080/api/performance
+Authorization: Bearer {{jwtToken}}
+
+### 3. Get performance records by workout log ID
+GET http://localhost:8080/api/performance/workout-log/1
+Authorization: Bearer {{jwtToken}}
+
+### 4. Get performance records by date range
+GET http://localhost:8080/api/performance?startDate=2024-06-01&endDate=2024-06-30
+Authorization: Bearer {{jwtToken}}
+
+### 5. Update a performance record
+PUT http://localhost:8080/api/performance/1
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "workoutLogId": 1,
+  "setNumber": 1,
+  "reps": 15,
+  "weight": 55.0,
+  "durationMinutes": 32,
+  "durationSeconds": 1920.0,
+  "distanceKm": 5.2,
+  "caloriesBurned": 320,
+  "notes": "Improved performance, increased weight"
+}
+
+### 6. Delete a performance record
+DELETE http://localhost:8080/api/performance/1
+Authorization: Bearer {{jwtToken}}

@@ -1,0 +1,98 @@
+### =================
+### EXERCISE LIBRARY API TESTS
+### Public endpoints - no authentication required
+### Tests the Exercise Library browsing functionality
+### =================
+
+### 1. Get all exercises (basic)
+GET http://localhost:8080/api/public/exercises
+
+### 2. Get all exercises with filtering
+GET http://localhost:8080/api/public/exercises?goal=fat-burn&difficulty=Intermediate
+
+### ✅ Working filter combinations:
+GET http://localhost:8080/api/public/exercises?goal=fat-burn&difficulty=Intermediate
+###
+GET http://localhost:8080/api/public/exercises?goal=muscle-building&difficulty=Beginner
+###
+GET http://localhost:8080/api/public/exercises?goal=recovery&difficulty=Beginner
+
+### 3. Get exercises by goal only
+GET http://localhost:8080/api/public/exercises?goal=muscle-building
+
+### 4. Get exercises by difficulty only
+GET http://localhost:8080/api/public/exercises?difficulty=Intermediate
+
+### 5. Get exercises by equipment
+GET http://localhost:8080/api/public/exercises?equipment=None
+
+### 6. Complex filtering (multiple parameters)
+GET http://localhost:8080/api/public/exercises?goal=fat-burn&difficulty=Intermediate&equipment=None
+
+### 7. Get specific exercise by ID
+GET http://localhost:8080/api/public/exercises/1
+
+### 8. Get specific exercise by ID (test different exercise)
+GET http://localhost:8080/api/public/exercises/5
+
+### 9. Get exercises by goal (dedicated endpoint)
+GET http://localhost:8080/api/public/exercises/goal/fat-burn
+
+### 10. Get exercises by goal (muscle gain)
+GET http://localhost:8080/api/public/exercises/goal/muscle-building
+
+### 11. Get exercises by goal (strength)
+GET http://localhost:8080/api/public/exercises/goal/endurance
+
+### 12. Get all available goals with summaries
+GET http://localhost:8080/api/public/exercises/goals
+
+### 13. Get filter options (equipment, difficulty, etc.)
+GET http://localhost:8080/api/public/exercises/filters
+
+### 14. Search exercises by name
+GET http://localhost:8080/api/public/exercises/search?q=hiit
+
+### 15. Search exercises by description
+GET http://localhost:8080/api/public/exercises/search?q=cardio
+
+### 16. Search exercises (broader term)
+GET http://localhost:8080/api/public/exercises/search?q=strength
+
+### 17. Search exercises (empty query - should return all)
+GET http://localhost:8080/api/public/exercises/search?q=
+
+### 18. Test pagination (if implemented)
+GET http://localhost:8080/api/public/exercises?page=0&size=10
+
+### 19. Get non-existent exercise (should return 404)
+GET http://localhost:8080/api/public/exercises/999
+
+### 20. Get exercises with invalid goal (should handle gracefully)
+GET http://localhost:8080/api/public/exercises/goal/invalid-goal
+
+### =================
+### SEARCH + FILTER COMBINATION TESTS
+### Testing if search endpoint supports additional filter parameters
+### =================
+
+### 21. Search with goal filter
+GET http://localhost:8080/api/public/exercises/search?q=hiit&goal=fat-burn
+
+### 22. Search with difficulty filter
+GET http://localhost:8080/api/public/exercises/search?q=cardio&difficulty=Intermediate
+
+### 23. Search with equipment filter
+GET http://localhost:8080/api/public/exercises/search?q=strength&equipment=None
+
+### 24. Search with multiple filters
+GET http://localhost:8080/api/public/exercises/search?q=workout&goal=muscle-building&difficulty=Beginner&equipment=None
+
+### 25. Search with goal and difficulty
+GET http://localhost:8080/api/public/exercises/search?q=training&goal=endurance&difficulty=Advanced
+
+### 26. Empty search with filters (should act like filtered browse)
+GET http://localhost:8080/api/public/exercises/search?q=&goal=fat-burn&difficulty=Intermediate
+
+### Test with stricter criteria that should return specific results
+GET http://localhost:8080/api/public/exercises/search?q=push&goal=muscle-building&difficulty=Intermediate&equipment=Dumbbells

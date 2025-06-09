@@ -1,0 +1,83 @@
+### =================
+### WORKOUT CONTROLLER TESTS
+### =================
+
+### 1. Create a new workout
+POST http://localhost:8080/api/workouts
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "workoutName": "Morning HIIT",
+  "workoutDescription": "High intensity interval training for morning energy",
+  "workoutCategory": "CARDIO",
+  "isCardio": true,
+  "imageUrl": "https://example.com/hiit-image.jpg"
+}
+
+### 2. Get all workouts for user
+GET http://localhost:8080/api/workouts
+Authorization: Bearer {{jwtToken}}
+
+### 3. Get specific workout by ID (replace {id} with actual workout ID)
+GET http://localhost:8080/api/workouts/1
+Authorization: Bearer {{jwtToken}}
+
+### 4. Update a workout (replace {id} with actual workout ID)
+PUT http://localhost:8080/api/workouts/1
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "workoutName": "Updated Morning HIIT",
+  "workoutDescription": "Updated high intensity interval training",
+  "workoutCategory": "CARDIO",
+  "isCardio": true,
+  "imageUrl": "https://example.com/updated-hiit-image.jpg"
+}
+
+### 5. Delete a workout (replace {id} with actual workout ID)
+DELETE http://localhost:8080/api/workouts/1
+Authorization: Bearer {{jwtToken}}
+
+### =================
+### WORKOUT LOG CONTROLLER TESTS
+### =================
+
+### 6. Create a workout log entry
+POST http://localhost:8080/api/workout-logs
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "workoutId": 1,
+  "date": "2024-06-05",
+  "notes": "Great workout session, felt energized"
+}
+
+### 7. Get all workout logs for user
+GET http://localhost:8080/api/workout-logs
+Authorization: Bearer {{jwtToken}}
+
+### 8. Get workout logs by date range
+GET http://localhost:8080/api/workout-logs?startDate=2024-06-01&endDate=2024-06-30
+Authorization: Bearer {{jwtToken}}
+
+### 9. Get specific workout log by ID
+GET http://localhost:8080/api/workout-logs/1
+Authorization: Bearer {{jwtToken}}
+
+### 10. Update a workout log
+PUT http://localhost:8080/api/workout-logs/1
+Authorization: Bearer {{jwtToken}}
+Content-Type: application/json
+
+{
+  "workoutId": 1,
+  "date": "2024-06-05",
+  "notes": "Updated notes: Excellent workout, increased intensity"
+}
+
+### 11. Delete a workout log
+DELETE http://localhost:8080/api/workout-logs/1
+Authorization: Bearer {{jwtToken}}

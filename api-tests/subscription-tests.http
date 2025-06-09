@@ -1,0 +1,11 @@
+### =================
+### SUBSCRIPTION GATING TESTS
+### =================
+
+### Test FREE user accessing premium content (should work)
+GET http://localhost:8080/api/workouts
+Authorization: Bearer {{jwtToken}}
+
+### Test subscription status
+GET http://localhost:8080/api/subscriptions/status
+Authorization: Bearer {{jwtToken}}

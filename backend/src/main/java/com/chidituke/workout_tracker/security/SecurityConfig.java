@@ -49,6 +49,7 @@ public class SecurityConfig {
                     auth.requestMatchers("/api/auth/**").permitAll();
                     auth.requestMatchers("/api/test/**").permitAll();
                     auth.requestMatchers("/error").permitAll();
+                    auth.requestMatchers("/api/public/**").permitAll();
                     auth.requestMatchers("/api/workouts/**").authenticated();
                     auth.requestMatchers("/api/subscriptions/test/**").permitAll();
                     auth.requestMatchers("/api/workouts/**").authenticated();

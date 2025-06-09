@@ -1,0 +1,62 @@
+### =================
+### JWT AUTHENTICATION TESTS (Run these first)
+### =================
+
+### 1. Register a new user
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 2. Login to get JWT token
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "password123"
+}
+
+### 3. Alternative login (email instead of username)
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 4. Test invalid login
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "wronguser",
+  "password": "wrongpassword"
+}
+
+### Store the JWT token from login response in a variable
+@jwtToken = {{login-response.response.body.$.token}}
+
+### =================
+### PROTECTED ENDPOINTS (Need JWT)
+### =================
+
+### 5. Test protected endpoint with valid token
+GET http://localhost:8080/api/test/user
+Authorization: Bearer {{jwtToken}}
+
+### 6. Test admin endpoint (might fail if user is not admin)
+GET http://localhost:8080/api/test/admin
+Authorization: Bearer {{jwtToken}}
+
+### 7. Test protected endpoint without token (should fail)
+GET http://localhost:8080/api/test/user
+
+### 8. Test protected endpoint with invalid token (should fail)
+GET http://localhost:8080/api/test/user
+Authorization: Bearer invalid.jwt.token

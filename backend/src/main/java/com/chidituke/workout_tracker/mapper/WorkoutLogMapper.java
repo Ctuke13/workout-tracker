@@ -1,6 +1,5 @@
 package com.chidituke.workout_tracker.mapper;
 
-import com.chidituke.workout_tracker.dto.WorkoutLogRequest;
 import com.chidituke.workout_tracker.dto.WorkoutLogResponse;
 import com.chidituke.workout_tracker.model.WorkoutLog;
 import org.springframework.stereotype.Component;

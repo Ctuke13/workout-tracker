@@ -1,6 +1,5 @@
 package com.chidituke.workout_tracker.controller;
 
-import com.chidituke.workout_tracker.dto.WorkoutRequest;
 import com.chidituke.workout_tracker.dto.WorkoutResponse;
 import com.chidituke.workout_tracker.service.WorkoutService;
 import jakarta.validation.Valid;
@@ -9,7 +8,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.swing.text.html.Option;
 import java.util.List;
 import java.util.Optional;
 

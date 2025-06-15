@@ -1,4 +1,4 @@
-package com.chidituke.workout_tracker.dto;
+package com.chidituke.workout_tracker.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

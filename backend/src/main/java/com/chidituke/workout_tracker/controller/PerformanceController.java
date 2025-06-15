@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.controller;
 
-import com.chidituke.workout_tracker.dto.PerformanceRequest;
+import com.chidituke.workout_tracker.dto.request.PerformanceRequest;
 import com.chidituke.workout_tracker.dto.PerformanceResponse;
 import com.chidituke.workout_tracker.service.PerformanceService;
 import com.chidituke.workout_tracker.service.SubscriptionService;

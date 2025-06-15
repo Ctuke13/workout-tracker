@@ -1,6 +1,5 @@
 package com.chidituke.workout_tracker.controller;
 
-import com.chidituke.workout_tracker.dto.WorkoutLogRequest;
 import com.chidituke.workout_tracker.dto.WorkoutLogResponse;
 import com.chidituke.workout_tracker.service.WorkoutLogService;
 import jakarta.validation.Valid;

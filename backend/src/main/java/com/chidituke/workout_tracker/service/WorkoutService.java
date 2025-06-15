@@ -1,7 +1,7 @@
 package com.chidituke.workout_tracker.service;
 
 import com.chidituke.workout_tracker.mapper.WorkoutMapper;
-import com.chidituke.workout_tracker.dto.WorkoutRequest;
+import com.chidituke.workout_tracker.dto.request.WorkoutRequest;
 import com.chidituke.workout_tracker.dto.WorkoutResponse;
 import com.chidituke.workout_tracker.model.Workout;
 import com.chidituke.workout_tracker.repository.WorkoutRepository;

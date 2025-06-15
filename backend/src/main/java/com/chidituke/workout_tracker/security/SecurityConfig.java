@@ -53,6 +53,10 @@ public class SecurityConfig {
                     auth.requestMatchers("/api/workouts/**").authenticated();
                     auth.requestMatchers("/api/subscriptions/test/**").permitAll();
                     auth.requestMatchers("/api/workouts/**").authenticated();
+                    auth.requestMatchers("/api/users/professionals").permitAll();
+                    auth.requestMatchers("/api/users/**").authenticated();
+                    auth.requestMatchers("/api/workouts/**").authenticated();
+                    auth.requestMatchers("/api/exercises/**").authenticated();
                     auth.anyRequest().authenticated();
                 })
 //                .exceptionHandling(ex -> ex

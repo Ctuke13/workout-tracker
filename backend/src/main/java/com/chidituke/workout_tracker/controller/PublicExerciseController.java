@@ -1,7 +1,5 @@
 package com.chidituke.workout_tracker.controller;  // ✅ Fixed spelling
 
-import com.chidituke.workout_tracker.dto.ExerciseDTO;
-import com.chidituke.workout_tracker.dto.GoalSummaryDTO;
 import com.chidituke.workout_tracker.model.Exercise;
 import com.chidituke.workout_tracker.repository.ExerciseRepository;
 import lombok.RequiredArgsConstructor;

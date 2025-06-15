@@ -69,4 +69,8 @@ public class JwtTokenProvider {
         }
         return false;
     }
+
+    public String generateToken(Authentication authentication) {
+        return generateJwtToken(authentication); // Delegate to existing method
+    }
 }

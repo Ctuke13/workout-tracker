@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.exceptions.common;
 
-import com.chidituke.workout_tracker.exceptions.WorkoutTrackerException;
+import com.chidituke.workout_tracker.exceptions.common.WorkoutTrackerException;
 
 /**
  * Thrown when a user attempts an operation they don't have permission to perform.

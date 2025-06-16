@@ -18,15 +18,15 @@ public class Subscription {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     @NotNull
     private User user;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "plan_type", nullable = false)
+    @Column(name = "subscription_tier", nullable = false)
     @Builder.Default
-    private PlanType planType = PlanType.FREE;
+    private SubscriptionTier subscriptionTier = SubscriptionTier.FREE;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -69,7 +69,8 @@ public class Subscription {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
-    // Business Logic Methods
+    // ==================== SUBSCRIPTION STATUS METHODS ====================
+
     public boolean isActive() {
         return status == SubscriptionStatus.ACTIVE &&
                 (endDate == null || endDate.isAfter(LocalDateTime.now()));
@@ -84,29 +85,51 @@ public class Subscription {
         return status == SubscriptionStatus.CANCELLED;
     }
 
+    public boolean isPending() {
+        return status == SubscriptionStatus.PENDING;
+    }
+
+    // ==================== TIER CHECKING METHODS ====================
+
     public boolean isFreeTier() {
-        return planType == PlanType.FREE;
+        return subscriptionTier == SubscriptionTier.FREE;
     }
 
     public boolean isPlusTier() {
-        return planType == PlanType.PLUS;
+        return subscriptionTier == SubscriptionTier.PLUS;
     }
 
     public boolean isProTier() {
-        return planType == PlanType.PRO;
-    }
-
-    public boolean isPaidTier() {
-        return planType == PlanType.PLUS || planType == PlanType.PRO || planType == PlanType.PRO_PROFESSIONAL;
+        return subscriptionTier == SubscriptionTier.PRO;
     }
 
     public boolean isProProfessional() {
-        return planType == PlanType.PRO_PROFESSIONAL;
+        return subscriptionTier == SubscriptionTier.PRO_PROFESSIONAL;
     }
 
-    public boolean canCreatePrograms() {
-        return planType == PlanType.PRO_PROFESSIONAL;
+    public boolean isPaidTier() {
+        return subscriptionTier != SubscriptionTier.FREE;
     }
+
+    // ==================== FEATURE ACCESS METHODS ====================
+
+    public boolean canScheduleWorkouts() {
+        return isActive() && subscriptionTier.canScheduleWorkouts();
+    }
+
+    public boolean canUseAI() {
+        return isActive() && subscriptionTier.canUseAIGeneration();
+    }
+
+    public boolean canManageClients() {
+        return isActive() && subscriptionTier.canManageClients();
+    }
+
+    public boolean hasAdvancedAnalytics() {
+        return isActive() && subscriptionTier.hasAdvancedAnalytics();
+    }
+
+    // ==================== SUBSCRIPTION MANAGEMENT ====================
 
     public long getDaysRemaining() {
         if (endDate == null) return Long.MAX_VALUE;
@@ -130,38 +153,88 @@ public class Subscription {
         }
     }
 
+    public void upgrade(SubscriptionTier newTier) {
+        if (newTier.ordinal() > this.subscriptionTier.ordinal()) {
+            this.subscriptionTier = newTier;
+            this.updatedAt = LocalDateTime.now();
+            // Sync with User entity
+            if (user != null) {
+                user.setSubscriptionTier(newTier);
+            }
+        }
+    }
+
+    public void downgrade(SubscriptionTier newTier) {
+        if (newTier.ordinal() < this.subscriptionTier.ordinal()) {
+            this.subscriptionTier = newTier;
+            this.updatedAt = LocalDateTime.now();
+            // Sync with User entity
+            if (user != null) {
+                user.setSubscriptionTier(newTier);
+            }
+        }
+    }
+
+    public double getMonthlyPrice() {
+        return subscriptionTier.getMonthlyPrice();
+    }
+
+    public String getTierDisplayName() {
+        return subscriptionTier.getDisplayName();
+    }
+
+    // ==================== BUSINESS LOGIC ====================
+
+    public boolean canUpgradeTo(SubscriptionTier targetTier) {
+        return targetTier.ordinal() > this.subscriptionTier.ordinal();
+    }
+
+    public boolean canDowngradeTo(SubscriptionTier targetTier) {
+        return targetTier.ordinal() < this.subscriptionTier.ordinal();
+    }
+
+    public boolean isEligibleForTrial(SubscriptionTier tier) {
+        // Users who've never had a paid subscription can get trials
+        return isFreeTier() && tier != SubscriptionTier.FREE;
+    }
+
+    // ==================== LEGACY METHODS (for backward compatibility) ====================
+
+    /**
+     * @deprecated Use canManageClients() instead
+     */
+    @Deprecated
+    public boolean canCreatePrograms() {
+        return canManageClients();
+    }
+
+    // ==================== LIFECYCLE METHODS ====================
+
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
-    }
 
-    public enum PlanType {
-        FREE("Free Plan", 0.0),
-        PLUS("Plus Plan", 5.0),
-        PRO("Pro Plan", 13.0),
-        PRO_PROFESSIONAL("Pro Professional", 25.0);
-
-        private final String displayName;
-        private final double price;
-
-        PlanType(String displayName, double price) {
-            this.displayName = displayName;
-            this.price = price;
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public double getPrice() {
-            return price;
+        // Sync subscription tier with User entity
+        if (user != null && user.getSubscriptionTier() != this.subscriptionTier) {
+            user.setSubscriptionTier(this.subscriptionTier);
         }
     }
+
+    @PrePersist
+    protected void onCreate() {
+        // Sync subscription tier with User entity on creation
+        if (user != null) {
+            user.setSubscriptionTier(this.subscriptionTier);
+        }
+    }
+
+    // ==================== ENUMS ====================
 
     public enum SubscriptionStatus {
         ACTIVE("Active"),
         CANCELLED("Cancelled"),
-        EXPIRED("Expired");
+        EXPIRED("Expired"),
+        PENDING("Pending");
 
         private final String displayName;
 

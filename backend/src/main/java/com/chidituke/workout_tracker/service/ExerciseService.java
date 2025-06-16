@@ -1,6 +1,11 @@
 package com.chidituke.workout_tracker.service;
 
 import com.chidituke.workout_tracker.dto.response.exercise.ExerciseFiltersDTO;
+import com.chidituke.workout_tracker.exceptions.exercise.ExerciseNotFoundException;
+import com.chidituke.workout_tracker.exceptions.exercise.InvalidExerciseDataException;
+import com.chidituke.workout_tracker.exceptions.user.ProfessionalVerificationException;
+import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
+import com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationException;
 import com.chidituke.workout_tracker.mapper.ExerciseMapper;
 import com.chidituke.workout_tracker.model.Exercise;
 import com.chidituke.workout_tracker.model.User;
@@ -42,7 +47,7 @@ public class ExerciseService {
     }
 
     public List<Exercise> findExercisesForWorkoutType(Exercise.ExerciseType type) {
-        return exerciseRepository.findByExerciseTypeAndPublishedOrderByNameAsc(type, true).stream()
+        return exerciseRepository.findByExerciseTypeAndPublishedTrueOrderByNameAsc(type).stream()
                 .sorted(Comparator.comparing(Exercise::getAverageRating).reversed()
                         .thenComparing(Exercise::getUsageCount).reversed())
                 .collect(Collectors.toList());
@@ -67,8 +72,10 @@ public class ExerciseService {
         }
     }
 
+    // 🔧 FIXED - Now throws custom exception instead of returning null
     public Exercise findById(Long id) {
-        return exerciseRepository.findById(id).orElse(null);
+        return exerciseRepository.findById(id)
+                .orElseThrow(() -> new ExerciseNotFoundException(id));
     }
 
     @Cacheable(value = "popular-exercises", key = "#limit")
@@ -77,7 +84,6 @@ public class ExerciseService {
     }
 
     public Page<Exercise> findPublishedExercises(Pageable pageable) {
-
         return exerciseRepository.findByPublishedTrueOrderByNameAsc(pageable);
     }
 
@@ -150,10 +156,13 @@ public class ExerciseService {
                     case "delete" -> deleteExercise(exerciseId, admin);
                     case "publish" -> publishExercise(exerciseId, admin);
                     case "unpublish" -> unpublishExercise(exerciseId, admin);
-                    default -> throw new IllegalArgumentException("Unknown action: " + action);
+                    // 🔧 FIXED - Now uses custom exception
+                    default -> throw new InvalidExerciseDataException("action", "Unknown action: " + action);
                 }
             } catch (Exception e) {
                 log.error("Failed to perform action {} on exercise {}: {}", action, exerciseId, e.getMessage());
+                // Re-throw for proper error handling
+                throw e;
             }
         }
 
@@ -165,8 +174,9 @@ public class ExerciseService {
 
     @Transactional
     public Exercise createProfessionalExercise(User professional, ExerciseCreationRequest request) {
-        // Validate professional permissions (FUTURE: PRO tier requirement)
+        // 🔧 FIXED - Added validation calls
         validateProfessionalCanCreateContent(professional);
+        validateExerciseCreationRequest(request);
 
         Exercise exercise = new Exercise();
 
@@ -188,8 +198,9 @@ public class ExerciseService {
 
     @Transactional
     public void approveExercise(Long exerciseId, User admin) {
+        // 🔧 FIXED - Now uses ExerciseNotFoundException
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
         validateAdminPermissions(admin);
 
@@ -201,8 +212,9 @@ public class ExerciseService {
 
     @Transactional
     public void deleteExercise(Long exerciseId, User admin) {
+        // 🔧 FIXED - Now uses ExerciseNotFoundException
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
         validateAdminPermissions(admin);
 
@@ -212,8 +224,9 @@ public class ExerciseService {
 
     @Transactional
     public void publishExercise(Long exerciseId, User admin) {
+        // 🔧 FIXED - Now uses ExerciseNotFoundException
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
         validateAdminPermissions(admin);
 
@@ -224,8 +237,9 @@ public class ExerciseService {
 
     @Transactional
     public void unpublishExercise(Long exerciseId, User admin) {
+        // 🔧 FIXED - Now uses ExerciseNotFoundException
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
         validateAdminPermissions(admin);
 
@@ -238,16 +252,19 @@ public class ExerciseService {
 
     @Transactional
     public void rateExercise(Long exerciseId, User user, double rating) {
+        // 🔧 FIXED - Now uses InvalidExerciseDataException
         if (rating < 0.0 || rating > 5.0) {
-            throw new IllegalArgumentException("Rating must be between 0.0 and 5.0");
+            throw new InvalidExerciseDataException("rating", "Rating must be between 0.0 and 5.0");
         }
 
+        // 🔧 FIXED - Now uses ExerciseNotFoundException
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
         // Check if user already rated this exercise
         if (hasUserRatedExercise(user, exercise)) {
-            throw new IllegalStateException("User has already rated this exercise");
+            // 🔧 FIXED - Now uses InvalidExerciseDataException
+            throw new InvalidExerciseDataException("rating", "User has already rated this exercise");
         }
 
         // Update exercise rating
@@ -264,8 +281,9 @@ public class ExerciseService {
 
     @Transactional
     public void recordExerciseUsage(Long exerciseId, User user) {
+        // 🔧 FIXED - Now uses ExerciseNotFoundException
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
         exercise.incrementUsage();
         exerciseRepository.save(exercise);
@@ -277,8 +295,9 @@ public class ExerciseService {
     }
 
     public ExerciseService.ExerciseAnalytics getExerciseAnalytics(Long exerciseId) {
+        // 🔧 FIXED - Now uses ExerciseNotFoundException
         Exercise exercise = exerciseRepository.findById(exerciseId)
-                .orElseThrow(() -> new IllegalArgumentException("Exercise not found"));
+                .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
         return ExerciseService.ExerciseAnalytics.builder()
                 .exerciseId(exercise.getId())
@@ -295,6 +314,9 @@ public class ExerciseService {
     // 🏋️ WORKOUT INTEGRATION
 
     public List<Exercise> buildWorkoutPlan(User user, WorkoutPlanRequest request) {
+        // 🔧 FIXED - Added validation
+        validateWorkoutPlanRequest(request);
+
         // Use optimized repository query instead of multiple calls
         List<Exercise> candidateExercises = exerciseRepository.findOptimizedForWorkoutPlan(
                 request.getTargetMuscleGroups(),
@@ -306,6 +328,12 @@ public class ExerciseService {
         List<Exercise> availableExercises = candidateExercises.stream()
                 .filter(ex -> hasRequiredEquipment(ex, request.getAvailableEquipment()))
                 .collect(Collectors.toList());
+
+        // 🔧 FIXED - Added error check for empty results
+        if (availableExercises.isEmpty()) {
+            throw new InvalidExerciseDataException("availableEquipment",
+                    "No exercises found matching your equipment and difficulty requirements");
+        }
 
         // Distribute exercises across muscle groups
         Map<String, List<Exercise>> exercisesByMuscleGroup = availableExercises.stream()
@@ -337,9 +365,14 @@ public class ExerciseService {
 
     // 🔧 HELPER METHODS
 
+    // 🔧 FIXED - Added null check for equipment list
     private boolean hasRequiredEquipment(Exercise exercise, List<String> availableEquipment) {
         if (exercise.getEquipmentRequired() == null || exercise.getEquipmentRequired().isEmpty()) {
             return true;
+        }
+
+        if (availableEquipment == null || availableEquipment.isEmpty()) {
+            return false; // Exercise requires equipment but none available
         }
 
         // Use Set for O(1) lookup instead of List.contains() which is O(n)
@@ -368,11 +401,74 @@ public class ExerciseService {
         return userId.equals(exercise.getCreatedByUserId());
     }
 
+    // 🔧 FIXED - Now uses proper custom exceptions
     private void validateAdminPermissions(User admin) {
         if (admin == null) {
-            throw new IllegalStateException("Admin user required");
+            throw new UserNotFoundException("Admin user not found");
         }
-        // TODO: Implement proper admin role checking
+
+        if (!admin.hasRole("ADMIN")) {
+            throw new UnauthorizedOperationException("Admin role required for this operation");
+        }
+    }
+
+    // 🔧 NEW VALIDATION METHODS
+
+    /**
+     * Validates that a professional user can create content
+     */
+    private void validateProfessionalCanCreateContent(User professional) {
+        if (professional == null) {
+            throw new UserNotFoundException("User not found");
+        }
+
+        // Check if user has professional role
+        if (!professional.hasRole("PROFESSIONAL") && !professional.hasRole("ADMIN")) {
+            throw new ProfessionalVerificationException("create professional exercises");
+        }
+
+        // Additional professional verification checks could go here
+        // e.g., check if professional profile is complete, verified, etc.
+    }
+
+    /**
+     * Validates exercise creation request data
+     */
+    private void validateExerciseCreationRequest(ExerciseCreationRequest request) {
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            throw new InvalidExerciseDataException("name", "Exercise name is required");
+        }
+
+        if (request.getExerciseType() == null) {
+            throw new InvalidExerciseDataException("exerciseType", "Exercise type is required");
+        }
+
+        if (request.getDifficultyLevel() == null) {
+            throw new InvalidExerciseDataException("difficultyLevel", "Difficulty level is required");
+        }
+
+        if (request.getTargetMuscleGroups() == null || request.getTargetMuscleGroups().isEmpty()) {
+            throw new InvalidExerciseDataException("targetMuscleGroups", "At least one target muscle group is required");
+        }
+    }
+
+    /**
+     * Validates workout plan request data
+     */
+    private void validateWorkoutPlanRequest(WorkoutPlanRequest request) {
+        if (request.getTargetMuscleGroups() == null || request.getTargetMuscleGroups().isEmpty()) {
+            throw new InvalidExerciseDataException("targetMuscleGroups", "At least one target muscle group is required");
+        }
+
+        if (request.getMaxDifficulty() == null) {
+            throw new InvalidExerciseDataException("maxDifficulty", "Maximum difficulty level is required");
+        }
+
+        if (request.getExercisesPerMuscleGroup() != null &&
+                (request.getExercisesPerMuscleGroup() < 1 || request.getExercisesPerMuscleGroup() > 10)) {
+            throw new InvalidExerciseDataException("exercisesPerMuscleGroup",
+                    "Exercises per muscle group must be between 1 and 10");
+        }
     }
 
     private boolean hasUserRatedExercise(User user, Exercise exercise) {
@@ -447,7 +543,6 @@ public class ExerciseService {
         log.debug("Adjusting workout duration from {} to {} minutes", currentDuration, targetDurationMinutes);
     }
 
-
     private double calculateRelevanceScore(Exercise exercise) {
         double score = 0.0;
 
@@ -477,20 +572,6 @@ public class ExerciseService {
 
         return score;
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     // 📋 INNER CLASSES (Keep for now - can be moved to separate DTOs later)
 

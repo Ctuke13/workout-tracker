@@ -18,7 +18,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -59,23 +58,24 @@ public class ExerciseController {
         return ResponseEntity.ok(response);
     }
 
+    // 🔧 FIXED - Clean version without try-catch and null check
     @GetMapping("/{id}")
     public ResponseEntity<ExerciseResponseDTO> getExerciseById(
             @PathVariable Long id,
-            @CurrentUser(required = false) User currentUser) { // ✅ Clean and consistent
+            @CurrentUser(required = false) User currentUser) { // ✅ Consistent annotation usage
 
+        // ✅ No try-catch needed - GlobalExceptionHandler handles ExerciseNotFoundException
         Exercise exercise = exerciseService.findById(id);
-        if (exercise == null || !exercise.isPublished()) {
+
+        // ✅ Fixed logic - no null check needed since findById throws exception if not found
+        if (!exercise.isPublished()) {
             return ResponseEntity.notFound().build();
         }
 
         // Record usage only if user is logged in
         if (currentUser != null) {
-            try {
-                exerciseService.recordExerciseUsage(id, currentUser);
-            } catch (Exception e) {
-                log.warn("Failed to record exercise usage for user {}: {}", currentUser.getId(), e.getMessage());
-            }
+            // ✅ No try-catch needed - GlobalExceptionHandler handles exceptions
+            exerciseService.recordExerciseUsage(id, currentUser);
         }
 
         ExerciseResponseDTO response = ExerciseResponseDTO.fromEntity(exercise);
@@ -154,7 +154,7 @@ public class ExerciseController {
 
     @GetMapping("/recommended")
     public ResponseEntity<List<ExerciseResponseDTO>> getRecommendedExercises(
-            @AuthenticationPrincipal User currentUser,
+            @CurrentUser User currentUser,
             @RequestParam(defaultValue = "10") int limit) {
 
         List<Exercise> recommended = exerciseService.findRecommendedExercises(currentUser, limit);
@@ -163,90 +163,76 @@ public class ExerciseController {
         return ResponseEntity.ok(response);
     }
 
+    // 🔧 FIXED - Clean version without try-catch
     @PostMapping("/{id}/rate")
     public ResponseEntity<String> rateExercise(
             @PathVariable Long id,
             @Valid @RequestBody ExerciseRatingRequestDTO ratingRequest,
-            @AuthenticationPrincipal User currentUser) {
+            @CurrentUser User currentUser) {
 
-        try {
-            exerciseService.rateExercise(id, currentUser, ratingRequest.getRating());
-            return ResponseEntity.ok("Exercise rated successfully");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-        }
+        // ✅ No try-catch needed - GlobalExceptionHandler handles InvalidExerciseDataException
+        exerciseService.rateExercise(id, currentUser, ratingRequest.getRating());
+        return ResponseEntity.ok("Exercise rated successfully");
     }
 
+    // 🔧 FIXED - Clean version without try-catch
     @PostMapping("/{id}/use")
     public ResponseEntity<String> recordExerciseUsage(
             @PathVariable Long id,
-            @AuthenticationPrincipal User currentUser) {
+            @CurrentUser User currentUser) {
 
-        try {
-            exerciseService.recordExerciseUsage(id, currentUser);
-            return ResponseEntity.ok("Exercise usage recorded");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to record usage: " + e.getMessage());
-        }
+        // ✅ No try-catch needed - GlobalExceptionHandler handles ExerciseNotFoundException
+        exerciseService.recordExerciseUsage(id, currentUser);
+        return ResponseEntity.ok("Exercise usage recorded");
     }
 
+    // 🔧 FIXED - Clean version without try-catch
     @PostMapping("/workout-plan")
     public ResponseEntity<List<ExerciseResponseDTO>> generateWorkoutPlan(
             @Valid @RequestBody WorkoutPlanRequestDTO planRequest,
-            @AuthenticationPrincipal User currentUser) {
+            @CurrentUser User currentUser) { //
 
-        try {
-            // Convert DTO to service request
-            ExerciseService.WorkoutPlanRequest serviceRequest = new ExerciseService.WorkoutPlanRequest();
-            serviceRequest.setTargetMuscleGroups(planRequest.getTargetMuscleGroups());
-            serviceRequest.setAvailableEquipment(planRequest.getAvailableEquipment());
-            serviceRequest.setMaxDifficulty(planRequest.getMaxDifficulty());
-            serviceRequest.setTargetDurationMinutes(planRequest.getTargetDurationMinutes());
-            serviceRequest.setExercisesPerMuscleGroup(planRequest.getExercisesPerMuscleGroup());
+        // Convert DTO to service request
+        ExerciseService.WorkoutPlanRequest serviceRequest = new ExerciseService.WorkoutPlanRequest();
+        serviceRequest.setTargetMuscleGroups(planRequest.getTargetMuscleGroups());
+        serviceRequest.setAvailableEquipment(planRequest.getAvailableEquipment());
+        serviceRequest.setMaxDifficulty(planRequest.getMaxDifficulty());
+        serviceRequest.setTargetDurationMinutes(planRequest.getTargetDurationMinutes());
+        serviceRequest.setExercisesPerMuscleGroup(planRequest.getExercisesPerMuscleGroup());
 
-            List<Exercise> workoutPlan = exerciseService.buildWorkoutPlan(currentUser, serviceRequest);
-            List<ExerciseResponseDTO> response = ExerciseResponseDTO.fromEntityList(workoutPlan);
+        // ✅ No try-catch needed - GlobalExceptionHandler handles InvalidExerciseDataException
+        List<Exercise> workoutPlan = exerciseService.buildWorkoutPlan(currentUser, serviceRequest);
+        List<ExerciseResponseDTO> response = ExerciseResponseDTO.fromEntityList(workoutPlan);
 
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Failed to generate workout plan for user {}: {}", currentUser.getId(), e.getMessage());
-            return ResponseEntity.badRequest().build();
-        }
+        return ResponseEntity.ok(response);
     }
 
     // 👨‍💼 PROFESSIONAL ENDPOINTS
 
+    // 🔧 FIXED - Clean version without try-catch
     @PostMapping
     @PreAuthorize("hasRole('PROFESSIONAL') or hasRole('ADMIN')")
     public ResponseEntity<ExerciseResponseDTO> createExercise(
             @Valid @RequestBody ExerciseCreateRequestDTO createRequest,
-            @AuthenticationPrincipal User currentUser) {
+            @CurrentUser User currentUser) { // ✅ Consistent annotation usage
 
-        try {
-            // Convert DTO to service request
-            ExerciseService.ExerciseCreationRequest serviceRequest = new ExerciseService.ExerciseCreationRequest();
-            serviceRequest.setName(createRequest.getName());
-            serviceRequest.setDescription(createRequest.getDescription());
-            serviceRequest.setExerciseType(createRequest.getExerciseType());
-            serviceRequest.setDifficultyLevel(createRequest.getDifficultyLevel());
-            serviceRequest.setTargetMuscleGroups(createRequest.getTargetMuscleGroups());
-            serviceRequest.setEquipmentRequired(createRequest.getEquipmentRequired());
-            serviceRequest.setBenefits(createRequest.getBenefits());
-            serviceRequest.setTips(createRequest.getTips());
-            serviceRequest.setVideoUrl(createRequest.getVideoUrl());
+        // Convert DTO to service request
+        ExerciseService.ExerciseCreationRequest serviceRequest = new ExerciseService.ExerciseCreationRequest();
+        serviceRequest.setName(createRequest.getName());
+        serviceRequest.setDescription(createRequest.getDescription());
+        serviceRequest.setExerciseType(createRequest.getExerciseType());
+        serviceRequest.setDifficultyLevel(createRequest.getDifficultyLevel());
+        serviceRequest.setTargetMuscleGroups(createRequest.getTargetMuscleGroups());
+        serviceRequest.setEquipmentRequired(createRequest.getEquipmentRequired());
+        serviceRequest.setBenefits(createRequest.getBenefits());
+        serviceRequest.setTips(createRequest.getTips());
+        serviceRequest.setVideoUrl(createRequest.getVideoUrl());
 
-            Exercise exercise = exerciseService.createProfessionalExercise(currentUser, serviceRequest);
-            ExerciseResponseDTO response = ExerciseResponseDTO.fromEntity(exercise);
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        } catch (Exception e) {
-            log.error("Failed to create exercise: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
-        }
+        Exercise exercise = exerciseService.createProfessionalExercise(currentUser, serviceRequest);
+        ExerciseResponseDTO response = ExerciseResponseDTO.fromEntity(exercise);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{id}")
@@ -254,89 +240,68 @@ public class ExerciseController {
     public ResponseEntity<ExerciseResponseDTO> updateExercise(
             @PathVariable Long id,
             @Valid @RequestBody ExerciseUpdateRequestDTO updateRequest,
-            @AuthenticationPrincipal User currentUser) {
+            @CurrentUser User currentUser) { // ✅ Consistent annotation usage
 
-        // Implementation would update the exercise
-        // For now, return not implemented
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+        // TODO: Implement exercise update functionality
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+                .header("X-Reason", "Exercise update functionality coming soon")
+                .build();
     }
 
     // 🔒 ADMIN ENDPOINTS
 
+    // 🔧 FIXED - Clean version without try-catch
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> approveExercise(
             @PathVariable Long id,
-            @AuthenticationPrincipal User admin) {
-
-        try {
-            exerciseService.approveExercise(id, admin);
-            return ResponseEntity.ok("Exercise approved successfully");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-        }
+            @CurrentUser User admin) {
+        exerciseService.approveExercise(id, admin);
+        return ResponseEntity.ok("Exercise approved successfully");
     }
 
+    // 🔧 FIXED - Clean version without try-catch
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteExercise(
             @PathVariable Long id,
-            @AuthenticationPrincipal User admin) {
-
-        try {
-            exerciseService.deleteExercise(id, admin);
-            return ResponseEntity.ok("Exercise deleted successfully");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Failed to delete exercise {}: {}", id, e.getMessage());
-            return ResponseEntity.badRequest().body("Failed to delete exercise: " + e.getMessage());
-        }
+            @CurrentUser User admin) {
+        exerciseService.deleteExercise(id, admin);
+        return ResponseEntity.ok("Exercise deleted successfully");
     }
 
+    // 🔧 FIXED - Clean version without try-catch
     @PostMapping("/bulk-action")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> performBulkAction(
             @Valid @RequestBody BulkExerciseActionRequestDTO bulkRequest,
-            @AuthenticationPrincipal User admin) {
+            @CurrentUser User admin) {
+        exerciseService.performBulkAction(
+                bulkRequest.getExerciseIds(),
+                bulkRequest.getAction(),
+                bulkRequest.getReason(),
+                admin
+        );
 
-        try {
-            exerciseService.performBulkAction(
-                    bulkRequest.getExerciseIds(),
-                    bulkRequest.getAction(),
-                    bulkRequest.getReason(),
-                    admin
-            );
-
-            return ResponseEntity.ok(String.format(
-                    "Bulk action '%s' completed on %d exercises",
-                    bulkRequest.getAction(),
-                    bulkRequest.getExerciseIds().size()
-            ));
-        } catch (Exception e) {
-            log.error("Bulk action failed: {}", e.getMessage());
-            return ResponseEntity.badRequest().body("Bulk action failed: " + e.getMessage());
-        }
+        return ResponseEntity.ok(String.format(
+                "Bulk action '%s' completed on %d exercises",
+                bulkRequest.getAction(),
+                bulkRequest.getExerciseIds().size()
+        ));
     }
 
+    // 🔧 FIXED - Clean version without try-catch
     @GetMapping("/{id}/analytics")
     @PreAuthorize("hasRole('ADMIN') or hasRole('PROFESSIONAL')")
     public ResponseEntity<ExerciseAnalyticsResponseDTO> getExerciseAnalytics(
             @PathVariable Long id,
-            @AuthenticationPrincipal User user) {
+            @CurrentUser User user) {
+        ExerciseService.ExerciseAnalytics analytics = exerciseService.getExerciseAnalytics(id);
 
-        try {
-            ExerciseService.ExerciseAnalytics analytics = exerciseService.getExerciseAnalytics(id);
+        // Use the DTO's fromServiceAnalytics method instead of manual building
+        ExerciseAnalyticsResponseDTO response = ExerciseAnalyticsResponseDTO.fromServiceAnalytics(analytics);
 
-            // Use the DTO's fromServiceAnalytics method instead of manual building
-            ExerciseAnalyticsResponseDTO response = ExerciseAnalyticsResponseDTO.fromServiceAnalytics(analytics);
-
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(response);
     }
 
     // 🔧 HELPER METHODS
@@ -360,14 +325,5 @@ public class ExerciseController {
         return PageRequest.of(request.getPage(), request.getSize(), sort);
     }
 
-
-
-    // 🔥 EXCEPTION HANDLING
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<String> handleException(Exception e) {
-        log.error("Unexpected error in ExerciseController: {}", e.getMessage(), e);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("An unexpected error occurred");
-    }
+    // 🔥 REMOVED - All exception handlers removed since GlobalExceptionHandler handles everything
 }

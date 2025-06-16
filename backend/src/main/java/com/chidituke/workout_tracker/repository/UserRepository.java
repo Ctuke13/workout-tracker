@@ -1,6 +1,7 @@
 package com.chidituke.workout_tracker.repository;
 
 import com.chidituke.workout_tracker.model.User;
+import com.chidituke.workout_tracker.model.SubscriptionTier;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,251 +16,233 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    // 🔐 AUTHENTICATION & BASIC QUERIES
+    // ==================== AUTHENTICATION & BASIC QUERIES ====================
+
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
 
-    // 👤 USER TYPE QUERIES
+    // ==================== USER TYPE QUERIES ====================
+
     List<User> findByUserType(User.UserType userType);
 
     @Query("SELECT u FROM User u WHERE u.userType = :userType AND u.accountStatus = 'ACTIVE'")
     List<User> findActiveUsersByType(@Param("userType") User.UserType userType);
 
-    // 🌍 LOCATION-BASED QUERIES
-    List<User> findByZipcodeAndUserType(String zipcode, User.UserType userType);
+    // ==================== PROFESSIONAL USER QUERIES ====================
 
-    List<User> findByLocationCityAndLocationStateAndUserType(
-            String city, String state, User.UserType userType);
-
-    @Query("SELECT u FROM User u WHERE u.zipcode IN :zipcodes AND u.userType = :userType AND u.accountStatus = 'ACTIVE'")
-    List<User> findByZipcodesAndUserType(@Param("zipcodes") List<String> zipcodes, @Param("userType") User.UserType userType);
-
-    // 💼 PROFESSIONAL USER QUERIES
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL AND u.accountStatus = 'ACTIVE'")
     List<User> findActiveProfessionals();
 
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.zipcode = :zipcode AND u.accountStatus = 'ACTIVE'")
-    List<User> findProfessionalsByZipcode(@Param("zipcode") String zipcode);
+            "AND u.accountStatus = 'ACTIVE' AND u.subscriptionTier = 'PRO_PROFESSIONAL'")
+    List<User> findActiveProfessionalsWithSubscription();
 
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.zipcode IN :zipcodes AND u.accountStatus = 'ACTIVE'")
-    List<User> findProfessionalsByZipcodes(@Param("zipcodes") List<String> zipcodes);
+            "AND u.professionalProfile.isProfilePublic = true AND u.accountStatus = 'ACTIVE'")
+    List<User> findPublicProfessionals();
 
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.allowProfessionalRequests = true AND u.accountStatus = 'ACTIVE'")
-    List<User> findProfessionalsAcceptingRequests();
+            "AND u.professionalProfile.acceptsNewClients = true AND u.accountStatus = 'ACTIVE'")
+    List<User> findProfessionalsAcceptingClients();
 
-    // 🎯 DIRECTORY & DISCOVERY QUERIES
-    @Query("SELECT u FROM User u WHERE u.profileVisibility = 'PUBLIC' AND u.showInDirectory = true AND u.accountStatus = 'ACTIVE'")
+    // ==================== DIRECTORY & DISCOVERY QUERIES ====================
+
+    @Query("SELECT u FROM User u WHERE u.privacySettings = 'PUBLIC' AND u.accountStatus = 'ACTIVE'")
     Page<User> findPublicUsers(Pageable pageable);
 
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.profileVisibility = 'PUBLIC' AND u.showInDirectory = true AND u.accountStatus = 'ACTIVE'")
-    Page<User> findPublicProfessionals(Pageable pageable);
+            "AND u.privacySettings = 'PUBLIC' AND u.professionalProfile.isProfilePublic = true AND u.accountStatus = 'ACTIVE'")
+    Page<User> findPublicProfessionalsForDirectory(Pageable pageable);
 
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.profileVisibility = 'PUBLIC' AND u.showInDirectory = true AND u.accountStatus = 'ACTIVE' " +
+            "AND u.privacySettings = 'PUBLIC' AND u.professionalProfile.isProfilePublic = true AND u.accountStatus = 'ACTIVE' " +
             "AND (LOWER(u.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(u.username) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     Page<User> searchPublicProfessionals(@Param("searchTerm") String searchTerm, Pageable pageable);
 
-    // 📊 SUBSCRIPTION-BASED QUERIES
-    @Query("SELECT u FROM User u JOIN u.subscriptions s WHERE s.status = 'ACTIVE' AND s.planType = :planType")
-    List<User> findUsersByActivePlan(@Param("planType") String planType);
+    // ==================== SUBSCRIPTION-BASED QUERIES (FIXED) ====================
 
-    @Query("SELECT u FROM User u WHERE EXISTS (SELECT s FROM u.subscriptions s WHERE s.status = 'ACTIVE' AND s.planType IN ('PLUS', 'PRO'))")
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier = :tier AND u.accountStatus = 'ACTIVE'")
+    List<User> findUsersBySubscriptionTier(@Param("tier") SubscriptionTier tier);
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier != 'FREE' AND u.accountStatus = 'ACTIVE'")
     List<User> findPaidSubscribers();
 
-    @Query("SELECT u FROM User u WHERE NOT EXISTS (SELECT s FROM u.subscriptions s WHERE s.status = 'ACTIVE' AND s.planType != 'FREE')")
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier = 'FREE' AND u.accountStatus = 'ACTIVE'")
     List<User> findFreeUsers();
 
-    // ✅ VERIFICATION QUERIES
-    List<User> findByIsVerifiedAndUserType(Boolean isVerified, User.UserType userType);
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier = 'PRO_PROFESSIONAL' AND u.userType = 'PROFESSIONAL' AND u.accountStatus = 'ACTIVE'")
+    List<User> findProProfessionalUsers();
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier IN ('PLUS', 'PRO', 'PRO_PROFESSIONAL') AND u.accountStatus = 'ACTIVE'")
+    List<User> findUsersWithPaidFeatures();
+
+    // ==================== VERIFICATION QUERIES (FIXED) ====================
 
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
             "AND u.professionalProfile.isVerified = true AND u.accountStatus = 'ACTIVE'")
     List<User> findVerifiedProfessionals();
 
-    // 🏃‍♂️ ACTIVITY & ENGAGEMENT QUERIES
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
+            "AND u.professionalProfile.isVerified = false AND u.subscriptionTier = 'PRO_PROFESSIONAL' AND u.accountStatus = 'ACTIVE'")
+    List<User> findUnverifiedProProfessionals();
+
+    // ==================== ACTIVITY & ENGAGEMENT QUERIES (FIXED) ====================
+
     @Query("SELECT u FROM User u WHERE u.lastActive >= :since AND u.accountStatus = 'ACTIVE'")
     List<User> findActiveUsersSince(@Param("since") LocalDateTime since);
 
-    @Query("SELECT u FROM User u WHERE u.lastWorkoutDate >= :since AND u.accountStatus = 'ACTIVE'")
-    List<User> findUsersWithRecentWorkouts(@Param("since") LocalDateTime since);
-
-    @Query("SELECT u FROM User u WHERE u.currentStreakDays >= :minStreak AND u.accountStatus = 'ACTIVE'")
+    @Query("SELECT u FROM User u WHERE u.currentStreak >= :minStreak AND u.accountStatus = 'ACTIVE'")
     List<User> findUsersWithWorkoutStreak(@Param("minStreak") Integer minStreak);
 
-    @Query("SELECT u FROM User u ORDER BY u.totalWorkoutsCompleted DESC")
+    @Query("SELECT u FROM User u WHERE u.accountStatus = 'ACTIVE' ORDER BY u.totalWorkouts DESC")
     Page<User> findMostActiveUsers(Pageable pageable);
 
-    // 🔔 NOTIFICATION & PRIVACY QUERIES
-    List<User> findByEmailNotificationsAndAccountStatus(Boolean emailNotifications, String accountStatus);
+    @Query("SELECT u FROM User u WHERE u.accountStatus = 'ACTIVE' ORDER BY u.currentStreak DESC")
+    Page<User> findUsersOrderByCurrentStreak(Pageable pageable);
 
-    List<User> findByAllowProfessionalRequestsAndAccountStatus(Boolean allowRequests, String accountStatus);
+    @Query("SELECT u FROM User u WHERE u.accountStatus = 'ACTIVE' ORDER BY u.longestStreak DESC")
+    Page<User> findUsersOrderByLongestStreak(Pageable pageable);
 
-    @Query("SELECT u FROM User u WHERE u.allowWorkoutInvitations = true AND u.accountStatus = 'ACTIVE' AND u.zipcode = :zipcode")
-    List<User> findUsersAcceptingInvitationsByZipcode(@Param("zipcode") String zipcode);
+    // ==================== NOTIFICATION QUERIES (FIXED) ====================
 
-    // 📈 ANALYTICS QUERIES
+    @Query("SELECT u FROM User u WHERE u.notificationSettings != 'NONE' AND u.accountStatus = 'ACTIVE'")
+    List<User> findUsersWithNotificationsEnabled();
+
+    @Query("SELECT u FROM User u WHERE u.notificationSettings = 'ALL' AND u.accountStatus = 'ACTIVE'")
+    List<User> findUsersWithAllNotifications();
+
+    @Query("SELECT u FROM User u WHERE u.notificationSettings = 'WORKOUT_ONLY' AND u.accountStatus = 'ACTIVE'")
+    List<User> findUsersWithWorkoutNotifications();
+
+    // ==================== PROFESSIONAL BUSINESS QUERIES ====================
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
+            "AND u.professionalProfile.acceptsNewClients = true " +
+            "AND (u.professionalProfile.maxClients IS NULL OR u.professionalProfile.activeClientsCount < u.professionalProfile.maxClients) " +
+            "AND u.subscriptionTier = 'PRO_PROFESSIONAL' AND u.accountStatus = 'ACTIVE'")
+    List<User> findAvailableProfessionals();
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
+            "AND u.professionalProfile.baseZipcode = :zipcode AND u.accountStatus = 'ACTIVE'")
+    List<User> findProfessionalsByBaseZipcode(@Param("zipcode") String zipcode);
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
+            "AND u.professionalProfile.offersVirtualSessions = true AND u.accountStatus = 'ACTIVE'")
+    List<User> findVirtualProfessionals();
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
+            "AND u.professionalProfile.serviceType = :serviceType AND u.accountStatus = 'ACTIVE'")
+    List<User> findProfessionalsByServiceType(@Param("serviceType") String serviceType);
+
+    // ==================== ANALYTICS QUERIES (FIXED) ====================
+
     @Query("SELECT COUNT(u) FROM User u WHERE u.userType = :userType AND u.accountStatus = 'ACTIVE'")
     Long countActiveUsersByType(@Param("userType") User.UserType userType);
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL AND u.accountStatus = 'ACTIVE'")
     Long countActiveProfessionals();
 
-    @Query("SELECT u.locationState, COUNT(u) FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.accountStatus = 'ACTIVE' GROUP BY u.locationState")
-    List<Object[]> countProfessionalsByState();
+    @Query("SELECT u.subscriptionTier, COUNT(u) FROM User u WHERE u.accountStatus = 'ACTIVE' GROUP BY u.subscriptionTier")
+    List<Object[]> countUsersBySubscriptionTier();
 
     @Query("SELECT DATE(u.createdAt), COUNT(u) FROM User u WHERE u.createdAt >= :since GROUP BY DATE(u.createdAt) ORDER BY DATE(u.createdAt)")
     List<Object[]> getUserRegistrationStats(@Param("since") LocalDateTime since);
 
-    // 🔍 ADVANCED SEARCH QUERIES
+    @Query("SELECT u.userType, u.subscriptionTier, COUNT(u) FROM User u WHERE u.accountStatus = 'ACTIVE' GROUP BY u.userType, u.subscriptionTier")
+    List<Object[]> getUserTypeSubscriptionBreakdown();
+
+    // ==================== ADVANCED SEARCH QUERIES (FIXED) ====================
+
     @Query("SELECT u FROM User u WHERE u.accountStatus = 'ACTIVE' " +
             "AND (:userType IS NULL OR u.userType = :userType) " +
-            "AND (:zipcode IS NULL OR u.zipcode = :zipcode) " +
-            "AND (:city IS NULL OR LOWER(u.locationCity) = LOWER(:city)) " +
-            "AND (:state IS NULL OR LOWER(u.locationState) = LOWER(:state)) " +
-            "AND (:isVerified IS NULL OR u.isVerified = :isVerified)")
+            "AND (:subscriptionTier IS NULL OR u.subscriptionTier = :subscriptionTier) " +
+            "AND (:searchTerm IS NULL OR LOWER(u.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(u.username) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     Page<User> findUsersWithFilters(
             @Param("userType") User.UserType userType,
-            @Param("zipcode") String zipcode,
-            @Param("city") String city,
-            @Param("state") String state,
-            @Param("isVerified") Boolean isVerified,
+            @Param("subscriptionTier") SubscriptionTier subscriptionTier,
+            @Param("searchTerm") String searchTerm,
             Pageable pageable
     );
 
-    // 👥 SOCIAL FEATURES QUERIES
-    @Query("SELECT u FROM User u WHERE u.profileVisibility != 'PRIVATE' AND u.accountStatus = 'ACTIVE' " +
+    // ==================== PROFESSIONAL SEARCH WITH LOCATION ====================
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
+            "AND u.professionalProfile.isProfilePublic = true AND u.accountStatus = 'ACTIVE' " +
+            "AND (:baseZipcode IS NULL OR u.professionalProfile.baseZipcode = :baseZipcode) " +
+            "AND (:serviceType IS NULL OR u.professionalProfile.serviceType = :serviceType) " +
+            "AND (:acceptsNewClients IS NULL OR u.professionalProfile.acceptsNewClients = :acceptsNewClients) " +
+            "AND (:offersVirtual IS NULL OR u.professionalProfile.offersVirtualSessions = :offersVirtual)")
+    Page<User> findProfessionalsWithLocationFilters(
+            @Param("baseZipcode") String baseZipcode,
+            @Param("serviceType") String serviceType,
+            @Param("acceptsNewClients") Boolean acceptsNewClients,
+            @Param("offersVirtual") Boolean offersVirtual,
+            Pageable pageable
+    );
+
+    // ==================== SOCIAL FEATURES QUERIES (SIMPLIFIED) ====================
+
+    @Query("SELECT u FROM User u WHERE u.privacySettings != 'PRIVATE' AND u.accountStatus = 'ACTIVE' " +
             "AND (LOWER(u.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(u.username) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
-    Page<User> searchUsersForFriendConnection(@Param("searchTerm") String searchTerm, Pageable pageable);
+    Page<User> searchUsersForConnection(@Param("searchTerm") String searchTerm, Pageable pageable);
 
-    @Query("SELECT u FROM User u WHERE u.allowFriendRequests = true AND u.accountStatus = 'ACTIVE' " +
-            "AND u.zipcode = :zipcode AND u.id != :excludeUserId")
-    List<User> findPotentialLocalConnections(@Param("zipcode") String zipcode, @Param("excludeUserId") Long excludeUserId);
+    // ==================== ACTIVITY STATUS QUERIES (ENHANCED) ====================
 
-    // 🏅 LEADERBOARD QUERIES
-    @Query("SELECT u FROM User u WHERE u.accountStatus = 'ACTIVE' ORDER BY u.currentStreakDays DESC")
-    Page<User> findUsersOrderByCurrentStreak(Pageable pageable);
-
-    @Query("SELECT u FROM User u WHERE u.accountStatus = 'ACTIVE' ORDER BY u.longestStreakDays DESC")
-    Page<User> findUsersOrderByLongestStreak(Pageable pageable);
-
-    @Query("SELECT u FROM User u WHERE u.accountStatus = 'ACTIVE' AND u.totalWorkoutsCompleted > 0 ORDER BY u.totalWorkoutsCompleted DESC")
-    Page<User> findUsersOrderByTotalWorkouts(Pageable pageable);
-
-    // 🔧 ADMIN & MAINTENANCE QUERIES
-    @Query("SELECT u FROM User u WHERE u.lastActive < :cutoffDate AND u.accountStatus = 'ACTIVE'")
-    List<User> findInactiveUsers(@Param("cutoffDate") LocalDateTime cutoffDate);
-
-    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NULL")
-    List<User> findProfessionalUsersWithoutProfile();
-
-    @Query("SELECT u FROM User u WHERE u.zipcode IS NULL AND u.accountStatus = 'ACTIVE'")
-    List<User> findUsersWithoutLocation();
-
-    // 🕐 ACTIVITY STATUS QUERIES (New)
-    @Query("SELECT u FROM User u WHERE u.showActivityStatus = true AND u.accountStatus = 'ACTIVE'")
-    List<User> findUsersWithPublicActivityStatus();
-
-    @Query("SELECT u FROM User u WHERE u.showActivityStatus = false AND u.accountStatus = 'ACTIVE'")
-    List<User> findUsersWithHiddenActivityStatus();
-
-    // Users active within specific time windows
     @Query("SELECT u FROM User u WHERE u.lastActive >= :cutoffTime AND u.accountStatus = 'ACTIVE'")
     List<User> findUsersActiveWithinMinutes(@Param("cutoffTime") LocalDateTime cutoffTime);
 
-    @Query("SELECT u FROM User u WHERE u.lastActive >= :yesterday AND u.lastActive < :today AND u.accountStatus = 'ACTIVE'")
-    List<User> findUsersActiveYesterday(@Param("yesterday") LocalDateTime yesterday, @Param("today") LocalDateTime today);
-
-    // Professional activity queries for ranking
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
             "AND u.lastActive >= :cutoffTime AND u.accountStatus = 'ACTIVE' " +
             "ORDER BY u.lastActive DESC")
     List<User> findRecentlyActiveProfessionals(@Param("cutoffTime") LocalDateTime cutoffTime);
 
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.allowProfessionalRequests = true AND u.lastActive >= :cutoffTime " +
-            "AND u.zipcode = :zipcode AND u.accountStatus = 'ACTIVE' " +
-            "ORDER BY u.lastActive DESC")
-    List<User> findRecentlyActiveProfessionalsByLocation(@Param("zipcode") String zipcode, @Param("cutoffTime") LocalDateTime cutoffTime);
-
-    // Find professionals who are both accepting clients AND recently active
-    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.allowProfessionalRequests = true AND u.accountStatus = 'ACTIVE' " +
-            "AND u.professionalProfile.acceptsNewClients = true " +
+            "AND u.professionalProfile.acceptsNewClients = true AND u.accountStatus = 'ACTIVE' " +
+            "AND u.subscriptionTier = 'PRO_PROFESSIONAL' " +
             "AND (u.professionalProfile.maxClients IS NULL OR u.professionalProfile.activeClientsCount < u.professionalProfile.maxClients) " +
             "AND u.lastActive >= :cutoffTime " +
             "ORDER BY u.lastActive DESC")
     List<User> findActivelyAcceptingProfessionals(@Param("cutoffTime") LocalDateTime cutoffTime);
 
-    // Find professionals available RIGHT NOW (within 5 minutes)
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.allowProfessionalRequests = true AND u.accountStatus = 'ACTIVE' " +
-            "AND u.professionalProfile.acceptsNewClients = true " +
+            "AND u.professionalProfile.acceptsNewClients = true AND u.accountStatus = 'ACTIVE' " +
+            "AND u.subscriptionTier = 'PRO_PROFESSIONAL' " +
             "AND u.lastActive >= :immediateTime " +
-            "AND (:zipcode IS NULL OR u.zipcode = :zipcode OR u.professionalProfile.offersVirtualSessions = true) " +
+            "AND (:baseZipcode IS NULL OR u.professionalProfile.baseZipcode = :baseZipcode OR u.professionalProfile.offersVirtualSessions = true) " +
             "ORDER BY u.lastActive DESC")
-    List<User> findImmediatelyAvailableProfessionals(@Param("zipcode") String zipcode, @Param("immediateTime") LocalDateTime immediateTime);
+    List<User> findImmediatelyAvailableProfessionals(@Param("baseZipcode") String baseZipcode, @Param("immediateTime") LocalDateTime immediateTime);
 
-    // Professionals ranked by activity and rating combined
+    // ==================== RANKING & DISCOVERY QUERIES ====================
+
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.profileVisibility = 'PUBLIC' AND u.showInDirectory = true AND u.accountStatus = 'ACTIVE' " +
-            "AND (:zipcode IS NULL OR u.zipcode = :zipcode) " +
+            "AND u.privacySettings = 'PUBLIC' AND u.professionalProfile.isProfilePublic = true AND u.accountStatus = 'ACTIVE' " +
+            "AND u.subscriptionTier = 'PRO_PROFESSIONAL' " +
+            "AND (:baseZipcode IS NULL OR u.professionalProfile.baseZipcode = :baseZipcode) " +
             "ORDER BY " +
             "CASE WHEN u.lastActive >= :recentCutoff THEN 1 ELSE 0 END DESC, " +
             "u.professionalProfile.averageRating DESC, " +
             "u.professionalProfile.totalReviews DESC, " +
             "u.lastActive DESC")
-    Page<User> findTopRankedProfessionalsByActivity(@Param("zipcode") String zipcode,
+    Page<User> findTopRankedProfessionalsByActivity(@Param("baseZipcode") String baseZipcode,
                                                     @Param("recentCutoff") LocalDateTime recentCutoff,
                                                     Pageable pageable);
 
-    // Location-based version
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.allowProfessionalRequests = true AND u.accountStatus = 'ACTIVE' " +
-            "AND u.professionalProfile.acceptsNewClients = true " +
-            "AND (u.professionalProfile.maxClients IS NULL OR u.professionalProfile.activeClientsCount < u.professionalProfile.maxClients) " +
-            "AND u.lastActive >= :cutoffTime AND u.zipcode = :zipcode " +
-            "ORDER BY u.lastActive DESC")
-    List<User> findActivelyAcceptingProfessionalsByLocation(@Param("zipcode") String zipcode, @Param("cutoffTime") LocalDateTime cutoffTime);
-
-    // Activity-based user recommendations
-    @Query("SELECT u FROM User u WHERE u.allowFriendRequests = true AND u.accountStatus = 'ACTIVE' " +
-            "AND u.zipcode = :zipcode AND u.id != :excludeUserId " +
-            "AND u.lastActive >= :cutoffTime " +
-            "ORDER BY u.lastActive DESC")
-    List<User> findActiveLocalConnectionsByActivity(@Param("zipcode") String zipcode,
-                                                    @Param("excludeUserId") Long excludeUserId,
-                                                    @Param("cutoffTime") LocalDateTime cutoffTime);
-
-    // For business intelligence - which professionals are most responsive
-    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.accountStatus = 'ACTIVE' " +
+            "AND u.accountStatus = 'ACTIVE' AND u.subscriptionTier = 'PRO_PROFESSIONAL' " +
             "AND u.lastActive >= :cutoffTime " +
             "ORDER BY u.professionalProfile.responseTimeHours ASC, u.lastActive DESC")
     List<User> findMostResponsiveProfessionals(@Param("cutoffTime") LocalDateTime cutoffTime);
 
-    // Find professionals similar to user's previous choices + activity
-    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.accountStatus = 'ACTIVE' AND u.profileVisibility = 'PUBLIC' " +
-            "AND u.lastActive >= :cutoffTime " +
-            "AND u.professionalProfile.serviceType = :preferredServiceType " +
-            "AND u.zipcode IN :preferredZipcodes " +
-            "ORDER BY u.lastActive DESC, u.professionalProfile.averageRating DESC")
-    List<User> findRecommendedActiveProfessionals(@Param("preferredServiceType") String serviceType,
-                                                  @Param("preferredZipcodes") List<String> zipcodes,
-                                                  @Param("cutoffTime") LocalDateTime cutoffTime);
+    // ==================== BUSINESS INTELLIGENCE QUERIES ====================
 
-    // Count professionals by response tier
     @Query("SELECT " +
             "CASE " +
             "  WHEN u.lastActive >= :onlineTime THEN 'ONLINE_NOW' " +
@@ -281,17 +264,61 @@ public interface UserRepository extends JpaRepository<User, Long> {
                                                        @Param("activeToday") LocalDateTime activeToday,
                                                        @Param("activeWeek") LocalDateTime activeWeek);
 
-    // Admin queries for activity monitoring
     @Query("SELECT COUNT(u) FROM User u WHERE u.lastActive >= :since AND u.accountStatus = 'ACTIVE'")
     Long countActiveUsersSince(@Param("since") LocalDateTime since);
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.lastActive >= :since AND u.accountStatus = 'ACTIVE'")
     Long countActiveProfessionalsSince(@Param("since") LocalDateTime since);
 
-    // Privacy-aware professional discovery
+    // ==================== ADMIN & MAINTENANCE QUERIES ====================
+
+    @Query("SELECT u FROM User u WHERE u.lastActive < :cutoffDate AND u.accountStatus = 'ACTIVE'")
+    List<User> findInactiveUsers(@Param("cutoffDate") LocalDateTime cutoffDate);
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NULL AND u.accountStatus = 'ACTIVE'")
+    List<User> findProfessionalUsersWithoutProfile();
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.subscriptionTier != 'PRO_PROFESSIONAL' AND u.accountStatus = 'ACTIVE'")
+    List<User> findProfessionalsWithoutProSubscription();
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier = 'FREE' AND u.createdAt <= :cutoffDate AND u.accountStatus = 'ACTIVE'")
+    List<User> findLongTermFreeUsers(@Param("cutoffDate") LocalDateTime cutoffDate);
+
+    // ==================== SUBSCRIPTION TIER SPECIFIC QUERIES ====================
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier = 'PLUS' AND u.lastActive >= :since AND u.accountStatus = 'ACTIVE'")
+    List<User> findActivePlusUsers(@Param("since") LocalDateTime since);
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier = 'PRO' AND u.lastActive >= :since AND u.accountStatus = 'ACTIVE'")
+    List<User> findActiveProUsers(@Param("since") LocalDateTime since);
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier = 'PRO_PROFESSIONAL' AND u.lastActive >= :since AND u.accountStatus = 'ACTIVE'")
+    List<User> findActiveProProfessionalUsers(@Param("since") LocalDateTime since);
+
+    // ==================== FEATURE ACCESS QUERIES ====================
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier IN ('PLUS', 'PRO', 'PRO_PROFESSIONAL') AND u.accountStatus = 'ACTIVE'")
+    List<User> findUsersWhoCanScheduleWorkouts();
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier IN ('PRO', 'PRO_PROFESSIONAL') AND u.accountStatus = 'ACTIVE'")
+    List<User> findUsersWhoCanUseAI();
+
+    @Query("SELECT u FROM User u WHERE u.subscriptionTier = 'PRO_PROFESSIONAL' AND u.userType = 'PROFESSIONAL' AND u.accountStatus = 'ACTIVE'")
+    List<User> findUsersWhoCanManageClients();
+
+    // ==================== PROFESSIONAL PROFILE SPECIFIC QUERIES ====================
+
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
-            "AND u.profileVisibility = 'PUBLIC' AND u.showInDirectory = true " +
-            "AND u.allowProfessionalRequests = true AND u.accountStatus = 'ACTIVE' " +
-            "AND (:showActivityStatus IS NULL OR u.showActivityStatus = :showActivityStatus)")
-    Page<User> findPublicProfessionalsWithActivityPreference(@Param("showActivityStatus") Boolean showActivityStatus, Pageable pageable);
+            "AND u.professionalProfile.profileCompletionPercentage >= :minCompletion AND u.accountStatus = 'ACTIVE'")
+    List<User> findProfessionalsWithCompletedProfiles(@Param("minCompletion") Integer minCompletion);
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
+            "AND u.professionalProfile.averageRating >= :minRating AND u.professionalProfile.totalReviews >= :minReviews " +
+            "AND u.accountStatus = 'ACTIVE'")
+    List<User> findHighRatedProfessionals(@Param("minRating") Double minRating, @Param("minReviews") Integer minReviews);
+
+    @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL " +
+            "AND u.professionalProfile.featuredUntil >= :now AND u.accountStatus = 'ACTIVE' " +
+            "ORDER BY u.professionalProfile.featuredUntil DESC")
+    List<User> findFeaturedProfessionals(@Param("now") LocalDateTime now);
 }

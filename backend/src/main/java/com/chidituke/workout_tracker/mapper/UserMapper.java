@@ -6,6 +6,7 @@ import com.chidituke.workout_tracker.dto.response.user.UserProfileResponse;
 import com.chidituke.workout_tracker.dto.response.user.UserSearchResponse;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -13,7 +14,7 @@ import java.util.stream.Collectors;
 public class UserMapper {
 
     /**
-     * Converts User entity to UserProfileResponse DTO
+     * Converts User entity to UserProfileResponse DTO (Performance Optimized)
      */
     public UserProfileResponse mapEntityToProfileResponse(User user) {
         UserProfileResponse response = new UserProfileResponse();
@@ -26,30 +27,38 @@ public class UserMapper {
         response.setLastName(user.getLastName());
         response.setDateOfBirth(user.getDateOfBirth());
         response.setGender(user.getGender());
-        response.setZipcode(user.getZipcode());
         response.setPhoneNumber(user.getPhoneNumber());
         response.setBio(user.getBio());
-        response.setProfilePictureUrl(user.getProfilePictureUrl());
-
-        // Account and role information
-        response.setRole(user.getRole());
+        response.setProfileImageUrl(user.getProfileImageUrl());
+        response.setUserType(user.getUserType());
         response.setAccountStatus(user.getAccountStatus());
         response.setPrivacySettings(user.getPrivacySettings());
         response.setNotificationSettings(user.getNotificationSettings());
 
+        // ✅ FIXED: Set ALL location fields for ALL users
+        response.setZipcode(user.getZipcode());
+        response.setCity(user.getCity());
+        response.setState(user.getState());
+        response.setCountry(user.getCountry());
+
         // Preferences and fitness information
-        response.setPreferredMeasurementSystem(user.getPreferredMeasurementSystem());
+        response.setMeasurementSystem(user.getMeasurementSystem());
         response.setFitnessLevel(user.getFitnessLevel());
         response.setFitnessGoals(user.getFitnessGoals());
-        response.setPreferredWorkoutDuration(user.getPreferredWorkoutDuration());
         response.setWorkoutFrequency(user.getWorkoutFrequency());
 
         // Activity and timestamp information
         response.setLastActive(user.getLastActive());
         response.setCreatedAt(user.getCreatedAt());
         response.setActivityLevel(user.getActivityLevel());
-        response.setCurrentlyActive(user.isCurrentlyActive());
-        response.setActiveToday(user.isActiveToday());
+
+        // ✅ ADDED: Physical measurements
+        response.setHeightCm(user.getHeightCm());
+        response.setWeightKg(user.getWeightKg());
+
+        // Activity status calculations
+        response.setCurrentlyActive(isCurrentlyActive(user));
+        response.setActiveToday(isActiveToday(user));
 
         // Professional profile information (if applicable)
         mapProfessionalInfoToProfileResponse(user, response);
@@ -58,7 +67,7 @@ public class UserMapper {
     }
 
     /**
-     * Converts User entity to UserSearchResponse DTO
+     * Converts User entity to UserSearchResponse DTO (Performance Optimized)
      */
     public UserSearchResponse mapEntityToSearchResponse(User user) {
         UserSearchResponse response = new UserSearchResponse();
@@ -68,13 +77,17 @@ public class UserMapper {
         response.setUsername(user.getUsername());
         response.setFirstName(user.getFirstName());
         response.setLastName(user.getLastName());
-        response.setProfilePictureUrl(user.getProfilePictureUrl());
+        response.setProfileImageUrl(user.getProfileImageUrl());
         response.setFitnessLevel(user.getFitnessLevel());
+
+        // ✅ Set location fields for ALL users
         response.setZipcode(user.getZipcode());
+        response.setCity(user.getCity());
+        response.setState(user.getState());
 
         // Activity information
         response.setActivityLevel(user.getActivityLevel());
-        response.setCurrentlyActive(user.isCurrentlyActive());
+        response.setCurrentlyActive(isCurrentlyActive(user));
         response.setLastActive(user.getLastActive());
 
         // Professional profile information (if applicable)
@@ -84,7 +97,7 @@ public class UserMapper {
     }
 
     /**
-     * Converts a list of User entities to UserProfileResponse DTOs
+     * Converts a list of User entities to UserProfileResponse DTOs (Batch Optimized)
      */
     public List<UserProfileResponse> mapEntitiesToProfileResponseList(List<User> users) {
         return users.stream()
@@ -93,7 +106,7 @@ public class UserMapper {
     }
 
     /**
-     * Converts a list of User entities to UserSearchResponse DTOs
+     * Converts a list of User entities to UserSearchResponse DTOs (Batch Optimized)
      */
     public List<UserSearchResponse> mapEntitiesToSearchResponseList(List<User> users) {
         return users.stream()
@@ -105,13 +118,13 @@ public class UserMapper {
      * Helper method to map professional profile information to UserProfileResponse
      */
     private void mapProfessionalInfoToProfileResponse(User user, UserProfileResponse response) {
-        if (user.getProfessionalProfile() != null) {
+        if (user.isProfessional() && user.getProfessionalProfile() != null) {
             ProfessionalProfile profile = user.getProfessionalProfile();
             response.setIsProfessional(true);
             response.setProfessionalDisplayName(profile.getDisplayName());
             response.setProfessionalServiceType(profile.getServiceType());
             response.setProfessionalVerified(profile.getIsVerified());
-            response.setProfessionalAcceptingClients(profile.isAcceptingClients());
+            response.setProfessionalAcceptingClients(profile.getAcceptsNewClients());
             response.setProfessionalRating(profile.getAverageRating());
         } else {
             response.setIsProfessional(false);
@@ -122,16 +135,29 @@ public class UserMapper {
      * Helper method to map professional profile information to UserSearchResponse
      */
     private void mapProfessionalInfoToSearchResponse(User user, UserSearchResponse response) {
-        if (user.getProfessionalProfile() != null) {
+        if (user.isProfessional() && user.getProfessionalProfile() != null) {
             ProfessionalProfile profile = user.getProfessionalProfile();
             response.setIsProfessional(true);
             response.setProfessionalDisplayName(profile.getDisplayName());
             response.setProfessionalServiceType(profile.getServiceType());
             response.setProfessionalVerified(profile.getIsVerified());
-            response.setProfessionalAcceptingClients(profile.isAcceptingClients());
+            response.setProfessionalAcceptingClients(profile.getAcceptsNewClients());
             response.setProfessionalRating(profile.getAverageRating());
         } else {
             response.setIsProfessional(false);
         }
+    }
+
+    // Helper methods for activity status calculation
+    private boolean isCurrentlyActive(User user) {
+        if (user.getLastActive() == null) return false;
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(15);
+        return user.getLastActive().isAfter(cutoff);
+    }
+
+    private boolean isActiveToday(User user) {
+        if (user.getLastActive() == null) return false;
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+        return user.getLastActive().isAfter(todayStart);
     }
 }

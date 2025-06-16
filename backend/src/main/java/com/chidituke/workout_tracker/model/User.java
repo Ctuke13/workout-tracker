@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 
-
 @Data
 @Entity
 @Table(name = "users")
@@ -56,6 +55,19 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(name = "gender")
     private Gender gender;
+
+    @Column(name = "zipcode")
+    private String zipcode;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "state")
+    private String state;
+
+    @Column(name = "country")
+    @Builder.Default
+    private String country = "US";
 
     @Column(name = "phone_number")
     private String phoneNumber;
@@ -171,6 +183,55 @@ public class User implements UserDetails {
     @Column(name = "updated_at")
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    // ==================== LOCATION METHODS ====================
+
+    /**
+     * Get display-friendly location string
+     */
+    public String getLocationDisplay() {
+        if (city != null && state != null) {
+            return city + ", " + state;
+        } else if (zipcode != null) {
+            return zipcode;
+        }
+        return "Location not set";
+    }
+
+    /**
+     * Get full address string
+     */
+    public String getFullLocation() {
+        StringBuilder location = new StringBuilder();
+        if (city != null) location.append(city);
+        if (state != null) {
+            if (location.length() > 0) location.append(", ");
+            location.append(state);
+        }
+        if (zipcode != null) {
+            if (location.length() > 0) location.append(" ");
+            location.append(zipcode);
+        }
+        return location.length() > 0 ? location.toString() : "Location not set";
+    }
+
+    /**
+     * For professionals: Get business location (falls back to personal if not set)
+     */
+    public String getBusinessLocation() {
+        if (isProfessional() && professionalProfile != null &&
+                professionalProfile.getBaseZipcode() != null) {
+            return professionalProfile.getBusinessLocationDisplay();
+        }
+        return getLocationDisplay(); // Fallback to personal location
+    }
+
+    /**
+     * Check if user has location information
+     */
+    public boolean hasLocation() {
+        return zipcode != null || (city != null && state != null);
+    }
 
     // ==================== ROLE CHECKING METHODS ====================
 
@@ -361,32 +422,6 @@ public class User implements UserDetails {
      */
     public boolean hasAdminAccess() {
         return userType != null && userType.hasAdminAccess();
-    }
-
-    // ==================== LEGACY/COMPATIBILITY METHODS ====================
-
-    /**
-     * @deprecated Use specific feature methods instead
-     */
-    @Deprecated
-    public boolean canCreatePrograms() {
-        return canCreateProfessionalContent();
-    }
-
-    /**
-     * @deprecated Use canManageClients() instead
-     */
-    @Deprecated
-    public boolean canRunProfessionalBusiness() {
-        return canManageClients();
-    }
-
-    /**
-     * @deprecated Use canManageClients() instead
-     */
-    @Deprecated
-    public boolean canAcceptClients() {
-        return canManageClients();
     }
 
     // ==================== SUBSCRIPTION MANAGEMENT ====================

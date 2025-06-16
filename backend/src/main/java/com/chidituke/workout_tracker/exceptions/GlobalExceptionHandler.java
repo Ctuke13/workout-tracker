@@ -2,6 +2,11 @@ package com.chidituke.workout_tracker.exceptions;
 
 import com.chidituke.workout_tracker.exceptions.common.ResourceNotFoundException;
 import com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationException;
+import com.chidituke.workout_tracker.exceptions.common.WorkoutTrackerException;
+import com.chidituke.workout_tracker.exceptions.subscription.FeatureNotAvailableException;
+import com.chidituke.workout_tracker.exceptions.subscription.PaymentProcessingException;
+import com.chidituke.workout_tracker.exceptions.subscription.SubscriptionException;
+import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -14,7 +19,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
-import org.springframework.web.ErrorResponse;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -23,6 +27,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,12 +46,13 @@ public class GlobalExceptionHandler {
 
         log.warn("Authentication failed: {} for request: {}", ex.getMessage(), request.getRequestURI());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.UNAUTHORIZED.value(),
-                "Authentication Failed",
-                "Invalid credentials or authentication required",
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .error("Authentication Failed")
+                .message("Invalid credentials or authentication required")
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
     }
@@ -57,12 +63,13 @@ public class GlobalExceptionHandler {
 
         log.warn("Bad credentials: {} for request: {}", ex.getMessage(), request.getRequestURI());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.UNAUTHORIZED.value(),
-                "Invalid Credentials",
-                "The provided credentials are invalid",
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .error("Invalid Credentials")
+                .message("The provided credentials are invalid")
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
     }
@@ -73,12 +80,13 @@ public class GlobalExceptionHandler {
 
         log.warn("Access denied: {} for request: {}", ex.getMessage(), request.getRequestURI());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.FORBIDDEN.value(),
-                "Access Denied",
-                "You don't have permission to access this resource",
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error("Access Denied")
+                .message("You don't have permission to access this resource")
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
     }
@@ -111,7 +119,7 @@ public class GlobalExceptionHandler {
         });
 
         ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(java.time.LocalDateTime.now())
+                .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Validation Failed")
                 .message("Input validation failed")
@@ -140,7 +148,7 @@ public class GlobalExceptionHandler {
         }
 
         ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(java.time.LocalDateTime.now())
+                .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Constraint Violation")
                 .message("Request violates data constraints")
@@ -151,6 +159,76 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
+    // 💳 SUBSCRIPTION EXCEPTIONS (NEW)
+
+    /**
+     * Handle feature not available exceptions (subscription tier too low)
+     */
+    @ExceptionHandler(FeatureNotAvailableException.class)
+    public ResponseEntity<ErrorResponse> handleFeatureNotAvailable(FeatureNotAvailableException ex, HttpServletRequest request) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error("Feature Not Available")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        log.warn("Feature not available: {} at {}", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    /**
+     * Handle payment processing exceptions
+     */
+    @ExceptionHandler(PaymentProcessingException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentProcessing(PaymentProcessingException ex, HttpServletRequest request) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.PAYMENT_REQUIRED.value())
+                .error("Payment Processing Error")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        log.error("Payment processing error: {} at {}", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(error);
+    }
+
+    /**
+     * Handle general subscription exceptions
+     */
+    @ExceptionHandler(SubscriptionException.class)
+    public ResponseEntity<ErrorResponse> handleSubscriptionException(SubscriptionException ex, HttpServletRequest request) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Subscription Error")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        log.warn("Subscription error: {} at {}", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    /**
+     * Handle user not found exceptions
+     */
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex, HttpServletRequest request) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("User Not Found")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        log.warn("User not found: {} at {}", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
     // 🔍 BUSINESS LOGIC EXCEPTIONS
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -159,12 +237,13 @@ public class GlobalExceptionHandler {
 
         log.warn("Illegal argument for request: {} - {}", request.getRequestURI(), ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "Invalid Request",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Invalid Request")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.badRequest().body(errorResponse);
     }
@@ -175,12 +254,13 @@ public class GlobalExceptionHandler {
 
         log.warn("Illegal state for request: {} - {}", request.getRequestURI(), ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.CONFLICT.value(),
-                "Operation Not Allowed",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error("Operation Not Allowed")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
@@ -193,12 +273,13 @@ public class GlobalExceptionHandler {
 
         log.warn("No handler found for request: {} {}", ex.getHttpMethod(), ex.getRequestURL());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.NOT_FOUND.value(),
-                "Endpoint Not Found",
-                "The requested endpoint does not exist",
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Endpoint Not Found")
+                .message("The requested endpoint does not exist")
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
@@ -209,15 +290,16 @@ public class GlobalExceptionHandler {
 
         log.warn("Method not supported: {} for request: {}", ex.getMethod(), request.getRequestURI());
 
+        // ✅ FIXED: Changed from Enum::name to method -> method.name()
         String supportedMethods = ex.getSupportedHttpMethods() != null ?
-                String.join(", ", ex.getSupportedHttpMethods().stream().map(Enum::name).toList()) : "None";
+                String.join(", ", ex.getSupportedHttpMethods().stream().map(method -> method.name()).toList()) : "None";
 
         Map<String, Object> details = new HashMap<>();
         details.put("supportedMethods", supportedMethods);
         details.put("attemptedMethod", ex.getMethod());
 
         ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(java.time.LocalDateTime.now())
+                .timestamp(LocalDateTime.now())
                 .status(HttpStatus.METHOD_NOT_ALLOWED.value())
                 .error("Method Not Allowed")
                 .message(String.format("HTTP method '%s' is not supported for this endpoint", ex.getMethod()))
@@ -234,13 +316,14 @@ public class GlobalExceptionHandler {
 
         log.warn("Missing request parameter: {} for request: {}", ex.getParameterName(), request.getRequestURI());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "Missing Parameter",
-                String.format("Required parameter '%s' of type '%s' is missing",
-                        ex.getParameterName(), ex.getParameterType()),
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Missing Parameter")
+                .message(String.format("Required parameter '%s' of type '%s' is missing",
+                        ex.getParameterName(), ex.getParameterType()))
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.badRequest().body(errorResponse);
     }
@@ -253,13 +336,14 @@ public class GlobalExceptionHandler {
 
         String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "Unknown";
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "Invalid Parameter Type",
-                String.format("Parameter '%s' should be of type '%s' but received '%s'",
-                        ex.getName(), expectedType, ex.getValue()),
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Invalid Parameter Type")
+                .message(String.format("Parameter '%s' should be of type '%s' but received '%s'",
+                        ex.getName(), expectedType, ex.getValue()))
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.badRequest().body(errorResponse);
     }
@@ -270,12 +354,13 @@ public class GlobalExceptionHandler {
 
         log.warn("Malformed JSON request for: {} - {}", request.getRequestURI(), ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "Malformed JSON",
-                "Request body contains invalid JSON or missing required fields",
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Malformed JSON")
+                .message("Request body contains invalid JSON or missing required fields")
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.badRequest().body(errorResponse);
     }
@@ -301,126 +386,66 @@ public class GlobalExceptionHandler {
             }
         }
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.CONFLICT.value(),
-                "Data Constraint Violation",
-                message,
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error("Data Constraint Violation")
+                .message(message)
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
     // 🏋️ WORKOUT TRACKER SPECIFIC EXCEPTIONS
 
-    @ExceptionHandler(com.chidituke.workout_tracker.exceptions.common.ResourceNotFoundException.class)
+    @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
             ResourceNotFoundException ex, HttpServletRequest request) {
 
         log.warn("Resource not found for request: {} - {}", request.getRequestURI(), ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.NOT_FOUND.value(),
-                "Resource Not Found",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Resource Not Found")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
-    @ExceptionHandler(com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationException.class)
+    @ExceptionHandler(UnauthorizedOperationException.class)
     public ResponseEntity<ErrorResponse> handleUnauthorizedOperationException(
             UnauthorizedOperationException ex, HttpServletRequest request) {
 
         log.warn("Unauthorized operation for request: {} - {}", request.getRequestURI(), ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.FORBIDDEN.value(),
-                "Operation Not Allowed",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error("Operation Not Allowed")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
     }
 
-    @ExceptionHandler({ExerciseException.class, UserException.class, WorkoutException.class})
+    @ExceptionHandler(WorkoutTrackerException.class)
     public ResponseEntity<ErrorResponse> handleDomainExceptions(
             WorkoutTrackerException ex, HttpServletRequest request) {
 
         log.warn("Domain exception for request: {} - {}", request.getRequestURI(), ex.getMessage());
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "Operation Failed",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.badRequest().body(errorResponse);
-    }
-
-    @ExceptionHandler(BusinessRuleViolationException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessRuleViolationException(
-            BusinessRuleViolationException ex, HttpServletRequest request) {
-
-        log.warn("Business rule violation for request: {} - {}", request.getRequestURI(), ex.getMessage());
-
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.UNPROCESSABLE_ENTITY.value(),
-                "Business Rule Violation",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errorResponse);
-    }
-
-    @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicateResourceException(
-            DuplicateResourceException ex, HttpServletRequest request) {
-
-        log.warn("Duplicate resource for request: {} - {}", request.getRequestURI(), ex.getMessage());
-
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.CONFLICT.value(),
-                "Resource Already Exists",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
-    }
-
-    @ExceptionHandler(ProfessionalVerificationException.class)
-    public ResponseEntity<ErrorResponse> handleProfessionalVerificationException(
-            ProfessionalVerificationException ex, HttpServletRequest request) {
-
-        log.warn("Professional verification failed for request: {} - {}", request.getRequestURI(), ex.getMessage());
-
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.FORBIDDEN.value(),
-                "Professional Verification Required",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
-    }
-
-    @ExceptionHandler(FileProcessingException.class)
-    public ResponseEntity<ErrorResponse> handleFileProcessingException(
-            FileProcessingException ex, HttpServletRequest request) {
-
-        log.warn("File processing failed for request: {} - {}", request.getRequestURI(), ex.getMessage());
-
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "File Processing Failed",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Operation Failed")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
 
         return ResponseEntity.badRequest().body(errorResponse);
     }
@@ -436,12 +461,13 @@ public class GlobalExceptionHandler {
 
             log.warn("Resource not found for request: {} - {}", request.getRequestURI(), ex.getMessage());
 
-            ErrorResponse errorResponse = ErrorResponse.of(
-                    HttpStatus.NOT_FOUND.value(),
-                    "Resource Not Found",
-                    ex.getMessage(),
-                    request.getRequestURI()
-            );
+            ErrorResponse errorResponse = ErrorResponse.builder()
+                    .timestamp(LocalDateTime.now())
+                    .status(HttpStatus.NOT_FOUND.value())
+                    .error("Resource Not Found")
+                    .message(ex.getMessage())
+                    .path(request.getRequestURI())
+                    .build();
 
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
         }
@@ -461,30 +487,15 @@ public class GlobalExceptionHandler {
         log.error("Unexpected error [{}] for request: {} - {}",
                 traceId, request.getRequestURI(), ex.getMessage(), ex);
 
-        ErrorResponse errorResponse = ErrorResponse.of(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Internal Server Error",
-                "An unexpected error occurred. Please try again later.",
-                request.getRequestURI(),
-                traceId
-        );
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("Internal Server Error")
+                .message("An unexpected error occurred. Please try again later.")
+                .path(request.getRequestURI())
+                .traceId(traceId)
+                .build();
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-    }
-
-    // 🔧 HELPER METHODS
-
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-
-        return request.getRemoteAddr();
     }
 }

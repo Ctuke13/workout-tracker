@@ -11,9 +11,12 @@ public class UserSearchResponse {
     private String username;
     private String firstName;
     private String lastName;
-    private String profilePictureUrl;
+    private String profileImageUrl;
     private User.FitnessLevel fitnessLevel;
     private String zipcode;
+    private String city;
+    private String state;
+
     private User.ActivityLevel activityLevel;
     private Boolean currentlyActive;
     private LocalDateTime lastActive;

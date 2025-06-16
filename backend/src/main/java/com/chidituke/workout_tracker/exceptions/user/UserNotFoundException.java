@@ -14,4 +14,8 @@ public class UserNotFoundException extends WorkoutTrackerException {
     public UserNotFoundException(String identifier) {
         super(String.format("User '%s' not found", identifier));
     }
+
+    public UserNotFoundException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

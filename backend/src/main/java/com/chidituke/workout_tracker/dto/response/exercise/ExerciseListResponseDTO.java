@@ -21,6 +21,8 @@ public class ExerciseListResponseDTO {
     private boolean isLast;
     private ExerciseFiltersDTO availableFilters;
 
+    // ===== EXISTING METHODS (Keep) =====
+
     public static ExerciseListResponseDTO fromPage(Page<Exercise> exercisePage) {
         return ExerciseListResponseDTO.builder()
                 .exercises(ExerciseResponseDTO.fromEntityList(exercisePage.getContent()))
@@ -38,6 +40,36 @@ public class ExerciseListResponseDTO {
     public static ExerciseListResponseDTO fromList(List<Exercise> exercises) {
         return ExerciseListResponseDTO.builder()
                 .exercises(ExerciseResponseDTO.fromEntityList(exercises))
+                .totalCount(exercises.size())
+                .page(0)
+                .size(exercises.size())
+                .totalPages(1)
+                .hasNext(false)
+                .hasPrevious(false)
+                .isFirst(true)
+                .isLast(true)
+                .build();
+    }
+
+    // ===== ADD FRONTEND METHODS =====
+
+    public static ExerciseListResponseDTO fromPageForFrontend(Page<Exercise> exercisePage) {
+        return ExerciseListResponseDTO.builder()
+                .exercises(ExerciseResponseDTO.fromEntityListForFrontend(exercisePage.getContent()))
+                .totalCount(exercisePage.getTotalElements())
+                .page(exercisePage.getNumber())
+                .size(exercisePage.getSize())
+                .totalPages(exercisePage.getTotalPages())
+                .hasNext(exercisePage.hasNext())
+                .hasPrevious(exercisePage.hasPrevious())
+                .isFirst(exercisePage.isFirst())
+                .isLast(exercisePage.isLast())
+                .build();
+    }
+
+    public static ExerciseListResponseDTO fromListForFrontend(List<Exercise> exercises) {
+        return ExerciseListResponseDTO.builder()
+                .exercises(ExerciseResponseDTO.fromEntityListForFrontend(exercises))
                 .totalCount(exercises.size())
                 .page(0)
                 .size(exercises.size())

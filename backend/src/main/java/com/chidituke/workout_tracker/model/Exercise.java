@@ -18,7 +18,7 @@ public class Exercise {
     @NotBlank(message = "Exercise name is required")
     @Size(min = 2, max = 100, message = "Exercise name must be 2-100 characters")
     @Column(nullable = false, length = 100)
-    private String name;
+    private String exerciseName;
 
     @Size(max = 10, message = "Emoji too long")
     @Column(length = 10)
@@ -71,7 +71,7 @@ public class Exercise {
     private String videoUrl;
 
     @Column(name = "created_by_user_id")
-    private Long createdByUserId; // Who created this exercise
+    private Long createdByUserId;
 
     @Column(name = "created_by_professional")
     private Boolean createdByProfessional = false;
@@ -85,7 +85,7 @@ public class Exercise {
 
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
-    @Column(name = "average_rating", precision = 3, scale = 2)
+    @Column(name = "average_rating")
     private Double averageRating = 0.0; // User ratings
 
     @Min(value = 0, message = "Total ratings cannot be negative")

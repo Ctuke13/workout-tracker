@@ -17,7 +17,7 @@ public class ExerciseMapper {
      * Maps ExerciseCreationRequest DTO to Exercise entity
      */
     public void mapRequestToEntity(ExerciseService.ExerciseCreationRequest request, Exercise exercise) {
-        exercise.setName(request.getName());
+        exercise.setExerciseName(request.getName());
         exercise.setDescription(request.getDescription());
         exercise.setExerciseType(request.getExerciseType());
         exercise.setDifficultyLevel(request.getDifficultyLevel());

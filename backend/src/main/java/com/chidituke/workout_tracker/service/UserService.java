@@ -61,6 +61,23 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
     }
 
+    /**
+     * Get user ID by username (ADDED FOR PERFORMANCE CONTROLLER)
+     */
+    public Long getUserIdByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+        return user.getId();
+    }
+
+    /**
+     * Get user by username (ADDED FOR CONVENIENCE)
+     */
+    public User getUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+    }
+
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
     }

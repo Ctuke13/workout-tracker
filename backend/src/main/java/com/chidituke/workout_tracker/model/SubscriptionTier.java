@@ -1,9 +1,12 @@
 package com.chidituke.workout_tracker.model;
 
+import lombok.Getter;
+
 /**
  * Subscription tiers that unlock different features
  * Based on the refined 4-tier structure for fitness platform
  */
+@Getter
 public enum SubscriptionTier {
     FREE("Free", 0.00, "Track your workouts and see your progress"),
     PLUS("Plus", 4.99, "Plan your workouts and stay consistent"),
@@ -19,10 +22,6 @@ public enum SubscriptionTier {
         this.monthlyPrice = monthlyPrice;
         this.description = description;
     }
-
-    public String getDisplayName() { return displayName; }
-    public Double getMonthlyPrice() { return monthlyPrice; }
-    public String getDescription() { return description; }
 
     // 🎯 PERSONAL FITNESS FEATURES
     public boolean canScheduleWorkouts() {

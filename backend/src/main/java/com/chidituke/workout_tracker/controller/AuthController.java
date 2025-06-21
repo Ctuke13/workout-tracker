@@ -4,6 +4,7 @@ import com.chidituke.workout_tracker.dto.request.auth.LoginRequest;
 import com.chidituke.workout_tracker.dto.request.auth.RegisterRequest;
 import com.chidituke.workout_tracker.dto.response.auth.JwtResponse;
 import com.chidituke.workout_tracker.model.User;
+import com.chidituke.workout_tracker.model.UserType;
 import com.chidituke.workout_tracker.service.UserService;
 import com.chidituke.workout_tracker.security.JwtTokenProvider;
 import com.chidituke.workout_tracker.security.CurrentUser;
@@ -64,7 +65,7 @@ public class AuthController {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getRole(),
+                user.getUserType(),
                 user.getProfessionalProfile() != null
         );
 
@@ -115,7 +116,7 @@ public class AuthController {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getRole(),
+                user.getUserType(),
                 user.getProfessionalProfile() != null
         );
 
@@ -148,7 +149,7 @@ public class AuthController {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getRole(),
+                user.getUserType(),
                 user.getAccountStatus(),
                 user.getActivityLevel(),
                 user.getProfessionalProfile() != null,
@@ -192,7 +193,7 @@ public class AuthController {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getRole(),
+                user.getUserType(),
                 user.getProfessionalProfile() != null
         );
 
@@ -227,46 +228,57 @@ public class AuthController {
         private String email;
         private String firstName;
         private String lastName;
-        private User.Role role;
+        private UserType userType;  // ✅ Field is userType
         private User.AccountStatus accountStatus;
         private User.ActivityLevel activityLevel;
         private Boolean isProfessional;
         private Boolean isVerified;
 
+        // ✅ Fix constructor - parameter name matches field assignment
         public UserSummary(Long id, String username, String email, String firstName, String lastName,
-                           User.Role role, User.AccountStatus accountStatus, User.ActivityLevel activityLevel,
+                           UserType userType, User.AccountStatus accountStatus, User.ActivityLevel activityLevel,
                            Boolean isProfessional, Boolean isVerified) {
             this.id = id;
             this.username = username;
             this.email = email;
             this.firstName = firstName;
             this.lastName = lastName;
-            this.role = role;
+            this.userType = userType;  // ✅ Now matches parameter name
             this.accountStatus = accountStatus;
             this.activityLevel = activityLevel;
             this.isProfessional = isProfessional;
             this.isVerified = isVerified;
         }
 
-        // Getters and setters
+        // ✅ Getters and setters with consistent naming
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
+
         public String getUsername() { return username; }
         public void setUsername(String username) { this.username = username; }
+
         public String getEmail() { return email; }
         public void setEmail(String email) { this.email = email; }
+
         public String getFirstName() { return firstName; }
         public void setFirstName(String firstName) { this.firstName = firstName; }
+
         public String getLastName() { return lastName; }
         public void setLastName(String lastName) { this.lastName = lastName; }
-        public User.Role getRole() { return role; }
-        public void setRole(User.Role role) { this.role = role; }
+
+        // ✅ Fixed getter/setter names
+        public UserType getUserType() { return userType; }
+        public void setUserType(UserType userType) { this.userType = userType; }
+
         public User.AccountStatus getAccountStatus() { return accountStatus; }
         public void setAccountStatus(User.AccountStatus accountStatus) { this.accountStatus = accountStatus; }
+
         public User.ActivityLevel getActivityLevel() { return activityLevel; }
         public void setActivityLevel(User.ActivityLevel activityLevel) { this.activityLevel = activityLevel; }
+
         public Boolean getIsProfessional() { return isProfessional; }
         public void setIsProfessional(Boolean isProfessional) { this.isProfessional = isProfessional; }
+
         public Boolean getIsVerified() { return isVerified; }
         public void setIsVerified(Boolean isVerified) { this.isVerified = isVerified; }
     }

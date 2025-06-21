@@ -14,17 +14,17 @@ import java.util.List;
 public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
 
     // 📚 BASIC QUERIES
-    List<Exercise> findByExerciseTypeAndPublishedTrueOrderByNameAsc(Exercise.ExerciseType exerciseType);
+    List<Exercise> findByExerciseTypeAndPublishedTrueOrderByExerciseNameAsc(Exercise.ExerciseType exerciseType);
 
     @Query("SELECT e FROM Exercise e WHERE (e.published = true OR e.published IS NULL)")
     List<Exercise> findPublishedExercises();
 
-    Page<Exercise> findByPublishedTrueOrderByNameAsc(Pageable pageable);
+    Page<Exercise> findByPublishedTrueOrderByExerciseNameAsc(Pageable pageable);
 
     // 🎯 EXERCISE TYPE & DIFFICULTY QUERIES
-    List<Exercise> findByDifficultyLevelAndPublishedTrueOrderByNameAsc(Exercise.DifficultyLevel difficultyLevel);
+    List<Exercise> findByDifficultyLevelAndPublishedTrueOrderByExerciseNameAsc(Exercise.DifficultyLevel difficultyLevel);
 
-    List<Exercise> findByExerciseTypeAndDifficultyLevelAndPublishedTrueOrderByNameAsc(
+    List<Exercise> findByExerciseTypeAndDifficultyLevelAndPublishedTrueOrderByExerciseNameAsc(
             Exercise.ExerciseType exerciseType, Exercise.DifficultyLevel difficultyLevel);
 
     // 🏋️ EQUIPMENT-BASED QUERIES
@@ -44,7 +44,7 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
 
     // 🔍 SEARCH QUERIES
     @Query("SELECT e FROM Exercise e WHERE e.published = true AND " +
-            "(LOWER(e.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "(LOWER(e.exerciseName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(e.description) LIKE LOWER(CONCAT('%', :search, '%')))")
     List<Exercise> findByNameOrDescriptionContaining(@Param("search") String search);
 
@@ -53,9 +53,9 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
             "AND (:exerciseType IS NULL OR e.exerciseType = :exerciseType) " +
             "AND (:difficulty IS NULL OR e.difficultyLevel = :difficulty) " +
             "AND (:muscleGroup IS NULL OR :muscleGroup MEMBER OF e.targetMuscleGroups) " +
-            "AND (:search IS NULL OR LOWER(e.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "AND (:search IS NULL OR LOWER(e.exerciseName) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "     OR LOWER(e.description) LIKE LOWER(CONCAT('%', :search, '%'))) " +
-            "ORDER BY e.averageRating DESC, e.usageCount DESC, e.name ASC")
+            "ORDER BY e.averageRating DESC, e.usageCount DESC, e.exerciseName ASC")
     Page<Exercise> searchExercisesWithFilters(
             @Param("search") String search,
             @Param("muscleGroup") String muscleGroup,

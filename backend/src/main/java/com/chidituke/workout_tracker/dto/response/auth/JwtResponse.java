@@ -1,6 +1,7 @@
 package com.chidituke.workout_tracker.dto.response.auth;
 
 import com.chidituke.workout_tracker.model.User;
+import com.chidituke.workout_tracker.model.UserType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,7 +17,7 @@ public class JwtResponse {
     private String email;
     private String firstName;
     private String lastName;
-    private User.Role role;
+    private UserType userType;
     private Boolean isProfessional;
 
     // ═══════════════════════════════════════════════════════════════════
@@ -27,7 +28,7 @@ public class JwtResponse {
      * Complete constructor used by AuthController
      */
     public JwtResponse(String accessToken, Long id, String username, String email,
-                       String firstName, String lastName, User.Role role, Boolean isProfessional) {
+                       String firstName, String lastName, UserType userType, Boolean isProfessional) {
         this.token = accessToken;
         this.type = "Bearer";
         this.id = id;
@@ -35,7 +36,7 @@ public class JwtResponse {
         this.email = email;
         this.firstName = firstName;
         this.lastName = lastName;
-        this.role = role;
+        this.userType = userType;
         this.isProfessional = isProfessional;
     }
 
@@ -80,9 +81,9 @@ public class JwtResponse {
      * Get role display name
      */
     public String getRoleDisplayName() {
-        if (role == null) return "User";
-        return switch (role) {
-            case USER -> "User";
+        if (userType == null) return "User";
+        return switch (userType) {
+            case REGULAR -> "User";
             case ADMIN -> "Administrator";
             case PROFESSIONAL -> "Professional";
         };
@@ -92,14 +93,14 @@ public class JwtResponse {
      * Check if user is admin
      */
     public boolean isAdmin() {
-        return role == User.Role.ADMIN;
+        return userType == UserType.ADMIN;
     }
 
     /**
      * Check if user has professional role
      */
     public boolean isProfessionalRole() {
-        return role == User.Role.PROFESSIONAL;
+        return userType == UserType.PROFESSIONAL;
     }
 
     /**

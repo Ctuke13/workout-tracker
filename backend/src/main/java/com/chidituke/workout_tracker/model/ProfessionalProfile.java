@@ -35,6 +35,11 @@ public class ProfessionalProfile {
 
     // ==================== PROFESSIONAL IDENTITY ====================
 
+    // ✅ ADDED: Missing displayName field
+    @Column(name = "display_name", length = 100)
+    @Size(max = 100, message = "Display name cannot exceed 100 characters")
+    private String displayName;
+
     @Column(name = "business_name", length = 100)
     @Size(max = 100, message = "Business name cannot exceed 100 characters")
     private String businessName;
@@ -70,9 +75,15 @@ public class ProfessionalProfile {
     @Builder.Default
     private Integer yearsExperience = 0;
 
+    // ✅ ADDED: Missing experienceLevel field
+    @Enumerated(EnumType.STRING)
+    @Column(name = "experience_level")
+    @Builder.Default
+    private ExperienceLevel experienceLevel = ExperienceLevel.BEGINNER;
+
     @DecimalMin(value = "0.0", message = "Hourly rate cannot be negative")
     @DecimalMax(value = "1000.0", message = "Hourly rate cannot exceed $1000")
-    @Column(name = "hourly_rate", precision = 8, scale = 2)
+    @Column(name = "hourly_rate")
     private Double hourlyRate;
 
     @Pattern(regexp = "^\\d{5}$", message = "Base zipcode must be 5 digits")
@@ -200,11 +211,21 @@ public class ProfessionalProfile {
     @Builder.Default
     private Boolean isVerified = false;
 
+    // ✅ ADDED: Missing verificationStatus field
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_status")
+    @Builder.Default
+    private VerificationStatus verificationStatus = VerificationStatus.PENDING;
+
     @Column(name = "verification_submitted_at")
     private LocalDateTime verificationSubmittedAt;
 
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
+
+    // ✅ ADDED: Missing verificationReviewedAt field
+    @Column(name = "verification_reviewed_at")
+    private LocalDateTime verificationReviewedAt;
 
     @Column(name = "verification_notes", length = 1000)
     @Size(max = 1000, message = "Verification notes cannot exceed 1000 characters")
@@ -240,7 +261,7 @@ public class ProfessionalProfile {
 
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
-    @Column(name = "average_rating", precision = 3, scale = 2)
+    @Column(name = "average_rating")
     @Builder.Default
     private Double averageRating = 0.0;
 
@@ -494,7 +515,7 @@ public class ProfessionalProfile {
     /**
      * Get verification status as string
      */
-    public String getVerificationStatus() {
+    public String getVerificationStatusString() {
         if (isFullyVerified()) return "FULLY_VERIFIED";
         if (Boolean.TRUE.equals(isVerified)) return "PARTIALLY_VERIFIED";
         if (verificationSubmittedAt != null) return "PENDING_VERIFICATION";
@@ -519,13 +540,20 @@ public class ProfessionalProfile {
     // ==================== BUSINESS LOGIC METHODS ====================
 
     /**
-     * Get display name (business name or user's full name)
+     * ✅ UPDATED: Get display name (displayName field, business name, or user's full name)
      */
     public String getDisplayName() {
+        // First priority: explicit displayName field
+        if (displayName != null && !displayName.trim().isEmpty()) {
+            return displayName;
+        }
+
+        // Second priority: business name
         if (businessName != null && !businessName.trim().isEmpty()) {
             return businessName;
         }
 
+        // Third priority: user's full name
         if (user != null) {
             String firstName = user.getFirstName() != null ? user.getFirstName() : "";
             String lastName = user.getLastName() != null ? user.getLastName() : "";
@@ -587,10 +615,7 @@ public class ProfessionalProfile {
         this.averageRating = Math.round(this.averageRating * 100.0) / 100.0;
     }
 
-    /**
-     * Calculate profile completion percentage
-     */
-    private void calculateProfileCompletion() {
+    public Double calculateProfileCompletion() {
         int completedFields = 0;
         int totalFields = 15;
 
@@ -610,7 +635,9 @@ public class ProfessionalProfile {
         if (Boolean.TRUE.equals(hasLiabilityInsurance)) completedFields++;
         if (Boolean.TRUE.equals(backgroundCheckCompleted)) completedFields++;
 
-        this.profileCompletionPercentage = (completedFields * 100) / totalFields;
+        double percentage = ((double) completedFields * 100) / totalFields;
+        this.profileCompletionPercentage = (int) Math.round(percentage);
+        return percentage;
     }
 
     // ==================== JPA LIFECYCLE METHODS ====================
@@ -631,31 +658,193 @@ public class ProfessionalProfile {
     // ==================== ENUMS ====================
 
     public enum ServiceType {
-        PERSONAL_TRAINER("Personal Trainer"),
-        FITNESS_COACH("Fitness Coach"),
-        YOGA_INSTRUCTOR("Yoga Instructor"),
-        PILATES_INSTRUCTOR("Pilates Instructor"),
-        NUTRITIONIST("Nutritionist"),
-        DIETITIAN("Dietitian"),
-        SPORTS_COACH("Sports Coach"),
-        PHYSICAL_THERAPIST("Physical Therapist"),
-        MASSAGE_THERAPIST("Massage Therapist"),
-        GYM_OWNER("Gym Owner"),
-        FITNESS_STUDIO_OWNER("Fitness Studio Owner"),
-        WELLNESS_COACH("Wellness Coach"),
-        STRENGTH_COACH("Strength & Conditioning Coach"),
-        REHABILITATION_SPECIALIST("Rehabilitation Specialist"),
-        GROUP_FITNESS_INSTRUCTOR("Group Fitness Instructor"),
-        ONLINE_COACH("Online Fitness Coach");
+        PERSONAL_TRAINER("Personal Trainer", "One-on-one fitness training and coaching"),
+        NUTRITIONIST("Nutritionist", "Dietary planning and nutritional counseling"),
+        YOGA_INSTRUCTOR("Yoga Instructor", "Yoga classes and mindfulness training"),
+        PILATES_INSTRUCTOR("Pilates Instructor", "Pilates classes and movement therapy"),
+        PHYSICAL_THERAPIST("Physical Therapist", "Rehabilitation and injury recovery"),
+        WELLNESS_COACH("Wellness Coach", "Holistic health and lifestyle coaching"),
+        STRENGTH_COACH("Strength Coach", "Specialized strength and conditioning training"),
+        SPORTS_COACH("Sports Coach", "Sport-specific training and performance coaching"),
+        FITNESS_INSTRUCTOR("Fitness Instructor", "Group fitness classes and programs"),
+        OTHER("Other", "Other professional fitness services");
 
         private final String displayName;
+        private final String description;
 
-        ServiceType(String displayName) {
+        ServiceType(String displayName, String description) {
             this.displayName = displayName;
+            this.description = description;
         }
 
         public String getDisplayName() {
             return displayName;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        /**
+         * Check if this service type requires specific certification
+         */
+        public boolean requiresCertification() {
+            return this == PERSONAL_TRAINER ||
+                    this == NUTRITIONIST ||
+                    this == PHYSICAL_THERAPIST ||
+                    this == STRENGTH_COACH;
+        }
+
+        /**
+         * Get related specializations for this service type
+         */
+        public String[] getCommonSpecializations() {
+            return switch (this) {
+                case PERSONAL_TRAINER -> new String[]{
+                        "Weight Loss", "Muscle Building", "Functional Training",
+                        "HIIT", "Strength Training", "Cardio Training"
+                };
+                case NUTRITIONIST -> new String[]{
+                        "Weight Management", "Sports Nutrition", "Meal Planning",
+                        "Dietary Restrictions", "Metabolic Health"
+                };
+                case YOGA_INSTRUCTOR -> new String[]{
+                        "Hatha Yoga", "Vinyasa Flow", "Yin Yoga",
+                        "Hot Yoga", "Meditation", "Breathwork"
+                };
+                case PILATES_INSTRUCTOR -> new String[]{
+                        "Mat Pilates", "Reformer Pilates", "Classical Pilates",
+                        "Contemporary Pilates", "Rehabilitation Pilates"
+                };
+                case PHYSICAL_THERAPIST -> new String[]{
+                        "Injury Rehabilitation", "Sports Medicine", "Manual Therapy",
+                        "Movement Analysis", "Pain Management"
+                };
+                case WELLNESS_COACH -> new String[]{
+                        "Stress Management", "Lifestyle Design", "Habit Formation",
+                        "Goal Setting", "Mindfulness", "Work-Life Balance"
+                };
+                default -> new String[]{"General Fitness", "Health Coaching"};
+            };
+        }
+    }
+
+    public enum ExperienceLevel {
+        BEGINNER("Beginner", "0-2 years", "New to the profession with basic qualifications"),
+        INTERMEDIATE("Intermediate", "3-5 years", "Several years of experience with proven track record"),
+        ADVANCED("Advanced", "6-10 years", "Extensive experience with specialized skills"),
+        EXPERT("Expert", "10+ years", "Industry expert with comprehensive expertise");
+
+        private final String displayName;
+        private final String yearRange;
+        private final String description;
+
+        ExperienceLevel(String displayName, String yearRange, String description) {
+            this.displayName = displayName;
+            this.yearRange = yearRange;
+            this.description = description;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public String getYearRange() {
+            return yearRange;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        /**
+         * Get full display with year range
+         */
+        public String getFullDisplay() {
+            return displayName + " (" + yearRange + ")";
+        }
+
+        /**
+         * Get experience level based on years
+         */
+        public static ExperienceLevel fromYears(int years) {
+            if (years <= 2) return BEGINNER;
+            if (years <= 5) return INTERMEDIATE;
+            if (years <= 10) return ADVANCED;
+            return EXPERT;
+        }
+
+        /**
+         * Get minimum years for this level
+         */
+        public int getMinimumYears() {
+            return switch (this) {
+                case BEGINNER -> 0;
+                case INTERMEDIATE -> 3;
+                case ADVANCED -> 6;
+                case EXPERT -> 10;
+            };
+        }
+    }
+
+    // ✅ ADDED: Missing VerificationStatus enum
+    public enum VerificationStatus {
+        NOT_SUBMITTED("Not Submitted", "Verification documents have not been submitted"),
+        PENDING("Pending", "Verification documents submitted, waiting for review"),
+        UNDER_REVIEW("Under Review", "Verification documents are being reviewed by admin"),
+        VERIFIED("Verified", "Professional has been successfully verified"),
+        REJECTED("Rejected", "Verification was rejected, resubmission required"),
+        EXPIRED("Expired", "Verification has expired and needs renewal");
+
+        private final String displayName;
+        private final String description;
+
+        VerificationStatus(String displayName, String description) {
+            this.displayName = displayName;
+            this.description = description;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        /**
+         * Check if this status represents a verified state
+         */
+        public boolean isVerified() {
+            return this == VERIFIED;
+        }
+
+        /**
+         * Check if this status requires action
+         */
+        public boolean requiresAction() {
+            return this == REJECTED || this == EXPIRED;
+        }
+
+        /**
+         * Check if this status is pending review
+         */
+        public boolean isPending() {
+            return this == PENDING || this == UNDER_REVIEW;
+        }
+
+        /**
+         * Get next possible statuses from current status
+         */
+        public VerificationStatus[] getNextPossibleStatuses() {
+            return switch (this) {
+                case NOT_SUBMITTED -> new VerificationStatus[]{PENDING};
+                case PENDING -> new VerificationStatus[]{UNDER_REVIEW, REJECTED};
+                case UNDER_REVIEW -> new VerificationStatus[]{VERIFIED, REJECTED};
+                case VERIFIED -> new VerificationStatus[]{EXPIRED};
+                case REJECTED -> new VerificationStatus[]{PENDING};
+                case EXPIRED -> new VerificationStatus[]{PENDING};
+            };
         }
     }
 

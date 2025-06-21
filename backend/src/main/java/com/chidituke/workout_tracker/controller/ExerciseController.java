@@ -20,7 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -31,7 +32,207 @@ public class ExerciseController {
 
     private final ExerciseService exerciseService;
 
-    // 🌍 PUBLIC ENDPOINTS (No authentication required - Free Exercise Library!)
+    // ===================================================================
+    // 🌍 FRONTEND-SPECIFIC ENDPOINTS (New additions for React frontend)
+    // ===================================================================
+
+    @GetMapping("/public")
+    public ResponseEntity<List<ExerciseResponseDTO>> getPublicExercises(
+            @RequestParam(required = false) String goal,
+            @RequestParam(required = false) String difficulty,
+            @RequestParam(required = false) String equipment) {
+
+        log.debug("Public frontend request - goal: {}, difficulty: {}, equipment: {}", goal, difficulty, equipment);
+
+        // Convert frontend parameters to your existing search structure
+        ExerciseSearchRequestDTO searchRequest = new ExerciseSearchRequestDTO();
+
+        // Map frontend difficulty to your enum
+        if (difficulty != null && !difficulty.equals("all")) {
+            try {
+                searchRequest.setDifficultyLevel(Exercise.DifficultyLevel.valueOf(difficulty.toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid difficulty level: {}", difficulty);
+            }
+        }
+
+        // Map frontend equipment
+        if (equipment != null && !equipment.equals("all")) {
+            if ("None".equals(equipment)) {
+                searchRequest.setRequiresEquipment(false);
+            } else {
+                searchRequest.setEquipment(List.of(equipment));
+            }
+        }
+
+        // Map frontend goal to exercise type (until you add fitnessGoals field)
+        if (goal != null && !goal.equals("all")) {
+            Exercise.ExerciseType mappedType = mapGoalToExerciseType(goal);
+            if (mappedType != null) {
+                searchRequest.setExerciseType(mappedType);
+            }
+        }
+
+        searchRequest.setPage(0);
+        searchRequest.setSize(100); // Frontend loads all initially
+        searchRequest.setSortBy("usageCount");
+        searchRequest.setSortDirection("desc");
+
+        // Use your existing search logic
+        Pageable pageable = createPageable(searchRequest);
+        Page<Exercise> exercisePage = exerciseService.searchExercises(
+                searchRequest.getSearch(),
+                searchRequest.getMuscleGroups(),
+                searchRequest.getEquipment(),
+                searchRequest.getDifficultyLevel(),
+                pageable
+        );
+
+        // Return exercises (using existing DTO for now)
+        List<ExerciseResponseDTO> response = ExerciseResponseDTO.fromEntityList(exercisePage.getContent());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/public/search")
+    public ResponseEntity<List<ExerciseResponseDTO>> searchPublicExercises(
+            @RequestParam String q,
+            @RequestParam(required = false) String goal,
+            @RequestParam(required = false) String difficulty,
+            @RequestParam(required = false) String equipment) {
+
+        log.debug("Public search request - query: {}, goal: {}, difficulty: {}, equipment: {}", q, goal, difficulty, equipment);
+
+        // Same logic as above but with search term
+        ExerciseSearchRequestDTO searchRequest = new ExerciseSearchRequestDTO();
+        searchRequest.setSearch(q);
+
+        // Map frontend parameters (same logic as above)
+        if (difficulty != null && !difficulty.equals("all")) {
+            try {
+                searchRequest.setDifficultyLevel(Exercise.DifficultyLevel.valueOf(difficulty.toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid difficulty level: {}", difficulty);
+            }
+        }
+
+        if (equipment != null && !equipment.equals("all")) {
+            if ("None".equals(equipment)) {
+                searchRequest.setRequiresEquipment(false);
+            } else {
+                searchRequest.setEquipment(List.of(equipment));
+            }
+        }
+
+        if (goal != null && !goal.equals("all")) {
+            Exercise.ExerciseType mappedType = mapGoalToExerciseType(goal);
+            if (mappedType != null) {
+                searchRequest.setExerciseType(mappedType);
+            }
+        }
+
+        searchRequest.setPage(0);
+        searchRequest.setSize(100);
+        searchRequest.setSortBy("usageCount");
+        searchRequest.setSortDirection("desc");
+
+        // Use your existing search logic
+        Pageable pageable = createPageable(searchRequest);
+        Page<Exercise> exercisePage = exerciseService.searchExercises(
+                searchRequest.getSearch(),
+                searchRequest.getMuscleGroups(),
+                searchRequest.getEquipment(),
+                searchRequest.getDifficultyLevel(),
+                pageable
+        );
+
+        List<ExerciseResponseDTO> response = ExerciseResponseDTO.fromEntityList(exercisePage.getContent());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/goals")
+    public ResponseEntity<List<Map<String, Object>>> getGoals() {
+        // Get counts using your existing repository method
+        List<Object[]> typeCounts = exerciseService.getExerciseTypeCounts();
+
+        // Map exercise types to frontend goals
+        Map<String, Integer> goalCounts = new HashMap<>();
+        goalCounts.put("fat-burn", 0);
+        goalCounts.put("muscle-building", 0);
+        goalCounts.put("endurance", 0);
+        goalCounts.put("flexibility", 0);
+        goalCounts.put("sport-specific", 0);
+        goalCounts.put("recovery", 0);
+
+        // Aggregate counts from exercise types to goals
+        for (Object[] typeCount : typeCounts) {
+            Exercise.ExerciseType type = (Exercise.ExerciseType) typeCount[0];
+            Integer count = ((Number) typeCount[1]).intValue();
+
+            switch (type) {
+                case CARDIO:
+                    goalCounts.put("fat-burn", goalCounts.get("fat-burn") + count);
+                    goalCounts.put("endurance", goalCounts.get("endurance") + count);
+                    break;
+                case PLYOMETRIC:
+                    goalCounts.put("fat-burn", goalCounts.get("fat-burn") + count);
+                    goalCounts.put("endurance", goalCounts.get("endurance") + count);
+                    break;
+                case STRENGTH:
+                    goalCounts.put("muscle-building", goalCounts.get("muscle-building") + count);
+                    break;
+                case FLEXIBILITY:
+                    goalCounts.put("flexibility", goalCounts.get("flexibility") + count);
+                    break;
+                case SPORTS_SPECIFIC:
+                    goalCounts.put("sport-specific", goalCounts.get("sport-specific") + count);
+                    break;
+                case REHABILITATION:
+                    goalCounts.put("recovery", goalCounts.get("recovery") + count);
+                    break;
+                case BALANCE:
+                    goalCounts.put("recovery", goalCounts.get("recovery") + count);
+                    break;
+            }
+        }
+
+        List<Map<String, Object>> goals = goalCounts.entrySet().stream()
+                .map(entry -> {
+                    Map<String, Object> goal = new HashMap<>();
+                    goal.put("goal", entry.getKey());
+                    goal.put("count", entry.getValue());
+                    return goal;
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(goals);
+    }
+
+    @GetMapping("/public/filters")
+    public ResponseEntity<Map<String, Object>> getPublicFilterOptions() {
+        // Use your existing filter logic but return in frontend format
+        ExerciseFiltersDTO filters = exerciseService.getAvailableFiltersWithCounts();
+
+        // Convert to frontend format
+        List<String> equipment = filters.getEquipment();
+        if (!equipment.contains("None")) {
+            equipment = new ArrayList<>(equipment);
+            equipment.add(0, "None");
+        }
+
+        List<String> difficulties = filters.getDifficultyLevels().stream()
+                .map(diff -> diff.getValue().charAt(0) + diff.getValue().substring(1).toLowerCase())
+                .collect(Collectors.toList());
+
+        Map<String, Object> frontendFilters = new HashMap<>();
+        frontendFilters.put("equipment", equipment);
+        frontendFilters.put("difficulties", difficulties);
+
+        return ResponseEntity.ok(frontendFilters);
+    }
+
+    // ===================================================================
+    // 🌍 PUBLIC ENDPOINTS (Your existing endpoints - unchanged)
+    // ===================================================================
 
     @GetMapping
     public ResponseEntity<ExerciseListResponseDTO> getAllExercises(
@@ -150,7 +351,9 @@ public class ExerciseController {
         return ResponseEntity.ok(filters);
     }
 
-    // 👤 USER AUTHENTICATED ENDPOINTS
+    // ===================================================================
+    // 👤 USER AUTHENTICATED ENDPOINTS (Your existing endpoints - unchanged)
+    // ===================================================================
 
     @GetMapping("/recommended")
     public ResponseEntity<List<ExerciseResponseDTO>> getRecommendedExercises(
@@ -207,7 +410,9 @@ public class ExerciseController {
         return ResponseEntity.ok(response);
     }
 
-    // 👨‍💼 PROFESSIONAL ENDPOINTS
+    // ===================================================================
+    // 👨‍💼 PROFESSIONAL ENDPOINTS (Your existing endpoints - unchanged)
+    // ===================================================================
 
     // 🔧 FIXED - Clean version without try-catch
     @PostMapping
@@ -248,7 +453,9 @@ public class ExerciseController {
                 .build();
     }
 
-    // 🔒 ADMIN ENDPOINTS
+    // ===================================================================
+    // 🔒 ADMIN ENDPOINTS (Your existing endpoints - unchanged)
+    // ===================================================================
 
     // 🔧 FIXED - Clean version without try-catch
     @PostMapping("/{id}/approve")
@@ -304,7 +511,9 @@ public class ExerciseController {
         return ResponseEntity.ok(response);
     }
 
-    // 🔧 HELPER METHODS
+    // ===================================================================
+    // 🔧 HELPER METHODS (Enhanced with new methods)
+    // ===================================================================
 
     // ✅ UNCHANGED - This method works correctly
     private Pageable createPageable(ExerciseSearchRequestDTO request) {
@@ -319,11 +528,22 @@ public class ExerciseController {
         if ("relevance".equals(request.getSortBy())) {
             sort = Sort.by(Sort.Direction.DESC, "averageRating")
                     .and(Sort.by(Sort.Direction.DESC, "usageCount"))
-                    .and(Sort.by(Sort.Direction.ASC, "name"));
+                    .and(Sort.by(Sort.Direction.ASC, "exerciseName"));
         }
 
         return PageRequest.of(request.getPage(), request.getSize(), sort);
     }
 
-    // 🔥 REMOVED - All exception handlers removed since GlobalExceptionHandler handles everything
+    // 🆕 NEW - Helper method to map frontend goals to exercise types
+    private Exercise.ExerciseType mapGoalToExerciseType(String goal) {
+        return switch (goal) {
+            case "fat-burn" -> Exercise.ExerciseType.CARDIO;
+            case "muscle-building" -> Exercise.ExerciseType.STRENGTH;
+            case "endurance" -> Exercise.ExerciseType.CARDIO;
+            case "flexibility" -> Exercise.ExerciseType.FLEXIBILITY;
+            case "sport-specific" -> Exercise.ExerciseType.SPORTS_SPECIFIC;
+            case "recovery" -> Exercise.ExerciseType.REHABILITATION;
+            default -> null;
+        };
+    }
 }

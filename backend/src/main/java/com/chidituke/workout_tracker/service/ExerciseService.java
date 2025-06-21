@@ -47,7 +47,7 @@ public class ExerciseService {
     }
 
     public List<Exercise> findExercisesForWorkoutType(Exercise.ExerciseType type) {
-        return exerciseRepository.findByExerciseTypeAndPublishedTrueOrderByNameAsc(type).stream()
+        return exerciseRepository.findByExerciseTypeAndPublishedTrueOrderByExerciseNameAsc(type).stream()
                 .sorted(Comparator.comparing(Exercise::getAverageRating).reversed()
                         .thenComparing(Exercise::getUsageCount).reversed())
                 .collect(Collectors.toList());
@@ -84,7 +84,7 @@ public class ExerciseService {
     }
 
     public Page<Exercise> findPublishedExercises(Pageable pageable) {
-        return exerciseRepository.findByPublishedTrueOrderByNameAsc(pageable);
+        return exerciseRepository.findByPublishedTrueOrderByExerciseNameAsc(pageable);
     }
 
     public ExerciseFiltersDTO getAvailableFilters() {
@@ -191,7 +191,7 @@ public class ExerciseService {
         Exercise savedExercise = exerciseRepository.save(exercise);
 
         log.info("Professional exercise created: {} by user {}",
-                savedExercise.getName(), professional.getId());
+                savedExercise.getExerciseName(), professional.getId());
 
         return savedExercise;
     }
@@ -207,7 +207,7 @@ public class ExerciseService {
         exercise.setPublished(true);
         exerciseRepository.save(exercise);
 
-        log.info("Exercise approved: {} by admin {}", exercise.getName(), admin.getId());
+        log.info("Exercise approved: {} by admin {}", exercise.getExerciseName(), admin.getId());
     }
 
     @Transactional
@@ -219,7 +219,7 @@ public class ExerciseService {
         validateAdminPermissions(admin);
 
         exerciseRepository.delete(exercise);
-        log.info("Exercise deleted: {} by admin {}", exercise.getName(), admin.getId());
+        log.info("Exercise deleted: {} by admin {}", exercise.getExerciseName(), admin.getId());
     }
 
     @Transactional
@@ -232,7 +232,7 @@ public class ExerciseService {
 
         exercise.setPublished(true);
         exerciseRepository.save(exercise);
-        log.info("Exercise published: {} by admin {}", exercise.getName(), admin.getId());
+        log.info("Exercise published: {} by admin {}", exercise.getExerciseName(), admin.getId());
     }
 
     @Transactional
@@ -245,7 +245,7 @@ public class ExerciseService {
 
         exercise.setPublished(false);
         exerciseRepository.save(exercise);
-        log.info("Exercise unpublished: {} by admin {}", exercise.getName(), admin.getId());
+        log.info("Exercise unpublished: {} by admin {}", exercise.getExerciseName(), admin.getId());
     }
 
     // 📊 RATING & ANALYTICS
@@ -276,7 +276,11 @@ public class ExerciseService {
         exerciseRepository.save(exercise);
 
         log.info("Exercise rated: {} - {} stars by user {}",
-                exercise.getName(), rating, user.getId());
+                exercise.getExerciseName(), rating, user.getId());
+    }
+
+    public List<Object[]> getExerciseTypeCounts() {
+        return exerciseRepository.countByExerciseType();
     }
 
     @Transactional
@@ -291,7 +295,7 @@ public class ExerciseService {
         // Record user's exercise history (implement UserExerciseHistory entity later)
         recordExerciseInHistory(user, exercise);
 
-        log.debug("Exercise usage recorded: {} by user {}", exercise.getName(), user.getId());
+        log.debug("Exercise usage recorded: {} by user {}", exercise.getExerciseName(), user.getId());
     }
 
     public ExerciseService.ExerciseAnalytics getExerciseAnalytics(Long exerciseId) {
@@ -301,7 +305,7 @@ public class ExerciseService {
 
         return ExerciseService.ExerciseAnalytics.builder()
                 .exerciseId(exercise.getId())
-                .exerciseName(exercise.getName())
+                .exerciseName(exercise.getExerciseName())
                 .totalUsage(exercise.getUsageCount())
                 .averageRating(exercise.getAverageRating())
                 .totalRatings(exercise.getTotalRatings())

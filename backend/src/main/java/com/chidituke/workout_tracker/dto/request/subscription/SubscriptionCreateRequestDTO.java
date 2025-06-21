@@ -25,6 +25,8 @@ public class SubscriptionCreateRequestDTO {
     private SubscriptionTier subscriptionTier;
 
     private LocalDateTime endDate;
+
+    @Builder.Default
     private Boolean autoRenew = true;
 
     // Stripe integration fields

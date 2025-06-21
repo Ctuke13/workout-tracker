@@ -70,7 +70,7 @@ public class WorkoutProgram {
 
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
-    @Column(name = "average_rating", precision = 3, scale = 2)
+    @Column(name = "average_rating")
     private Double averageRating = 0.0;
 
     @Min(value = 0, message = "Total ratings cannot be negative")

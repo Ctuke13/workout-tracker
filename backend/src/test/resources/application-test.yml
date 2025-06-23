@@ -1,0 +1,31 @@
+
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  # Explicitly disable H2
+  h2:
+    console:
+      enabled: false
+
+  # Reduce logging noise during tests
+logging:
+  level:
+    org.flywaydb: WARN
+    org.testcontainers: WARN
+    org.springframework.jdbc: WARN
+    org.hibernate: WARN

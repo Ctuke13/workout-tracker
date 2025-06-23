@@ -120,7 +120,12 @@ public interface WorkoutPlanRepository extends JpaRepository<WorkoutPlan, Long> 
     List<Object[]> countByDifficultyLevel();
 
     // Find trending workouts (most used in recent period)
-    @Query("SELECT w FROM WorkoutPlan w WHERE w.isPublic = true " +
-            "AND w.updatedAt >= CURRENT_DATE - 30 ORDER BY w.timesUsed DESC")
+    @Query(
+            value = "SELECT * FROM workout_plan " +
+                    "WHERE is_public = true " +
+                    "AND updated_at >= CURRENT_DATE - INTERVAL '30 days' " +
+                    "ORDER BY times_used DESC",
+            nativeQuery = true
+    )
     List<WorkoutPlan> findTrendingWorkouts(Pageable pageable);
 }

@@ -101,7 +101,7 @@ public interface ProgramPlanRepository extends JpaRepository<ProgramPlan, Long> 
     List<Object[]> countWorkoutsByWeek(@Param("program") WorkoutProgram program);
 
     // Program structure overview
-    @Query("SELECT pp.weekNumber, pp.dayNumber, pp.workoutPlan.name, pp.isRestDay, pp.phaseType FROM ProgramPlan pp WHERE pp.program = :program ORDER BY pp.weekNumber, pp.dayNumber")
+    @Query("SELECT pp.weekNumber, pp.dayNumber, pp.workoutPlan.workoutName, pp.isRestDay, pp.phaseType FROM ProgramPlan pp WHERE pp.program = :program ORDER BY pp.weekNumber, pp.dayNumber")
     List<Object[]> getProgramStructure(@Param("program") WorkoutProgram program);
 
     // Additional useful methods for the service

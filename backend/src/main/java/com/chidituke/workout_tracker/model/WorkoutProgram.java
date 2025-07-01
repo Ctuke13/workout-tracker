@@ -12,6 +12,7 @@ import java.util.List;
 public class WorkoutProgram {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "workout_program_id")
     private Long id;
 
     @NotBlank(message = "Program name is required")

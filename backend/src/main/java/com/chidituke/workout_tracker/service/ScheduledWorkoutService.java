@@ -184,7 +184,7 @@ public class ScheduledWorkoutService {
         validateOwnership(scheduledWorkout, username);
 
         // Validate workout session belongs to this scheduled workout
-        if (!workoutSession.getWorkout().getId().equals(scheduledWorkout.getWorkoutPlan().getId())) {
+        if (!workoutSession.getWorkoutPlan().getId().equals(scheduledWorkout.getWorkoutPlan().getId())) {
             throw new IllegalArgumentException("Workout session does not match scheduled workout plan");
         }
 

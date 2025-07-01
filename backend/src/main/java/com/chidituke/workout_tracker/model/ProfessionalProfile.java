@@ -3,7 +3,6 @@ package com.chidituke.workout_tracker.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
-import org.springframework.cache.annotation.Cacheable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +24,7 @@ public class ProfessionalProfile {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "professional_profile_id")
     private Long id;
 
     // ==================== CORE RELATIONSHIP ====================
@@ -54,14 +54,14 @@ public class ProfessionalProfile {
     private ServiceType serviceType = ServiceType.PERSONAL_TRAINER;
 
     @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "professional_specializations", joinColumns = @JoinColumn(name = "professional_id"))
+    @CollectionTable(name = "professional_specializations", joinColumns = @JoinColumn(name = "professional_profile_id"))
     @Column(name = "specialization")
     @Size(max = 10, message = "Maximum 10 specializations allowed")
     @Builder.Default
     private List<String> specializations = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "professional_certifications", joinColumns = @JoinColumn(name = "professional_id"))
+    @CollectionTable(name = "professional_certifications", joinColumns = @JoinColumn(name = "professional_profile_id"))
     @Column(name = "certification")
     @Size(max = 15, message = "Maximum 15 certifications allowed")
     @Builder.Default
@@ -91,7 +91,7 @@ public class ProfessionalProfile {
     private String baseZipcode;
 
     @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "professional_service_areas", joinColumns = @JoinColumn(name = "professional_id"))
+    @CollectionTable(name = "professional_service_areas", joinColumns = @JoinColumn(name = "professional_profile_id"))
     @Column(name = "zipcode")
     @Size(max = 50, message = "Maximum 50 service areas allowed")
     @Builder.Default
@@ -141,7 +141,7 @@ public class ProfessionalProfile {
     private String licenseNumber;
 
     @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "professional_social_links", joinColumns = @JoinColumn(name = "professional_id"))
+    @CollectionTable(name = "professional_social_links", joinColumns = @JoinColumn(name = "professional_profile_id"))
     @Column(name = "social_link")
     @Size(max = 10, message = "Maximum 10 social media links allowed")
     @Builder.Default

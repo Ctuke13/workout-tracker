@@ -14,6 +14,7 @@ import java.time.temporal.ChronoUnit;
 public class ScheduledWorkout {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "scheduled_workout_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)

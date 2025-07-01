@@ -1,7 +1,7 @@
 -- =============================================================================
 -- V001__Create_Core_User_System.sql
 -- Creates users, subscriptions, and professional_profiles tables
--- EXACTLY MATCHES the JPA entity definitions
+-- EXACTLY MATCHES the JPA entity definitions with explicit column names
 -- =============================================================================
 
 -- =====================================================
@@ -9,7 +9,7 @@
 -- =====================================================
 
 CREATE TABLE users (
-                       id BIGSERIAL PRIMARY KEY,
+                       user_id BIGSERIAL PRIMARY KEY,
 
     -- Basic account info
                        username VARCHAR(20) NOT NULL UNIQUE,
@@ -103,7 +103,7 @@ ALTER TABLE users ADD CONSTRAINT chk_workout_frequency
 -- =====================================================
 
 CREATE TABLE subscriptions (
-                               id BIGSERIAL PRIMARY KEY,
+                               subscription_id BIGSERIAL PRIMARY KEY,
                                user_id BIGINT NOT NULL,
 
     -- Subscription details
@@ -129,7 +129,7 @@ CREATE TABLE subscriptions (
                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     -- Foreign key
-                               CONSTRAINT fk_subscription_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                               CONSTRAINT fk_subscription_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 -- Add constraints for Subscription enum values
@@ -148,7 +148,7 @@ ALTER TABLE subscriptions ADD CONSTRAINT chk_status
 -- =====================================================
 
 CREATE TABLE professional_profiles (
-                                       id BIGSERIAL PRIMARY KEY,
+                                       professional_profile_id BIGSERIAL PRIMARY KEY,
                                        user_id BIGINT NOT NULL,
 
     -- Professional Identity
@@ -225,7 +225,7 @@ CREATE TABLE professional_profiles (
                                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     -- Foreign key
-                                       CONSTRAINT fk_professional_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                                       CONSTRAINT fk_professional_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 -- Add constraints for ProfessionalProfile enum values
@@ -256,30 +256,30 @@ ALTER TABLE professional_profiles ADD CONSTRAINT chk_rating
 
 -- Specializations list
 CREATE TABLE professional_specializations (
-                                              professional_id BIGINT NOT NULL,
+                                              professional_profile_id BIGINT NOT NULL,
                                               specialization VARCHAR(255) NOT NULL,
-                                              CONSTRAINT fk_specializations_professional FOREIGN KEY (professional_id) REFERENCES professional_profiles(id) ON DELETE CASCADE
+                                              CONSTRAINT fk_specializations_professional FOREIGN KEY (professional_profile_id) REFERENCES professional_profiles(professional_profile_id) ON DELETE CASCADE
 );
 
 -- Certifications list
 CREATE TABLE professional_certifications (
-                                             professional_id BIGINT NOT NULL,
+                                             professional_profile_id BIGINT NOT NULL,
                                              certification VARCHAR(255) NOT NULL,
-                                             CONSTRAINT fk_certifications_professional FOREIGN KEY (professional_id) REFERENCES professional_profiles(id) ON DELETE CASCADE
+                                             CONSTRAINT fk_certifications_professional FOREIGN KEY (professional_profile_id) REFERENCES professional_profiles(professional_profile_id) ON DELETE CASCADE
 );
 
 -- Service areas list
 CREATE TABLE professional_service_areas (
-                                            professional_id BIGINT NOT NULL,
+                                            professional_profile_id BIGINT NOT NULL,
                                             zipcode VARCHAR(255) NOT NULL,
-                                            CONSTRAINT fk_service_areas_professional FOREIGN KEY (professional_id) REFERENCES professional_profiles(id) ON DELETE CASCADE
+                                            CONSTRAINT fk_service_areas_professional FOREIGN KEY (professional_profile_id) REFERENCES professional_profiles(professional_profile_id) ON DELETE CASCADE
 );
 
 -- Social media links list
 CREATE TABLE professional_social_links (
-                                           professional_id BIGINT NOT NULL,
+                                           professional_profile_id BIGINT NOT NULL,
                                            social_link VARCHAR(255) NOT NULL,
-                                           CONSTRAINT fk_social_links_professional FOREIGN KEY (professional_id) REFERENCES professional_profiles(id) ON DELETE CASCADE
+                                           CONSTRAINT fk_social_links_professional FOREIGN KEY (professional_profile_id) REFERENCES professional_profiles(professional_profile_id) ON DELETE CASCADE
 );
 
 -- =====================================================
@@ -332,11 +332,11 @@ CREATE INDEX idx_professional_location_service ON professional_profiles(service_
 CREATE INDEX idx_users_subscription_active ON users(subscription_tier, enabled);
 
 -- Collection table indexes
-CREATE INDEX idx_specializations_professional ON professional_specializations(professional_id);
-CREATE INDEX idx_certifications_professional ON professional_certifications(professional_id);
-CREATE INDEX idx_service_areas_professional ON professional_service_areas(professional_id);
+CREATE INDEX idx_specializations_professional ON professional_specializations(professional_profile_id);
+CREATE INDEX idx_certifications_professional ON professional_certifications(professional_profile_id);
+CREATE INDEX idx_service_areas_professional ON professional_service_areas(professional_profile_id);
 CREATE INDEX idx_service_areas_zipcode ON professional_service_areas(zipcode);
-CREATE INDEX idx_social_links_professional ON professional_social_links(professional_id);
+CREATE INDEX idx_social_links_professional ON professional_social_links(professional_profile_id);
 
 -- =====================================================
 -- UNIQUE CONSTRAINTS

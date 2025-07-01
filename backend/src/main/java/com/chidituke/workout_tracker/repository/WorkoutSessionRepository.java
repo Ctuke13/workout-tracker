@@ -45,23 +45,23 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     // =======================
 
     // Find sessions for specific workout plan
-    List<WorkoutSession> findByWorkoutOrderByDateDesc(WorkoutPlan workout);
+    List<WorkoutSession> findByWorkoutPlanOrderByDateDesc(WorkoutPlan workoutPlan);
 
     // Find how many times user completed specific workout plan
-    long countByUserAndWorkout(User user, WorkoutPlan workout);
+    long countByUserAndWorkoutPlan(User user, WorkoutPlan workoutPlan);
 
     // Find user's sessions for specific workout plan
-    List<WorkoutSession> findByUserAndWorkoutOrderByDateDesc(User user, WorkoutPlan workout);
+    List<WorkoutSession> findByUserAndWorkoutPlanOrderByDateDesc(User user, WorkoutPlan workoutPlan);
 
     // Find user's last completion of specific workout plan
-    Optional<WorkoutSession> findTopByUserAndWorkoutOrderByDateDesc(User user, WorkoutPlan workout);
+    Optional<WorkoutSession> findTopByUserAndWorkoutPlanOrderByDateDesc(User user, WorkoutPlan workoutPlan);
 
     // =======================
     // WORKOUT PROGRAM TRACKING (Multi-week programs)
     // =======================
 
     // Count sessions by workout plan
-    long countByWorkout(WorkoutPlan workoutPlan);
+    long countByWorkoutPlan(WorkoutPlan workoutPlan);
 
     // Count sessions by program
     long countByProgram(WorkoutProgram program);

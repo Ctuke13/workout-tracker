@@ -24,6 +24,7 @@ public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "user_id")
     private Long id;
 
     @Column(unique = true, nullable = false)
@@ -664,6 +665,405 @@ public class User implements UserDetails {
 
         public String getDescription() {
             return description;
+        }
+    }
+
+    // ==================== SOCIAL SHARING PREFERENCES ====================
+
+    @Column(name = "auto_suggest_workout_sharing")
+    @Builder.Default
+    private Boolean autoSuggestWorkoutSharing = true;
+
+    @Column(name = "default_post_privacy")
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private DefaultPostPrivacy defaultPostPrivacy = DefaultPostPrivacy.PUBLIC;
+
+    @Column(name = "auto_share_achievements")
+    @Builder.Default
+    private Boolean autoShareAchievements = true;
+
+    @Column(name = "allow_mentions")
+    @Builder.Default
+    private Boolean allowMentions = true;
+
+    @Column(name = "show_workout_stats_in_posts")
+    @Builder.Default
+    private Boolean showWorkoutStatsInPosts = true;
+
+    @Column(name = "allow_comments_on_posts")
+    @Builder.Default
+    private Boolean allowCommentsOnPosts = true;
+
+    @Column(name = "moderate_comments")
+    @Builder.Default
+    private Boolean moderateComments = false;
+
+    // ==================== SOCIAL COUNTERS ====================
+
+    @Column(name = "followers_count")
+    @Builder.Default
+    private Integer followersCount = 0;
+
+    @Column(name = "following_count")
+    @Builder.Default
+    private Integer followingCount = 0;
+
+    @Column(name = "posts_count")
+    @Builder.Default
+    private Integer postsCount = 0;
+
+    @Column(name = "total_likes_received")
+    @Builder.Default
+    private Integer totalLikesReceived = 0;
+
+    // ==================== SOCIAL ENGAGEMENT SETTINGS ====================
+
+    @Column(name = "show_activity_status")
+    @Builder.Default
+    private Boolean showActivityStatus = true;
+
+    @Column(name = "allow_friend_requests")
+    @Builder.Default
+    private Boolean allowFriendRequests = true;
+
+    @Column(name = "auto_accept_follow_requests")
+    @Builder.Default
+    private Boolean autoAcceptFollowRequests = true;
+
+    // ==================== ADD THESE METHODS TO USER ENTITY ====================
+    // (Add these methods to your existing User.java class)
+
+    // ==================== SOCIAL SHARING METHODS ====================
+
+    /**
+     * Check if user wants to be prompted to share workout completions
+     */
+    public boolean shouldPromptWorkoutSharing() {
+        return Boolean.TRUE.equals(autoSuggestWorkoutSharing);
+    }
+
+    /**
+     * Disable auto-suggestion for workout sharing ("Don't ask me again")
+     */
+    public void disableWorkoutSharingPrompts() {
+        this.autoSuggestWorkoutSharing = false;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Enable auto-suggestion for workout sharing
+     */
+    public void enableWorkoutSharingPrompts() {
+        this.autoSuggestWorkoutSharing = true;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Get default privacy level for new posts
+     */
+    public DefaultPostPrivacy getDefaultPostPrivacy() {
+        return defaultPostPrivacy != null ? defaultPostPrivacy : DefaultPostPrivacy.PUBLIC;
+    }
+
+    /**
+     * Set default post privacy level
+     */
+    public void setDefaultPostPrivacy(DefaultPostPrivacy privacy) {
+        this.defaultPostPrivacy = privacy;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Check if user allows being mentioned in posts
+     */
+    public boolean allowsMentions() {
+        return Boolean.TRUE.equals(allowMentions);
+    }
+
+    /**
+     * Check if user wants workout stats included in shared posts
+     */
+    public boolean includeWorkoutStatsInPosts() {
+        return Boolean.TRUE.equals(showWorkoutStatsInPosts);
+    }
+
+    /**
+     * Check if user allows comments on their posts
+     */
+    public boolean allowsCommentsOnPosts() {
+        return Boolean.TRUE.equals(allowCommentsOnPosts);
+    }
+
+    /**
+     * Check if user moderates comments before they appear
+     */
+    public boolean moderatesComments() {
+        return Boolean.TRUE.equals(moderateComments);
+    }
+
+    /**
+     * Check if user auto-shares achievements
+     */
+    public boolean autoSharesAchievements() {
+        return Boolean.TRUE.equals(autoShareAchievements);
+    }
+
+    // ==================== SOCIAL COUNTER METHODS ====================
+
+    /**
+     * Increment posts counter
+     */
+    public void incrementPostsCount() {
+        this.postsCount = (this.postsCount == null ? 0 : this.postsCount) + 1;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Decrement posts counter
+     */
+    public void decrementPostsCount() {
+        this.postsCount = Math.max(0, (this.postsCount == null ? 0 : this.postsCount) - 1);
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Update follower count
+     */
+    public void updateFollowersCount(int change) {
+        this.followersCount = Math.max(0, (this.followersCount == null ? 0 : this.followersCount) + change);
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Update following count
+     */
+    public void updateFollowingCount(int change) {
+        this.followingCount = Math.max(0, (this.followingCount == null ? 0 : this.followingCount) + change);
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Add to total likes received across all posts
+     */
+    public void addLikesReceived(int likes) {
+        this.totalLikesReceived = (this.totalLikesReceived == null ? 0 : this.totalLikesReceived) + likes;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Get social stats summary
+     */
+    public String getSocialStatsSummary() {
+        int posts = this.postsCount != null ? this.postsCount : 0;
+        int followers = this.followersCount != null ? this.followersCount : 0;
+        int following = this.followingCount != null ? this.followingCount : 0;
+
+        return String.format("%d posts • %d followers • %d following", posts, followers, following);
+    }
+
+    /**
+     * Get detailed social stats
+     */
+    public String getDetailedSocialStats() {
+        int posts = this.postsCount != null ? this.postsCount : 0;
+        int followers = this.followersCount != null ? this.followersCount : 0;
+        int following = this.followingCount != null ? this.followingCount : 0;
+        int likes = this.totalLikesReceived != null ? this.totalLikesReceived : 0;
+
+        return String.format("Posts: %d | Followers: %d | Following: %d | Total Likes: %d",
+                posts, followers, following, likes);
+    }
+
+    // ==================== SOCIAL PRIVACY METHODS ====================
+
+    /**
+     * Check if user shows their activity status to others
+     */
+    public boolean showsActivityStatus() {
+        return Boolean.TRUE.equals(showActivityStatus);
+    }
+
+    /**
+     * Check if user accepts friend requests
+     */
+    public boolean acceptsFriendRequests() {
+        return Boolean.TRUE.equals(allowFriendRequests);
+    }
+
+    /**
+     * Check if user auto-accepts follow requests
+     */
+    public boolean autoAcceptsFollowRequests() {
+        return Boolean.TRUE.equals(autoAcceptFollowRequests);
+    }
+
+    /**
+     * Toggle activity status visibility
+     */
+    public void toggleActivityStatusVisibility() {
+        this.showActivityStatus = !Boolean.TRUE.equals(this.showActivityStatus);
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Toggle friend request acceptance
+     */
+    public void toggleFriendRequestAcceptance() {
+        this.allowFriendRequests = !Boolean.TRUE.equals(this.allowFriendRequests);
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Toggle auto-accept follow requests
+     */
+    public void toggleAutoAcceptFollowRequests() {
+        this.autoAcceptFollowRequests = !Boolean.TRUE.equals(this.autoAcceptFollowRequests);
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // ==================== SOCIAL ENGAGEMENT METHODS ====================
+
+    /**
+     * Check if user has an active social presence
+     */
+    public boolean hasActiveSocialPresence() {
+        return (this.postsCount != null && this.postsCount > 0) ||
+                (this.followersCount != null && this.followersCount > 0) ||
+                (this.followingCount != null && this.followingCount > 0);
+    }
+
+    /**
+     * Check if user is a popular content creator
+     */
+    public boolean isPopularCreator() {
+        int followers = this.followersCount != null ? this.followersCount : 0;
+        int posts = this.postsCount != null ? this.postsCount : 0;
+        int likes = this.totalLikesReceived != null ? this.totalLikesReceived : 0;
+
+        return followers > 100 || (posts > 10 && likes > 50);
+    }
+
+    /**
+     * Get engagement rate (likes per post)
+     */
+    public double getEngagementRate() {
+        if (postsCount == null || postsCount == 0) return 0.0;
+        int likes = this.totalLikesReceived != null ? this.totalLikesReceived : 0;
+        return (double) likes / postsCount;
+    }
+
+    /**
+     * Check if user is socially active (posted recently or has good engagement)
+     */
+    public boolean isSociallyActive() {
+        boolean hasRecentActivity = isActiveToday(); // Reuse existing activity logic
+        boolean hasGoodEngagement = getEngagementRate() > 2.0; // Average 2+ likes per post
+        boolean hasFollowers = this.followersCount != null && this.followersCount > 5;
+
+        return hasRecentActivity || hasGoodEngagement || hasFollowers;
+    }
+
+    public boolean isActiveToday() {
+        if (lastActive == null) return false;
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+        return lastActive.isAfter(todayStart);
+    }
+
+    public boolean isCurrentlyActive() {
+        if (lastActive == null) return false;
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(15);
+        return lastActive.isAfter(cutoff);
+    }
+
+    /**
+     * Get social influence score (0-100)
+     */
+    public int getSocialInfluenceScore() {
+        int score = 0;
+
+        // Followers contribution (max 40 points)
+        if (followersCount != null) {
+            score += Math.min(40, followersCount / 10);
+        }
+
+        // Posts contribution (max 20 points)
+        if (postsCount != null) {
+            score += Math.min(20, postsCount / 2);
+        }
+
+        // Likes contribution (max 25 points)
+        if (totalLikesReceived != null) {
+            score += Math.min(25, totalLikesReceived / 20);
+        }
+
+        // Engagement rate contribution (max 15 points)
+        score += Math.min(15, (int)(getEngagementRate() * 3));
+
+        return Math.min(100, score);
+    }
+
+    // ==================== PROFESSIONAL ACTIVITY METHODS ====================
+// These should only be used when user.isProfessional() is true
+
+    /**
+     * For professionals: Check if they're active today via their professional profile
+     */
+    public boolean isProfessionalActiveToday() {
+        if (!isProfessional() || professionalProfile == null) {
+            return isActiveToday(); // Fallback to regular user activity
+        }
+        return professionalProfile.isProfessionalActiveToday();
+    }
+
+    /**
+     * For professionals: Check if they're currently active via their professional profile
+     */
+    public boolean isProfessionalCurrentlyActive() {
+        if (!isProfessional() || professionalProfile == null) {
+            return isCurrentlyActive(); // Fallback to regular user activity
+        }
+        return professionalProfile.isProfessionalCurrentlyActive();
+    }
+
+    // ==================== ADD THIS ENUM TO USER.java ====================
+    // (Add this enum inside the User class, alongside your other enums)
+
+    public enum DefaultPostPrivacy {
+        PUBLIC("Public - Visible to everyone"),
+        FRIENDS_ONLY("Friends Only - Visible to connections"),
+        PRIVATE("Private - Only visible to you");
+
+        private final String description;
+
+        DefaultPostPrivacy(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        /**
+         * Convert to SocialPost.PrivacyLevel
+         */
+        public SocialPost.PrivacyLevel toSocialPostPrivacy() {
+            return switch (this) {
+                case PUBLIC -> SocialPost.PrivacyLevel.PUBLIC;
+                case FRIENDS_ONLY -> SocialPost.PrivacyLevel.FRIENDS_ONLY;
+                case PRIVATE -> SocialPost.PrivacyLevel.PRIVATE;
+            };
+        }
+
+        /**
+         * Create from SocialPost.PrivacyLevel
+         */
+        public static DefaultPostPrivacy fromSocialPostPrivacy(SocialPost.PrivacyLevel privacy) {
+            return switch (privacy) {
+                case PUBLIC -> PUBLIC;
+                case FRIENDS_ONLY -> FRIENDS_ONLY;
+                case PRIVATE -> PRIVATE;
+            };
         }
     }
 }

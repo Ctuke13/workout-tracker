@@ -70,6 +70,12 @@ public class UserService {
         return user.getId();
     }
 
+    @Transactional
+    public User save(User user) {
+        user.setUpdatedAt(LocalDateTime.now());
+        return userRepository.save(user);
+    }
+
     /**
      * Get user by username (ADDED FOR CONVENIENCE)
      */

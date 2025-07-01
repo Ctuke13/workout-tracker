@@ -9,7 +9,6 @@ import com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationExce
 import com.chidituke.workout_tracker.mapper.ExerciseMapper;
 import com.chidituke.workout_tracker.model.Exercise;
 import com.chidituke.workout_tracker.model.User;
-import com.chidituke.workout_tracker.model.ProfessionalProfile;
 import com.chidituke.workout_tracker.repository.ExerciseRepository;
 import com.chidituke.workout_tracker.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

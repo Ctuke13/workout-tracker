@@ -148,9 +148,9 @@ public class PerformanceMapper {
         if (performanceRecord.getWorkoutSession() != null) {
             builder.workoutDate(performanceRecord.getWorkoutSession().getDate());
 
-            if (performanceRecord.getWorkoutSession().getWorkout() != null) {
-                builder.workoutName(performanceRecord.getWorkoutSession().getWorkout().getWorkoutName())
-                        .workoutCategory(performanceRecord.getWorkoutSession().getWorkout().getWorkoutCategory());
+            if (performanceRecord.getWorkoutSession().getWorkoutPlan() != null) {
+                builder.workoutName(performanceRecord.getWorkoutSession().getWorkoutPlan().getWorkoutName())
+                        .workoutCategory(performanceRecord.getWorkoutSession().getWorkoutPlan().getWorkoutCategory());
             }
         }
 

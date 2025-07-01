@@ -16,11 +16,11 @@ import java.time.LocalDateTime;
 @Data
 @Entity
 @Table(name = "performance_records", indexes = {
-        @Index(name = "idx_performance_workout_log", columnList = "workout_log_id"),
+        @Index(name = "idx_performance_workout_session", columnList = "workout_session_id"),
         @Index(name = "idx_performance_exercise", columnList = "exercise_id"),
-        @Index(name = "idx_performance_user_date", columnList = "workout_log_id, created_at"),
-        @Index(name = "idx_performance_user_exercise", columnList = "workout_log_id, exercise_id"),
-        @Index(name = "idx_performance_set_number", columnList = "workout_log_id, set_number")
+        @Index(name = "idx_performance_user_date", columnList = "workout_session_id, created_at"),
+        @Index(name = "idx_performance_user_exercise", columnList = "workout_session_id, exercise_id"),
+        @Index(name = "idx_performance_set_number", columnList = "workout_session_id, set_number")
 })
 @NoArgsConstructor
 @AllArgsConstructor
@@ -32,6 +32,7 @@ public class PerformanceRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "performance_record_id")
     private Long id;
 
     // ==============================================
@@ -44,8 +45,8 @@ public class PerformanceRecord {
     private Exercise exercise;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "workout_log_id", nullable = false)
-    @NotNull(message = "Workout log is required")
+    @JoinColumn(name = "workout_session_id", nullable = false)
+    @NotNull(message = "Workout Session is required")
     private WorkoutSession workoutSession;
 
     // ==============================================

@@ -6,10 +6,11 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "workouts")
+@Table(name = "workout_plans")
 public class WorkoutPlan {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "workout_plan_id")
     private Long id;
 
     @Column(nullable = false)

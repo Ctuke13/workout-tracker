@@ -12,8 +12,6 @@ import com.chidituke.workout_tracker.model.*;
 import com.chidituke.workout_tracker.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +45,7 @@ public class WorkoutSessionService {
 
         WorkoutSession workoutSession = new WorkoutSession();
         workoutSession.setUser(user);
-        workoutSession.setWorkout(workoutPlan);
+        workoutSession.setWorkoutPlan(workoutPlan);
         workoutSession.setDate(request.getDate() != null ? request.getDate() : LocalDate.now());
 
         // Map request fields
@@ -164,7 +162,7 @@ public class WorkoutSessionService {
         WorkoutPlan workoutPlan = findWorkoutPlanById(workoutPlanId);
 
         List<WorkoutSession> sessions = workoutSessionRepository
-                .findByUserAndWorkoutOrderByDateDesc(user, workoutPlan);
+                .findByUserAndWorkoutPlanOrderByDateDesc(user, workoutPlan);
         return workoutSessionMapper.toResponseList(sessions);
     }
 
@@ -172,14 +170,14 @@ public class WorkoutSessionService {
         User user = findUserByUsername(username);
         WorkoutPlan workoutPlan = findWorkoutPlanById(workoutPlanId);
 
-        return workoutSessionRepository.countByUserAndWorkout(user, workoutPlan);
+        return workoutSessionRepository.countByUserAndWorkoutPlan(user, workoutPlan);
     }
 
     public Optional<WorkoutSessionResponse> getLastCompletionOfWorkoutPlan(String username, Long workoutPlanId) {
         User user = findUserByUsername(username);
         WorkoutPlan workoutPlan = findWorkoutPlanById(workoutPlanId);
 
-        return workoutSessionRepository.findTopByUserAndWorkoutOrderByDateDesc(user, workoutPlan)
+        return workoutSessionRepository.findTopByUserAndWorkoutPlanOrderByDateDesc(user, workoutPlan)
                 .map(workoutSessionMapper::toResponse);
     }
 
@@ -380,7 +378,7 @@ public class WorkoutSessionService {
         // Create a new workout session from the scheduled workout
         WorkoutSession workoutSession = new WorkoutSession();
         workoutSession.setUser(user);
-        workoutSession.setWorkout(scheduledWorkout.getWorkoutPlan());
+        workoutSession.setWorkoutPlan(scheduledWorkout.getWorkoutPlan());
         workoutSession.setDate(LocalDate.now());
         workoutSession.setScheduledWorkout(scheduledWorkout);
 
@@ -462,5 +460,21 @@ public class WorkoutSessionService {
         }
 
         return streak;
+    }
+
+    public WorkoutSession findById(Long sessionId) {
+        return workoutSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new WorkoutSessionNotFoundException(sessionId));
+    }
+
+    public long countByUserId(Long userId) {
+        User user = findUserById(userId);
+        return workoutSessionRepository.countByUser(user);
+    }
+
+    // Helper method if it doesn't exist
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + userId));
     }
 }

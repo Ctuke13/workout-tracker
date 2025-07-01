@@ -13,6 +13,7 @@ import java.util.ArrayList;
 public class Exercise {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "exercise_id")
     private Long id;
 
     @NotBlank(message = "Exercise name is required")

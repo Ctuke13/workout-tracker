@@ -12,10 +12,11 @@ import java.time.LocalDateTime;
 public class PlanExercise {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "plan_exercise_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "workout_id", nullable = false)
+    @JoinColumn(name = "workout_plan_id", nullable = false)
     @NotNull(message = "Workout is required")
     private WorkoutPlan workoutPlan;
 

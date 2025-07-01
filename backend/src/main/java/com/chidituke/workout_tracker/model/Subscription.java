@@ -16,6 +16,7 @@ public class Subscription {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "subscription_id")
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)

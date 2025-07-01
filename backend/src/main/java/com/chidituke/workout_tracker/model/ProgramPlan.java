@@ -1,14 +1,15 @@
 package com.chidituke.workout_tracker.model;
 
+import com.chidituke.workout_tracker.model.WorkoutPlan;
+import com.chidituke.workout_tracker.model.WorkoutProgram;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-// Add your actual package imports here:
-// import your.package.entities.WorkoutProgram;
-// import your.package.entities.WorkoutPlan;
+
 
 @Entity
 @Table(name = "program_plans",
@@ -22,6 +23,7 @@ public class ProgramPlan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "program_plan_id")
     private Long id;
 
     @Column(name = "created_at", nullable = false, updatable = false)

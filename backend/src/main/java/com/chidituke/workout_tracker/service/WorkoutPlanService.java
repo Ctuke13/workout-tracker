@@ -3,8 +3,6 @@ package com.chidituke.workout_tracker.service;
 import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutPlanRequest;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanResponse;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanAnalyticsResponse;
-import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanListResponse;
-import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanSearchResponse;
 import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
 import com.chidituke.workout_tracker.exceptions.workout_plan.WorkoutPlanNotFoundException;
 import com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationException;
@@ -219,7 +217,7 @@ public class WorkoutPlanService {
         validateOwnership(workoutPlan, username);
 
         // Check if workout plan is being used in any sessions
-        long sessionCount = workoutSessionRepository.countByWorkout(workoutPlan);
+        long sessionCount = workoutSessionRepository.countByWorkoutPlan(workoutPlan);
         if (sessionCount > 0) {
             throw new IllegalStateException(
                     "Cannot delete workout plan that has been used in workout sessions");
@@ -298,7 +296,7 @@ public class WorkoutPlanService {
         }
 
         // Get usage statistics
-        long totalCompletions = workoutSessionRepository.countByWorkout(workoutPlan);
+        long totalCompletions = workoutSessionRepository.countByWorkoutPlan(workoutPlan);
         int exerciseCount = (int) planExerciseRepository.countByWorkoutPlan(workoutPlan);
 
         return WorkoutPlanAnalyticsResponse.builder()

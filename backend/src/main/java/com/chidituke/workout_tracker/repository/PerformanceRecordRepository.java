@@ -62,7 +62,7 @@ public interface PerformanceRecordRepository extends JpaRepository<PerformanceRe
      */
     @Query("SELECT pr FROM PerformanceRecord pr " +
             "JOIN pr.workoutSession ws " +
-            "JOIN ws.workout w " +
+            "JOIN ws.workoutPlan w " +
             "WHERE ws.user = :user AND w.id = :workoutPlanId " +
             "ORDER BY ws.date DESC, pr.setNumber")
     Page<PerformanceRecord> findByUserAndWorkoutPlan(@Param("user") User user,

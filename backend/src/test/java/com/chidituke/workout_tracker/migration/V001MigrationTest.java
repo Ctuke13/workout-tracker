@@ -37,8 +37,8 @@ class V001MigrationTest extends BaseIntegrationTest {
                 .map(row -> row.get("column_name").toString())
                 .toList();
 
-        // Core fields
-        assertThat(columnNames).contains("id", "username", "email", "password");
+        // Core fields - UPDATED to use user_id
+        assertThat(columnNames).contains("user_id", "username", "email", "password");
 
         // Personal info
         assertThat(columnNames).contains("first_name", "last_name", "date_of_birth", "gender");
@@ -83,8 +83,8 @@ class V001MigrationTest extends BaseIntegrationTest {
                 .map(row -> row.get("column_name").toString())
                 .toList();
 
-        // Core subscription fields
-        assertThat(columnNames).contains("id", "user_id", "subscription_tier", "status");
+        // Core subscription fields - UPDATED to use subscription_id
+        assertThat(columnNames).contains("subscription_id", "user_id", "subscription_tier", "status");
 
         // Date fields
         assertThat(columnNames).contains("start_date", "end_date", "next_billing_date");
@@ -114,8 +114,8 @@ class V001MigrationTest extends BaseIntegrationTest {
                 .map(row -> row.get("column_name").toString())
                 .toList();
 
-        // Core professional fields
-        assertThat(columnNames).contains("id", "user_id", "display_name", "business_name", "bio", "service_type");
+        // Core professional fields - UPDATED to use professional_profile_id
+        assertThat(columnNames).contains("professional_profile_id", "user_id", "display_name", "business_name", "bio", "service_type");
 
         // Service details
         assertThat(columnNames).contains("years_experience", "experience_level", "hourly_rate",
@@ -201,14 +201,14 @@ class V001MigrationTest extends BaseIntegrationTest {
 
         assertThat(constraints).hasSizeGreaterThan(0);
 
-        // Verify subscriptions.user_id references users
+        // Verify subscriptions.user_id references users - UPDATED to check for users(user_id)
         assertThat(constraints).anyMatch(row ->
                 "subscriptions".equals(row.get("table_name")) &&
                         "user_id".equals(row.get("column_name")) &&
                         "users".equals(row.get("foreign_table_name"))
         );
 
-        // Verify professional_profiles.user_id references users
+        // Verify professional_profiles.user_id references users - UPDATED to check for users(user_id)
         assertThat(constraints).anyMatch(row ->
                 "professional_profiles".equals(row.get("table_name")) &&
                         "user_id".equals(row.get("column_name")) &&
@@ -243,7 +243,7 @@ class V001MigrationTest extends BaseIntegrationTest {
                 FROM information_schema.check_constraints 
                 WHERE constraint_name LIKE 'chk_%' 
                 AND constraint_name IN (
-                    'chk_user_type', 'chk_subscription_tier', 'chk_account_status', 
+                    'chk_user_type', 'chk_user_subscription_tier', 'chk_account_status', 
                     'chk_gender', 'chk_privacy_settings', 'chk_activity_level'
                 )
                 """
@@ -257,7 +257,7 @@ class V001MigrationTest extends BaseIntegrationTest {
                 .toList();
 
         assertThat(constraintNames).contains("chk_user_type");
-        assertThat(constraintNames).contains("chk_subscription_tier");
+        assertThat(constraintNames).contains("chk_user_subscription_tier"); // Updated name
         assertThat(constraintNames).contains("chk_account_status");
     }
 

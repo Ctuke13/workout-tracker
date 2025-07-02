@@ -1,8 +1,8 @@
 package com.chidituke.workout_tracker.dto.response.user;
 
-import com.chidituke.workout_tracker.model.User;
-import com.chidituke.workout_tracker.model.UserType;
-import com.chidituke.workout_tracker.model.ProfessionalProfile;
+import com.chidituke.workout_tracker.model.user.User;
+import com.chidituke.workout_tracker.model.user.enums.UserType;
+import com.chidituke.workout_tracker.model.user.ProfessionalProfile;
 import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;

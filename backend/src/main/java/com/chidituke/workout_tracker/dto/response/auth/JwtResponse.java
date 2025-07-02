@@ -1,7 +1,6 @@
 package com.chidituke.workout_tracker.dto.response.auth;
 
-import com.chidituke.workout_tracker.model.User;
-import com.chidituke.workout_tracker.model.UserType;
+import com.chidituke.workout_tracker.model.user.enums.UserType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

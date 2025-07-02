@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.dto.request.performance;
 
-import com.chidituke.workout_tracker.model.PerformanceRecord;
+import com.chidituke.workout_tracker.model.workout.PerformanceRecord;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

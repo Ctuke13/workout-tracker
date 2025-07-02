@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.dto.response.performance;
 
-import com.chidituke.workout_tracker.model.PerformanceRecord;
+import com.chidituke.workout_tracker.model.workout.PerformanceRecord;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

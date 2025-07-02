@@ -1,7 +1,7 @@
 package com.chidituke.workout_tracker.config;
 
-import com.chidituke.workout_tracker.model.Exercise;
-import com.chidituke.workout_tracker.repository.ExerciseRepository;
+import com.chidituke.workout_tracker.model.workout.Exercise;
+import com.chidituke.workout_tracker.repository.workout.ExerciseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;

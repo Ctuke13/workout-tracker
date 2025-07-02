@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.dto.response.professionional_user;
 
-import com.chidituke.workout_tracker.model.ProfessionalProfile;
+import com.chidituke.workout_tracker.model.user.ProfessionalProfile;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

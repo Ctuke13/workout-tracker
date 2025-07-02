@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.dto.request.subscription;
 
-import com.chidituke.workout_tracker.model.SubscriptionTier;
+import com.chidituke.workout_tracker.model.user.enums.SubscriptionTier;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

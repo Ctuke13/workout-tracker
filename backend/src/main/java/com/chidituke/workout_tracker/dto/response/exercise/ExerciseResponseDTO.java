@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.dto.response.exercise;
 
-import com.chidituke.workout_tracker.model.Exercise;
+import com.chidituke.workout_tracker.model.workout.Exercise;
 import lombok.Builder;
 import lombok.Data;
 

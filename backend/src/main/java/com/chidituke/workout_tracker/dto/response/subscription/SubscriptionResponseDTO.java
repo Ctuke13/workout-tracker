@@ -1,7 +1,7 @@
 // ===== SubscriptionResponseDTO.java =====
 package com.chidituke.workout_tracker.dto.response.subscription;
 
-import com.chidituke.workout_tracker.model.SubscriptionTier;
+import com.chidituke.workout_tracker.model.user.enums.SubscriptionTier;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

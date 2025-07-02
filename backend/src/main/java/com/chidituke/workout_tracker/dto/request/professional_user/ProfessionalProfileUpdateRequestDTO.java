@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.dto.request.professional_user;
 
-import com.chidituke.workout_tracker.model.ProfessionalProfile;
+import com.chidituke.workout_tracker.model.user.ProfessionalProfile;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.util;
 
-import com.chidituke.workout_tracker.model.WorkoutPlan;
+import com.chidituke.workout_tracker.model.workout.WorkoutPlan;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

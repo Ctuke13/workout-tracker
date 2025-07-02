@@ -1,7 +1,7 @@
 package com.chidituke.workout_tracker.security;
 
-import com.chidituke.workout_tracker.model.User;
-import com.chidituke.workout_tracker.repository.UserRepository;
+import com.chidituke.workout_tracker.model.user.User;
+import com.chidituke.workout_tracker.repository.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

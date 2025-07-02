@@ -1,7 +1,7 @@
 package com.chidituke.workout_tracker.dto.request.user;
 
-import com.chidituke.workout_tracker.model.User;
-import com.chidituke.workout_tracker.model.UserType;
+import com.chidituke.workout_tracker.model.user.User;
+import com.chidituke.workout_tracker.model.user.enums.UserType;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 

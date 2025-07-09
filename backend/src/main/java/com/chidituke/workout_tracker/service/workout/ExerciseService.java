@@ -8,8 +8,12 @@ import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
 import com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationException;
 import com.chidituke.workout_tracker.mapper.workout.ExerciseMapper;
 import com.chidituke.workout_tracker.model.workout.Exercise;
+import com.chidituke.workout_tracker.model.workout.UserExerciseRating;
+import com.chidituke.workout_tracker.model.workout.UserExerciseHistory;
 import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.repository.workout.ExerciseRepository;
+import com.chidituke.workout_tracker.repository.workout.UserExerciseRatingRepository;
+import com.chidituke.workout_tracker.repository.workout.UserExerciseHistoryRepository;
 import com.chidituke.workout_tracker.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +37,10 @@ public class ExerciseService {
     private final ExerciseRepository exerciseRepository;
     private final UserRepository userRepository;
     private final ExerciseMapper exerciseMapper;
+
+    // 🆕 NEW DEPENDENCIES
+    private final UserExerciseRatingRepository ratingRepository;
+    private final UserExerciseHistoryRepository historyRepository;
 
     // 🔍 EXERCISE DISCOVERY & SEARCH (NO SUBSCRIPTION FILTERING - ALL FREE!)
 
@@ -59,16 +67,44 @@ public class ExerciseService {
         return exerciseRepository.searchExercisesWithFilters(searchTerm, muscleGroup, null, difficulty, pageable);
     }
 
+    // 🆕 UPDATED - Now uses real user history for personalized recommendations
     public List<Exercise> findRecommendedExercises(User user, int limit) {
+
+        if (user == null) {
+            // Return popular exercises for anonymous users
+            return exerciseRepository.findRecommendations(PageRequest.of(0, limit)).getContent();
+        }
+
         List<Exercise> recentExercises = getRecentlyUsedExercises(user);
         List<String> preferredMuscleGroups = extractPreferredMuscleGroups(recentExercises);
+        List<String> preferredTypes = extractPreferredExerciseTypes(user);
 
-        if (preferredMuscleGroups.isEmpty()) {
+        if (preferredMuscleGroups.isEmpty() && preferredTypes.isEmpty()) {
+            // New user - return popular exercises
             return exerciseRepository.findRecommendations(PageRequest.of(0, limit)).getContent();
-        } else {
-            return exerciseRepository.findRecommendationsByMuscleGroups(
-                    preferredMuscleGroups, PageRequest.of(0, limit)).getContent();
         }
+
+        // Get personalized recommendations
+        List<Exercise> recommendations = new ArrayList<>();
+
+        // Add exercises based on preferred muscle groups
+        if (!preferredMuscleGroups.isEmpty()) {
+            List<Exercise> muscleGroupRecs = exerciseRepository.findRecommendationsByMuscleGroups(
+                    preferredMuscleGroups, PageRequest.of(0, limit / 2)).getContent();
+            recommendations.addAll(muscleGroupRecs);
+        }
+
+        // Fill remaining slots with highly rated exercises user hasn't tried
+        if (recommendations.size() < limit) {
+            List<Exercise> untriedExercises = findUntriedHighlyRatedExercises(user, limit - recommendations.size());
+            recommendations.addAll(untriedExercises);
+        }
+
+        // Remove duplicates and limit results
+        return recommendations.stream()
+                .distinct()
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 
     // 🔧 FIXED - Now throws custom exception instead of returning null
@@ -247,16 +283,21 @@ public class ExerciseService {
         log.info("Exercise unpublished: {} by admin {}", exercise.getExerciseName(), admin.getId());
     }
 
-    // 📊 RATING & ANALYTICS
+    // ===================================================================
+    // 📊 RATING & ANALYTICS - 🆕 REAL IMPLEMENTATION
+    // ===================================================================
 
     @Transactional
-    public void rateExercise(Long exerciseId, User user, double rating) {
-        // 🔧 FIXED - Now uses InvalidExerciseDataException
+    public void rateExercise(Long exerciseId, User user, double rating, String comment, List<String> tags) {
+
+        if (user == null) {
+            throw new UserNotFoundException("User not found - authentication required");
+        }
+
         if (rating < 0.0 || rating > 5.0) {
             throw new InvalidExerciseDataException("rating", "Rating must be between 0.0 and 5.0");
         }
 
-        // 🔧 FIXED - Now uses ExerciseNotFoundException
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
@@ -266,35 +307,71 @@ public class ExerciseService {
             throw new InvalidExerciseDataException("rating", "User has already rated this exercise");
         }
 
+        // Create and save user rating
+        UserExerciseRating userRating = new UserExerciseRating(user, exercise, rating, comment, tags);
+        ratingRepository.save(userRating);
+
         // Update exercise rating
         updateExerciseRating(exercise, rating);
-
-        // Record user's rating (implement UserExerciseRating entity later)
-        recordUserRating(user, exercise, rating);
-
         exerciseRepository.save(exercise);
+
+        // Record user's rating in history
+        recordExerciseInHistory(user, exercise, UserExerciseHistory.CONTEXT_RATE);
 
         log.info("Exercise rated: {} - {} stars by user {}",
                 exercise.getExerciseName(), rating, user.getId());
+    }
+
+    // Overloaded method for backward compatibility (rating only)
+    @Transactional
+    public void rateExercise(Long exerciseId, User user, double rating) {
+        rateExercise(exerciseId, user, rating, null, null);
     }
 
     public List<Object[]> getExerciseTypeCounts() {
         return exerciseRepository.countByExerciseType();
     }
 
+    // 🆕 UPDATED - Real usage tracking with persistence
     @Transactional
     public void recordExerciseUsage(Long exerciseId, User user) {
-        // 🔧 FIXED - Now uses ExerciseNotFoundException
+        if (user == null) {
+            log.debug("User is null - skipping usage recording for exercise {}", exerciseId);
+            return; // Silently skip if user is null (for anonymous usage)
+        }
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
 
         exercise.incrementUsage();
         exerciseRepository.save(exercise);
 
-        // Record user's exercise history (implement UserExerciseHistory entity later)
-        recordExerciseInHistory(user, exercise);
+        // Record user's exercise history
+        recordExerciseInHistory(user, exercise, UserExerciseHistory.CONTEXT_VIEW);
 
         log.debug("Exercise usage recorded: {} by user {}", exercise.getExerciseName(), user.getId());
+    }
+
+    // 🆕 NEW - Workout usage tracking with duration and notes
+    @Transactional
+    public void recordWorkoutUsage(Long exerciseId, User user, Integer durationMinutes, String notes) {
+
+        if (user == null) {
+            throw new UserNotFoundException("User not found - authentication required");
+        }
+
+        Exercise exercise = exerciseRepository.findById(exerciseId)
+                .orElseThrow(() -> new ExerciseNotFoundException(exerciseId));
+
+        exercise.incrementUsage();
+        exerciseRepository.save(exercise);
+
+        // Record detailed workout usage
+        UserExerciseHistory history = new UserExerciseHistory(
+                user, exercise, UserExerciseHistory.CONTEXT_WORKOUT, durationMinutes, notes);
+        historyRepository.save(history);
+
+        log.info("Workout usage recorded: {} - {} minutes by user {}",
+                exercise.getExerciseName(), durationMinutes, user.getId());
     }
 
     public ExerciseService.ExerciseAnalytics getExerciseAnalytics(Long exerciseId) {
@@ -311,6 +388,50 @@ public class ExerciseService {
                 .popularityRank(calculatePopularityRank(exercise))
                 .usageGrowthRate(calculateUsageGrowthRate(exercise))
                 .isFromVerifiedSource(exercise.isFromVerifiedSource())
+                .build();
+    }
+
+    // ===================================================================
+    // 🆕 USER ANALYTICS AND INSIGHTS
+    // ===================================================================
+
+    public UserExerciseInsights getUserExerciseInsights(User user) {
+        if (user == null) {
+            // Return empty insights for null user
+            return UserExerciseInsights.builder()
+                    .totalExercisesTried(0)
+                    .totalWorkouts(0)
+                    .totalRatingsGiven(0)
+                    .averageRatingGiven(0.0)
+                    .preferredMuscleGroups(List.of())
+                    .favoriteExercises(List.of())
+                    .weeklyActivity(0)
+                    .monthlyActivity(0)
+                    .build();
+        }
+
+        LocalDateTime monthAgo = LocalDateTime.now().minusDays(30);
+        LocalDateTime weekAgo = LocalDateTime.now().minusDays(7);
+
+        // Get user statistics
+        List<UserExerciseHistory> recentHistory = historyRepository.findUserRecentHistory(user.getId(), monthAgo);
+        List<UserExerciseRating> userRatings = ratingRepository.findByUserId(user.getId());
+        Long workoutCount = historyRepository.countUserWorkouts(user.getId(), monthAgo);
+
+        // Calculate insights
+        List<Object[]> preferredMuscleGroups = historyRepository.getUserPreferredMuscleGroups(user.getId(), monthAgo);
+        List<Object[]> mostUsedExercises = historyRepository.getUserMostUsedExercises(user.getId());
+        List<UserExerciseRating> favoriteExercises = ratingRepository.findUserHighRatedExercises(user.getId(), 4.0);
+
+        return UserExerciseInsights.builder()
+                .totalExercisesTried(getTriedExerciseIds(user).size())
+                .totalWorkouts(workoutCount.intValue())
+                .totalRatingsGiven(userRatings.size())
+                .averageRatingGiven(userRatings.stream().mapToDouble(UserExerciseRating::getRating).average().orElse(0.0))
+                .preferredMuscleGroups(preferredMuscleGroups.stream().limit(3).map(row -> (String) row[0]).collect(Collectors.toList()))
+                .favoriteExercises(favoriteExercises.stream().limit(5).map(UserExerciseRating::getExercise).collect(Collectors.toList()))
+                .weeklyActivity(historyRepository.countUsageSince(weekAgo).intValue())
+                .monthlyActivity(recentHistory.size())
                 .build();
     }
 
@@ -366,7 +487,106 @@ public class ExerciseService {
         return selectedExercises;
     }
 
-    // 🔧 HELPER METHODS
+    // ===================================================================
+    // 🔧 HELPER METHODS - 🆕 REAL IMPLEMENTATIONS
+    // ===================================================================
+
+    // 🆕 REAL IMPLEMENTATION - Now uses database
+    private boolean hasUserRatedExercise(User user, Exercise exercise) {
+        if (user == null || exercise == null) {
+            return false; // Safe default - user hasn't rated if user is null
+        }
+        return ratingRepository.existsByUserIdAndExerciseId(user.getId(), exercise.getId());
+    }
+
+    private void updateExerciseRating(Exercise exercise, double newRating) {
+        Integer currentTotal = exercise.getTotalRatings();
+        Double currentAverage = exercise.getAverageRating();
+
+        if (currentTotal == null) currentTotal = 0;
+        if (currentAverage == null) currentAverage = 0.0;
+
+        double totalPoints = currentAverage * currentTotal;
+        int newTotal = currentTotal + 1;
+        double newAverage = (totalPoints + newRating) / newTotal;
+
+        exercise.setTotalRatings(newTotal);
+        exercise.setAverageRating(newAverage);
+    }
+
+    // 🆕 REAL IMPLEMENTATION - Now persists to database
+    private void recordExerciseInHistory(User user, Exercise exercise, String context) {
+        UserExerciseHistory history = new UserExerciseHistory(user, exercise, context);
+        historyRepository.save(history);
+
+        log.debug("Exercise history recorded: user={}, exercise={}, context={}",
+                user.getId(), exercise.getId(), context);
+    }
+
+    // 🆕 REAL IMPLEMENTATION - Now queries database
+    private List<Exercise> getRecentlyUsedExercises(User user) {
+        if (user == null) {
+            return List.of();
+        }
+        LocalDateTime since = LocalDateTime.now().minusDays(30);
+        List<UserExerciseHistory> recentHistory = historyRepository.findUserRecentHistory(user.getId(), since);
+
+        return recentHistory.stream()
+                .map(UserExerciseHistory::getExercise)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private List<String> extractPreferredMuscleGroups(List<Exercise> recentExercises) {
+        if (recentExercises.isEmpty()) {
+            return List.of();
+        }
+
+        return recentExercises.stream()
+                .flatMap(ex -> ex.getTargetMuscleGroups().stream())
+                .collect(Collectors.groupingBy(group -> group, Collectors.counting()))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(3)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+    }
+
+    // 🆕 NEW - Extract exercise type preferences from user history
+    private List<String> extractPreferredExerciseTypes(User user) {
+        if (user == null) {
+            return List.of();
+        }
+        LocalDateTime since = LocalDateTime.now().minusDays(30);
+        List<Object[]> typePreferences = historyRepository.getUserPreferredExerciseTypes(user.getId(), since);
+
+        return typePreferences.stream()
+                .limit(2) // Top 2 preferred types
+                .map(row -> ((Exercise.ExerciseType) row[0]).name())
+                .collect(Collectors.toList());
+    }
+
+    // 🆕 NEW - Find exercises user hasn't tried
+    private List<Exercise> findUntriedHighlyRatedExercises(User user, int limit) {
+        List<Exercise> highlyRated = exerciseRepository.findHighlyRated();
+        Set<Long> triedExerciseIds = getTriedExerciseIds(user);
+
+        return highlyRated.stream()
+                .filter(exercise -> !triedExerciseIds.contains(exercise.getId()))
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    // 🆕 NEW - Get set of exercise IDs user has tried
+    private Set<Long> getTriedExerciseIds(User user) {
+        if (user == null) {
+            return Set.of();
+        }
+        List<UserExerciseHistory> userHistory = historyRepository.findByUserId(user.getId());
+        return userHistory.stream()
+                .map(history -> history.getExercise().getId())
+                .collect(Collectors.toSet());
+    }
 
     // 🔧 FIXED - Added null check for equipment list
     private boolean hasRequiredEquipment(Exercise exercise, List<String> availableEquipment) {
@@ -404,14 +624,13 @@ public class ExerciseService {
         return userId.equals(exercise.getCreatedByUserId());
     }
 
-    // 🔧 FIXED - Now uses proper custom exceptions
     private void validateAdminPermissions(User admin) {
         if (admin == null) {
             throw new UserNotFoundException("Admin user not found");
         }
 
         if (!admin.hasRole("ADMIN")) {
-            throw new UnauthorizedOperationException("Admin role required for this operation");
+            throw new UnauthorizedOperationException("Admin role required for this operation", true);
         }
     }
 
@@ -427,7 +646,7 @@ public class ExerciseService {
 
         // Check if user has professional role
         if (!professional.hasRole("PROFESSIONAL") && !professional.hasRole("ADMIN")) {
-            throw new ProfessionalVerificationException("create professional exercises");
+            throw new ProfessionalVerificationException("Professional verification required for operation: create professional exercises");
         }
 
         // Additional professional verification checks could go here
@@ -472,57 +691,6 @@ public class ExerciseService {
             throw new InvalidExerciseDataException("exercisesPerMuscleGroup",
                     "Exercises per muscle group must be between 1 and 10");
         }
-    }
-
-    private boolean hasUserRatedExercise(User user, Exercise exercise) {
-        // TODO: Implement UserExerciseRating entity and query
-        return false;
-    }
-
-    private void updateExerciseRating(Exercise exercise, double newRating) {
-        Integer currentTotal = exercise.getTotalRatings();
-        Double currentAverage = exercise.getAverageRating();
-
-        if (currentTotal == null) currentTotal = 0;
-        if (currentAverage == null) currentAverage = 0.0;
-
-        double totalPoints = currentAverage * currentTotal;
-        int newTotal = currentTotal + 1;
-        double newAverage = (totalPoints + newRating) / newTotal;
-
-        exercise.setTotalRatings(newTotal);
-        exercise.setAverageRating(newAverage);
-    }
-
-    private void recordUserRating(User user, Exercise exercise, double rating) {
-        // TODO: Implement UserExerciseRating entity recording
-        log.debug("Recording user rating: user={}, exercise={}, rating={}",
-                user.getId(), exercise.getId(), rating);
-    }
-
-    private void recordExerciseInHistory(User user, Exercise exercise) {
-        // TODO: Implement UserExerciseHistory entity recording
-        log.debug("Recording exercise usage: user={}, exercise={}", user.getId(), exercise.getId());
-    }
-
-    private List<Exercise> getRecentlyUsedExercises(User user) {
-        // TODO: Query user's exercise history when implemented
-        return List.of();
-    }
-
-    private List<String> extractPreferredMuscleGroups(List<Exercise> recentExercises) {
-        if (recentExercises.isEmpty()) {
-            return List.of();
-        }
-
-        return recentExercises.stream()
-                .flatMap(ex -> ex.getTargetMuscleGroups().stream())
-                .collect(Collectors.groupingBy(group -> group, Collectors.counting()))
-                .entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                .limit(3)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
     }
 
     private int calculatePopularityRank(Exercise exercise) {
@@ -703,5 +871,19 @@ public class ExerciseService {
         public Integer getPopularityRank() { return popularityRank; }
         public Double getUsageGrowthRate() { return usageGrowthRate; }
         public Boolean getIsFromVerifiedSource() { return isFromVerifiedSource; }
+    }
+
+    // 🆕 NEW - User Exercise Insights DTO
+    @lombok.Data
+    @lombok.Builder
+    public static class UserExerciseInsights {
+        private Integer totalExercisesTried;
+        private Integer totalWorkouts;
+        private Integer totalRatingsGiven;
+        private Double averageRatingGiven;
+        private List<String> preferredMuscleGroups;
+        private List<Exercise> favoriteExercises;
+        private Integer weeklyActivity;
+        private Integer monthlyActivity;
     }
 }

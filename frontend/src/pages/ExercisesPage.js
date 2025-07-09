@@ -23,8 +23,8 @@ const ExercisesPage = () => {
     const [error, setError] = useState(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    // API base URL - adjust if your backend runs on a different port
-    const API_BASE = 'http://localhost:8080/api/public/exercises';
+    // Updated API base URL to match your controller
+    const API_BASE = 'http://localhost:8080/api/exercises';
 
     // Fetch initial data on component mount
     useEffect(() => {
@@ -33,11 +33,11 @@ const ExercisesPage = () => {
                 setLoading(true);
                 setError(null);
 
-                // Fetch all data in parallel
+                // Fetch all data in parallel using the new endpoints
                 const [exercisesRes, goalsRes, filterRes] = await Promise.all([
-                    fetch(API_BASE),
-                    fetch(`${API_BASE}/goals`),
-                    fetch(`${API_BASE}/filters`)
+                    fetch(`${API_BASE}/public`),  // Updated endpoint
+                    fetch(`${API_BASE}/goals`),   // Updated endpoint
+                    fetch(`${API_BASE}/public/filters`)  // Updated endpoint
                 ]);
 
                 if (!exercisesRes.ok || !goalsRes.ok || !filterRes.ok){
@@ -50,11 +50,26 @@ const ExercisesPage = () => {
                     filterRes.json()
                 ]);
 
-                setExercises(exerciseData);
+                // Transform exercise data to match frontend expectations
+                const transformedExercises = exerciseData.map(exercise => ({
+                    id: exercise.id,
+                    name: exercise.name,
+                    emoji: exercise.emoji || '💪',
+                    difficulty: exercise.difficultyLevel || 'Beginner',
+                    description: exercise.description,
+                    duration: formatDuration(exercise.estimatedDurationMinutes),
+                    calories: formatCalories(exercise.estimatedCalories),
+                    equipment: formatEquipment(exercise.equipmentRequired),
+                    benefits: exercise.benefits || [],
+                    tips: exercise.tips || [],
+                    videoUrl: exercise.videoUrl
+                }));
+
+                setExercises(transformedExercises);
 
                 // Add "All" option to goals and set proper format
                 const formattedGoals = [
-                    {id: 'all', name: 'All Goals', emoji: '🎯',  count: exerciseData.length},
+                    {id: 'all', name: 'All Goals', emoji: '🎯', count: transformedExercises.length},
                     ...goalsData.map(goal => ({
                         id: goal.goal,
                         name: formatGoalName(goal.goal),
@@ -85,12 +100,12 @@ const ExercisesPage = () => {
 
             try {
                 setError(null);
-                let url = API_BASE;
+                let url = `${API_BASE}/public`;  // Updated base endpoint
                 const params = new URLSearchParams();
 
                 // Handle search
                 if (searchTerm.trim()) {
-                    url = `${API_BASE}/search`;
+                    url = `${API_BASE}/public/search`;  // Updated search endpoint
                     params.append('q', searchTerm.trim());
 
                     // Add filters to search
@@ -126,7 +141,23 @@ const ExercisesPage = () => {
                 }
 
                 const data = await response.json();
-                setExercises(data);
+
+                // Transform exercise data to match frontend expectations
+                const transformedExercises = data.map(exercise => ({
+                    id: exercise.id,
+                    name: exercise.name,
+                    emoji: exercise.emoji || '💪',
+                    difficulty: exercise.difficultyLevel || 'Beginner',
+                    description: exercise.description,
+                    duration: formatDuration(exercise.estimatedDurationMinutes),
+                    calories: formatCalories(exercise.estimatedCalories),
+                    equipment: formatEquipment(exercise.equipmentRequired),
+                    benefits: exercise.benefits || [],
+                    tips: exercise.tips || [],
+                    videoUrl: exercise.videoUrl
+                }));
+
+                setExercises(transformedExercises);
 
             } catch (err) {
                 console.error('Error fetching filtered exercises:', err);
@@ -138,8 +169,55 @@ const ExercisesPage = () => {
         return () => clearTimeout(timeoutId);
     }, [activeGoal, searchTerm, selectedEquipment, selectedDifficulty, loading]);
 
+    // Helper functions for data transformation
+    const formatDuration = (durationMinutes) => {
+        if (!durationMinutes) return "20 mins";
 
-    // Helper functions
+        if (durationMinutes <= 15) return durationMinutes + " mins";
+        if (durationMinutes <= 30) return durationMinutes + " mins";
+        if (durationMinutes <= 60) return durationMinutes + " mins";
+
+        const hours = Math.floor(durationMinutes / 60);
+        const mins = durationMinutes % 60;
+        return hours + "h" + (mins > 0 ? " " + mins + "m" : "");
+    };
+
+    const formatCalories = (calories) => {
+        if (!calories) return "200-400/hr";
+
+        const lower = Math.floor(calories * 0.8);
+        const upper = Math.floor(calories * 1.2);
+        return lower + "-" + upper + "/hr";
+    };
+
+    const formatEquipment = (equipmentList) => {
+        if (!equipmentList || equipmentList.length === 0) {
+            return "No Equipment";
+        }
+
+        if (equipmentList.length === 1) {
+            return formatSingleEquipment(equipmentList[0]);
+        }
+
+        return formatSingleEquipment(equipmentList[0]) + " (+more)";
+    };
+
+    const formatSingleEquipment = (equipment) => {
+        const equipmentMap = {
+            'dumbbells': 'Dumbbells',
+            'dumbbell': 'Dumbbells',
+            'barbell': 'Barbell',
+            'resistance_bands': 'Resistance Bands',
+            'resistance_band': 'Resistance Bands',
+            'kettlebell': 'Kettlebell',
+            'yoga_mat': 'Yoga Mat',
+            'bodyweight': 'No Equipment',
+            'none': 'No Equipment'
+        };
+        return equipmentMap[equipment.toLowerCase()] || equipment;
+    };
+
+    // Existing helper functions
     const formatGoalName = (goal) => {
         const goalMap = {
             'fat-burn': 'Fat Burn',
@@ -189,16 +267,12 @@ const ExercisesPage = () => {
         setSelectedDifficulty('all');
     };
 
-    // Add this helper function after your existing helper functions (around line 150)
-
     const formatEquipmentName = (equipment) => {
         if (equipment === 'None') {
             return 'No Equipment';
         }
         return equipment;
     };
-
-// Update your generateResultsSummary function (around line 185)
 
     const generateResultsSummary = () => {
         const count = exercises.length;
@@ -525,12 +599,16 @@ const ExercisesPage = () => {
                                     <div className="mb-4">
                                         <h4 className="text-xs sm:text-sm font-semibold text-text-primary mb-2">Key Benefits:</h4>
                                         <div className="space-y-1">
-                                            {exercise.benefits.map((benefit, i) => (
-                                                <div key={i} className="flex items-center text-xs text-text-muted">
-                                                    <span className="text-neon-green mr-2">✓</span>
-                                                    {benefit}
-                                                </div>
-                                            ))}
+                                            {exercise.benefits && exercise.benefits.length > 0 ? (
+                                                exercise.benefits.map((benefit, i) => (
+                                                    <div key={i} className="flex items-center text-xs text-text-muted">
+                                                        <span className="text-neon-green mr-2">✓</span>
+                                                        {benefit}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-xs text-text-muted">Benefits information coming soon</div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -539,12 +617,16 @@ const ExercisesPage = () => {
                                         <div className="mb-4 p-3 sm:p-4 bg-light-bg-secondary rounded-lg border border-light-border">
                                             <h4 className="text-xs sm:text-sm font-semibold text-text-primary mb-2">Form Tips:</h4>
                                             <div className="space-y-2">
-                                                {exercise.tips.map((tip, i) => (
-                                                    <div key={i} className="flex items-start text-xs text-text-secondary">
-                                                        <span className="text-electric-blue mr-2 mt-0.5">•</span>
-                                                        {tip}
-                                                    </div>
-                                                ))}
+                                                {exercise.tips && exercise.tips.length > 0 ? (
+                                                    exercise.tips.map((tip, i) => (
+                                                        <div key={i} className="flex items-start text-xs text-text-secondary">
+                                                            <span className="text-electric-blue mr-2 mt-0.5">•</span>
+                                                            {tip}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="text-xs text-text-secondary">Form tips coming soon</div>
+                                                )}
                                             </div>
                                             {exercise.description && (
                                                 <div className="mt-3 p-3 bg-electric-blue/10 rounded-lg border border-electric-blue/20">

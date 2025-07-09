@@ -4,7 +4,10 @@ import com.chidituke.workout_tracker.dto.request.exercise.*;
 import com.chidituke.workout_tracker.dto.response.exercise.*;
 import com.chidituke.workout_tracker.model.workout.Exercise;
 import com.chidituke.workout_tracker.model.user.User;
+import com.chidituke.workout_tracker.repository.workout.ExerciseRepository;
 import com.chidituke.workout_tracker.security.CurrentUser;
+import com.chidituke.workout_tracker.security.UserPrincipal;
+import com.chidituke.workout_tracker.service.user.UserService;
 import com.chidituke.workout_tracker.service.workout.ExerciseService;
 
 import jakarta.validation.Valid;
@@ -18,9 +21,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,6 +38,8 @@ import java.util.stream.Collectors;
 public class ExerciseController {
 
     private final ExerciseService exerciseService;
+    private final UserService userService;
+    private final ExerciseRepository exerciseRepository;
 
     // ===================================================================
     // 🌍 FRONTEND-SPECIFIC ENDPOINTS (New additions for React frontend)
@@ -259,28 +268,73 @@ public class ExerciseController {
         return ResponseEntity.ok(response);
     }
 
-    // 🔧 FIXED - Clean version without try-catch and null check
     @GetMapping("/{id}")
-    public ResponseEntity<ExerciseResponseDTO> getExerciseById(
+    public ResponseEntity<Object> getExerciseById(
             @PathVariable Long id,
-            @CurrentUser(required = false) User currentUser) { // ✅ Consistent annotation usage
+            @CurrentUser(required = false) UserPrincipal userPrincipal) {
 
-        // ✅ No try-catch needed - GlobalExceptionHandler handles ExerciseNotFoundException
-        Exercise exercise = exerciseService.findById(id);
+        try {
+            System.out.println("🔍 DEBUG: getExerciseById called with ID: " + id);
+            System.out.println("🔍 DEBUG: UserPrincipal: " + userPrincipal);
 
-        // ✅ Fixed logic - no null check needed since findById throws exception if not found
-        if (!exercise.isPublished()) {
-            return ResponseEntity.notFound().build();
+            // ✅ Use repository directly instead of service
+            Optional<Exercise> exerciseOpt = exerciseRepository.findById(id);
+
+            if (exerciseOpt.isEmpty()) {
+                System.out.println("🔍 DEBUG: Exercise not found");
+                return ResponseEntity.notFound().build();
+            }
+
+            Exercise exercise = exerciseOpt.get();
+            System.out.println("🔍 DEBUG: Exercise found: " + exercise.getExerciseName());
+            System.out.println("🔍 DEBUG: Exercise published: " + exercise.isPublished());
+
+            // Check if exercise is published
+            if (!exercise.isPublished()) {
+                System.out.println("🔍 DEBUG: Exercise not published, returning 404");
+                return ResponseEntity.notFound().build();
+            }
+
+            // Record usage only if user is logged in
+            if (userPrincipal != null) {
+                System.out.println("🔍 DEBUG: Recording usage for user ID: " + userPrincipal.getId());
+                try {
+                    User currentUser = userService.getUserById(userPrincipal.getId());
+                    System.out.println("🔍 DEBUG: User found: " + currentUser.getUsername());
+
+                    // ✅ Try the usage recording - this might be where the error occurs
+                    exerciseService.recordExerciseUsage(id, currentUser);
+                    System.out.println("🔍 DEBUG: Usage recorded successfully");
+                } catch (Exception e) {
+                    System.err.println("🔍 DEBUG: Error recording usage: " + e.getMessage());
+                    e.printStackTrace();
+                    // Continue without failing the request
+                }
+            } else {
+                System.out.println("🔍 DEBUG: No user logged in, skipping usage recording");
+            }
+
+            // ✅ Create simple response map instead of DTO conversion
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", exercise.getId());
+            response.put("name", exercise.getExerciseName());
+            response.put("description", exercise.getDescription());
+            response.put("exerciseType", exercise.getExerciseType().toString());
+            response.put("difficultyLevel", exercise.getDifficultyLevel().toString());
+            response.put("targetMuscleGroups", exercise.getTargetMuscleGroups());
+            response.put("equipmentRequired", exercise.getEquipmentRequired());
+            response.put("usageCount", exercise.getUsageCount());
+            response.put("averageRating", exercise.getAverageRating());
+            response.put("totalRatings", exercise.getTotalRatings());
+
+            System.out.println("🔍 DEBUG: Response created successfully");
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("🔍 DEBUG: Exception in getExerciseById: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
-
-        // Record usage only if user is logged in
-        if (currentUser != null) {
-            // ✅ No try-catch needed - GlobalExceptionHandler handles exceptions
-            exerciseService.recordExerciseUsage(id, currentUser);
-        }
-
-        ExerciseResponseDTO response = ExerciseResponseDTO.fromEntity(exercise);
-        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/search")
@@ -292,7 +346,7 @@ public class ExerciseController {
             @RequestParam(required = false) Exercise.ExerciseType type,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "name") String sort,
+            @RequestParam(defaultValue = "exerciseName") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
 
         // Build search request
@@ -352,48 +406,86 @@ public class ExerciseController {
     }
 
     // ===================================================================
-    // 👤 USER AUTHENTICATED ENDPOINTS (Your existing endpoints - unchanged)
+    // 👤 USER AUTHENTICATED ENDPOINTS - 🆕 ENHANCED WITH REAL IMPLEMENTATIONS
     // ===================================================================
 
     @GetMapping("/recommended")
+    @PreAuthorize("isAuthenticated()")  // ✅ Add this line - requires any authentication
     public ResponseEntity<List<ExerciseResponseDTO>> getRecommendedExercises(
-            @CurrentUser User currentUser,
+            @CurrentUser UserPrincipal userPrincipal,
             @RequestParam(defaultValue = "10") int limit) {
 
+        User currentUser = userService.getUserById(userPrincipal.getId());
         List<Exercise> recommended = exerciseService.findRecommendedExercises(currentUser, limit);
         List<ExerciseResponseDTO> response = ExerciseResponseDTO.fromEntityList(recommended);
 
         return ResponseEntity.ok(response);
     }
 
-    // 🔧 FIXED - Clean version without try-catch
+    // 🆕 UPDATED - Now supports comments and tags
     @PostMapping("/{id}/rate")
     public ResponseEntity<String> rateExercise(
             @PathVariable Long id,
             @Valid @RequestBody ExerciseRatingRequestDTO ratingRequest,
-            @CurrentUser User currentUser) {
+            @CurrentUser UserPrincipal userPrincipal) {
 
-        // ✅ No try-catch needed - GlobalExceptionHandler handles InvalidExerciseDataException
-        exerciseService.rateExercise(id, currentUser, ratingRequest.getRating());
+        // Get the full User object from UserPrincipal
+        User currentUser = userService.getUserById(userPrincipal.getId());
+
+        // Pass all rating parameters to the service
+        exerciseService.rateExercise(
+                id,
+                currentUser,
+                ratingRequest.getRating(),
+                ratingRequest.getComment(),    // Now supported!
+                ratingRequest.getTags()        // Now supported!
+        );
+
         return ResponseEntity.ok("Exercise rated successfully");
     }
 
-    // 🔧 FIXED - Clean version without try-catch
     @PostMapping("/{id}/use")
     public ResponseEntity<String> recordExerciseUsage(
             @PathVariable Long id,
-            @CurrentUser User currentUser) {
+            @CurrentUser UserPrincipal userPrincipal) {
+
+        // Get the full User object from UserPrincipal
+        User currentUser = userService.getUserById(userPrincipal.getId());
 
         // ✅ No try-catch needed - GlobalExceptionHandler handles ExerciseNotFoundException
         exerciseService.recordExerciseUsage(id, currentUser);
         return ResponseEntity.ok("Exercise usage recorded");
     }
 
-    // 🔧 FIXED - Clean version without try-catch
+    // 🆕 NEW - Workout usage tracking with duration and notes
+    @PostMapping("/{id}/workout")
+    public ResponseEntity<String> recordWorkoutUsage(
+            @PathVariable Long id,
+            @RequestParam(required = false) Integer durationMinutes,
+            @RequestParam(required = false) String notes,
+            @CurrentUser UserPrincipal userPrincipal) {
+
+        User currentUser = userService.getUserById(userPrincipal.getId());
+        exerciseService.recordWorkoutUsage(id, currentUser, durationMinutes, notes);
+        return ResponseEntity.ok("Workout usage recorded");
+    }
+
+    // 🆕 NEW - Get user exercise insights and analytics
+    @GetMapping("/insights")
+    public ResponseEntity<ExerciseService.UserExerciseInsights> getUserInsights(
+            @CurrentUser UserPrincipal userPrincipal) {
+
+        User currentUser = userService.getUserById(userPrincipal.getId());
+        ExerciseService.UserExerciseInsights insights = exerciseService.getUserExerciseInsights(currentUser);
+        return ResponseEntity.ok(insights);
+    }
+
     @PostMapping("/workout-plan")
     public ResponseEntity<List<ExerciseResponseDTO>> generateWorkoutPlan(
             @Valid @RequestBody WorkoutPlanRequestDTO planRequest,
-            @CurrentUser User currentUser) { //
+            @CurrentUser UserPrincipal userPrincipal) {
+
+        User currentUser = userService.getUserById(userPrincipal.getId());
 
         // Convert DTO to service request
         ExerciseService.WorkoutPlanRequest serviceRequest = new ExerciseService.WorkoutPlanRequest();
@@ -419,7 +511,9 @@ public class ExerciseController {
     @PreAuthorize("hasRole('PROFESSIONAL') or hasRole('ADMIN')")
     public ResponseEntity<ExerciseResponseDTO> createExercise(
             @Valid @RequestBody ExerciseCreateRequestDTO createRequest,
-            @CurrentUser User currentUser) { // ✅ Consistent annotation usage
+            @CurrentUser UserPrincipal userPrincipal) {
+
+        User currentUser = userService.getUserById(userPrincipal.getId());
 
         // Convert DTO to service request
         ExerciseService.ExerciseCreationRequest serviceRequest = new ExerciseService.ExerciseCreationRequest();
@@ -433,7 +527,6 @@ public class ExerciseController {
         serviceRequest.setTips(createRequest.getTips());
         serviceRequest.setVideoUrl(createRequest.getVideoUrl());
 
-
         Exercise exercise = exerciseService.createProfessionalExercise(currentUser, serviceRequest);
         ExerciseResponseDTO response = ExerciseResponseDTO.fromEntity(exercise);
 
@@ -445,7 +538,7 @@ public class ExerciseController {
     public ResponseEntity<ExerciseResponseDTO> updateExercise(
             @PathVariable Long id,
             @Valid @RequestBody ExerciseUpdateRequestDTO updateRequest,
-            @CurrentUser User currentUser) { // ✅ Consistent annotation usage
+            @CurrentUser UserPrincipal userPrincipal) {
 
         // TODO: Implement exercise update functionality
         return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
@@ -462,7 +555,9 @@ public class ExerciseController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> approveExercise(
             @PathVariable Long id,
-            @CurrentUser User admin) {
+            @CurrentUser UserPrincipal userPrincipal) {
+
+        User admin = userService.getUserById(userPrincipal.getId());
         exerciseService.approveExercise(id, admin);
         return ResponseEntity.ok("Exercise approved successfully");
     }
@@ -472,7 +567,9 @@ public class ExerciseController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteExercise(
             @PathVariable Long id,
-            @CurrentUser User admin) {
+            @CurrentUser UserPrincipal userPrincipal) {
+
+        User admin = userService.getUserById(userPrincipal.getId());
         exerciseService.deleteExercise(id, admin);
         return ResponseEntity.ok("Exercise deleted successfully");
     }
@@ -482,7 +579,9 @@ public class ExerciseController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> performBulkAction(
             @Valid @RequestBody BulkExerciseActionRequestDTO bulkRequest,
-            @CurrentUser User admin) {
+            @CurrentUser UserPrincipal userPrincipal) {
+
+        User admin = userService.getUserById(userPrincipal.getId());
         exerciseService.performBulkAction(
                 bulkRequest.getExerciseIds(),
                 bulkRequest.getAction(),
@@ -497,12 +596,12 @@ public class ExerciseController {
         ));
     }
 
-    // 🔧 FIXED - Clean version without try-catch
     @GetMapping("/{id}/analytics")
     @PreAuthorize("hasRole('ADMIN') or hasRole('PROFESSIONAL')")
     public ResponseEntity<ExerciseAnalyticsResponseDTO> getExerciseAnalytics(
             @PathVariable Long id,
-            @CurrentUser User user) {
+            @CurrentUser UserPrincipal userPrincipal) {
+
         ExerciseService.ExerciseAnalytics analytics = exerciseService.getExerciseAnalytics(id);
 
         // Use the DTO's fromServiceAnalytics method instead of manual building
@@ -515,14 +614,18 @@ public class ExerciseController {
     // 🔧 HELPER METHODS (Enhanced with new methods)
     // ===================================================================
 
-    // ✅ UNCHANGED - This method works correctly
     private Pageable createPageable(ExerciseSearchRequestDTO request) {
+        String sortField = request.getSortBy();
+        if ("name".equals(sortField)) {
+            sortField = "exerciseName";
+        }
+
         // Create sort
         Sort.Direction direction = "desc".equalsIgnoreCase(request.getSortDirection())
                 ? Sort.Direction.DESC
                 : Sort.Direction.ASC;
 
-        Sort sort = Sort.by(direction, request.getSortBy());
+        Sort sort = Sort.by(direction, sortField);
 
         // Handle default sorting for relevance
         if ("relevance".equals(request.getSortBy())) {
@@ -534,7 +637,6 @@ public class ExerciseController {
         return PageRequest.of(request.getPage(), request.getSize(), sort);
     }
 
-    // 🆕 NEW - Helper method to map frontend goals to exercise types
     private Exercise.ExerciseType mapGoalToExerciseType(String goal) {
         return switch (goal) {
             case "fat-burn" -> Exercise.ExerciseType.CARDIO;

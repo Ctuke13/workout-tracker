@@ -46,17 +46,54 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
+                    // ===================================================================
+                    // 🌍 PUBLIC ACCESS - No authentication required
+                    // ===================================================================
                     auth.requestMatchers("/api/auth/**").permitAll();
                     auth.requestMatchers("/api/test/**").permitAll();
                     auth.requestMatchers("/error").permitAll();
                     auth.requestMatchers("/api/public/**").permitAll();
-                    auth.requestMatchers("/api/workouts/**").authenticated();
                     auth.requestMatchers("/api/subscriptions/test/**").permitAll();
-                    auth.requestMatchers("/api/workouts/**").authenticated();
                     auth.requestMatchers("/api/users/professionals").permitAll();
-                    auth.requestMatchers("/api/users/**").authenticated();
+
+                    // 🌍 PUBLIC EXERCISE LIBRARY - Browse, search, view exercises
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises").permitAll();                    // Browse/search exercises
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/popular").permitAll();            // Popular exercises
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/filters").permitAll();            // Available filters
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/goals").permitAll();              // Fitness goals
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/public/**").permitAll();          // Frontend-specific endpoints
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/type/**").permitAll();            // Exercises by type
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/{id}").permitAll();               // Individual exercise details
+
+                    // ===================================================================
+                    // 🔐 USER AUTHENTICATED - Requires login
+                    // ===================================================================
+                    auth.requestMatchers(HttpMethod.POST, "/api/exercises/*/rate").authenticated();        // Rate exercises
+                    auth.requestMatchers(HttpMethod.POST, "/api/exercises/*/record-usage").authenticated(); // Record usage
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/recommended").authenticated();     // Personal recommendations
+                    auth.requestMatchers(HttpMethod.POST, "/api/exercises/workout-plan").authenticated();   // Create workout plans
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/insights").authenticated();        // User insights
+
+                    // ===================================================================
+                    // 💼 PROFESSIONAL ROLE - Content creation
+                    // ===================================================================
+                    auth.requestMatchers(HttpMethod.POST, "/api/exercises").hasRole("PROFESSIONAL");       // Create exercises
+                    auth.requestMatchers(HttpMethod.PUT, "/api/exercises/**").hasRole("PROFESSIONAL");     // Update exercises
+
+                    // ===================================================================
+                    // 🔐 ADMIN ROLE - Management operations
+                    // ===================================================================
+                    auth.requestMatchers(HttpMethod.DELETE, "/api/exercises/**").hasRole("ADMIN");         // Delete exercises
+                    auth.requestMatchers(HttpMethod.POST, "/api/exercises/bulk-action").hasRole("ADMIN");  // Bulk operations
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/analytics").hasRole("ADMIN");     // Analytics
+
+                    // ===================================================================
+                    // 🔐 OTHER AUTHENTICATED ENDPOINTS
+                    // ===================================================================
                     auth.requestMatchers("/api/workouts/**").authenticated();
-                    auth.requestMatchers("/api/exercises/**").authenticated();
+                    auth.requestMatchers("/api/users/**").authenticated();
+
+                    // All other requests require authentication
                     auth.anyRequest().authenticated();
                 })
 //                .exceptionHandling(ex -> ex

@@ -114,6 +114,7 @@ public class UserService {
                 .lastName(request.getLastName())
                 .dateOfBirth(request.getDateOfBirth())
                 .gender(request.getGender())
+                .zipcode(request.getZipcode())
                 .userType(UserType.REGULAR)
                 .accountStatus(User.AccountStatus.ACTIVE)
                 .privacySettings(User.PrivacySettings.PUBLIC)

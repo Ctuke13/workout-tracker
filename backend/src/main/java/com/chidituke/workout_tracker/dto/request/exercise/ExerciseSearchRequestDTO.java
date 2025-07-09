@@ -36,7 +36,7 @@ public class ExerciseSearchRequestDTO {
     @Max(value = 100, message = "Size cannot exceed 100")
     private Integer size = 20;
 
-    private String sortBy = "name"; // name, rating, usage, created
+    private String sortBy = "exerciseName";
 
     @Pattern(regexp = "^(asc|desc)$", message = "Sort direction must be 'asc' or 'desc'")
     private String sortDirection = "asc";

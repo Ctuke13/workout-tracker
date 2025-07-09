@@ -9,11 +9,18 @@ CREATE TRIGGER update_exercises_updated_at
     BEFORE UPDATE ON exercises
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- UPDATED: Changed from 'workouts' to 'workout_plans'
 CREATE TRIGGER update_workout_plans_updated_at
     BEFORE UPDATE ON workout_plans
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_plan_exercise_updated_at
     BEFORE UPDATE ON plan_exercise
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_fitness_goals_updated_at
+    BEFORE UPDATE ON fitness_goals
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_exercise_ratings_updated_at
+    BEFORE UPDATE ON user_exercise_ratings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

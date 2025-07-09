@@ -7,6 +7,7 @@ import com.chidituke.workout_tracker.exceptions.subscription.FeatureNotAvailable
 import com.chidituke.workout_tracker.exceptions.subscription.PaymentProcessingException;
 import com.chidituke.workout_tracker.exceptions.subscription.SubscriptionException;
 import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
+import com.chidituke.workout_tracker.exceptions.exercise.ExerciseNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -19,6 +20,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -267,6 +269,26 @@ public class GlobalExceptionHandler {
 
     // 🗂️ HTTP & REQUEST EXCEPTIONS
 
+    /**
+     * Handle exercise not found exceptions
+     */
+    @ExceptionHandler(ExerciseNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleExerciseNotFound(
+            ExerciseNotFoundException ex, HttpServletRequest request) {
+
+        log.warn("Exercise not found for request: {} - {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Exercise Not Found")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoHandlerFoundException(
             NoHandlerFoundException ex, HttpServletRequest request) {
@@ -308,6 +330,32 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(errorResponse);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+
+        log.warn("Unsupported media type: {} for request: {}", ex.getContentType(), request.getRequestURI());
+
+        String supportedTypes = ex.getSupportedMediaTypes() != null ?
+                ex.getSupportedMediaTypes().toString() : "application/json";
+
+        Map<String, Object> details = new HashMap<>();
+        details.put("contentType", ex.getContentType() != null ? ex.getContentType().toString() : "unknown");
+        details.put("supportedTypes", supportedTypes);
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value())
+                .error("Unsupported Media Type")
+                .message(String.format("Content type '%s' is not supported. Supported types: %s",
+                        ex.getContentType(), supportedTypes))
+                .path(request.getRequestURI())
+                .details(details)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(errorResponse);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)

@@ -1,6 +1,6 @@
 -- =============================================================================
 -- V003__Create_Exercise_System.sql
--- Creates exercises, workout_plans, and plan_exercise tables
+-- Creates exercises, workout_plans, plan_exercise tables + FITNESS GOALS SYSTEM
 -- EXACTLY MATCHES the JPA entity definitions with explicit column names
 -- =============================================================================
 
@@ -214,6 +214,42 @@ CREATE TABLE exercise_tips (
                                CONSTRAINT fk_tips_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE
 );
 
+-- =============================================================================
+-- FITNESS GOALS SYSTEM - Multiple goals per exercise with relevance scoring
+-- =============================================================================
+
+-- =====================================================
+-- FITNESS GOALS DEFINITION TABLE
+-- =====================================================
+CREATE TABLE fitness_goals (
+                               goal_id SERIAL PRIMARY KEY,
+                               goal_code VARCHAR(50) NOT NULL UNIQUE,        -- 'build-muscle', 'lose-weight'
+                               goal_name VARCHAR(100) NOT NULL,              -- 'Build Muscle', 'Lose Weight'
+                               goal_emoji VARCHAR(10),                       -- '💪', '🔥'
+                               goal_description TEXT,                        -- Detailed description
+                               display_order INTEGER NOT NULL DEFAULT 999,  -- UI ordering (lower = higher priority)
+                               is_active BOOLEAN DEFAULT true,              -- Enable/disable goals
+                               created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =====================================================
+-- EXERCISE-GOAL MAPPING (Many-to-Many)
+-- =====================================================
+CREATE TABLE exercise_goal_mapping (
+                                       exercise_id BIGINT NOT NULL,
+                                       goal_id INTEGER NOT NULL,
+                                       relevance_score INTEGER NOT NULL DEFAULT 3,   -- 1-5: How relevant (1=poor, 5=perfect)
+                                       is_primary BOOLEAN DEFAULT false,             -- Mark the most relevant goal as primary
+                                       notes TEXT,                                   -- Optional: why this exercise fits this goal
+                                       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+                                       PRIMARY KEY (exercise_id, goal_id),
+                                       CONSTRAINT fk_exercise_goal_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE,
+                                       CONSTRAINT fk_exercise_goal_goal FOREIGN KEY (goal_id) REFERENCES fitness_goals(goal_id) ON DELETE CASCADE,
+                                       CONSTRAINT chk_relevance_score CHECK (relevance_score >= 1 AND relevance_score <= 5)
+);
+
 -- =====================================================
 -- INDEXES FOR PERFORMANCE (Based on Expected Queries)
 -- =====================================================
@@ -259,11 +295,52 @@ CREATE INDEX idx_equipment_equipment ON exercise_equipment(equipment);
 CREATE INDEX idx_benefits_exercise ON exercise_benefits(exercise_id);
 CREATE INDEX idx_tips_exercise ON exercise_tips(exercise_id);
 
+-- Fitness Goals indexes
+CREATE INDEX idx_fitness_goals_code ON fitness_goals(goal_code);
+CREATE INDEX idx_fitness_goals_active ON fitness_goals(is_active, display_order);
+
+-- Exercise Goal Mapping indexes
+CREATE INDEX idx_exercise_goal_mapping_exercise ON exercise_goal_mapping(exercise_id);
+CREATE INDEX idx_exercise_goal_mapping_goal ON exercise_goal_mapping(goal_id);
+CREATE INDEX idx_exercise_goal_mapping_relevance ON exercise_goal_mapping(goal_id, relevance_score DESC);
+CREATE INDEX idx_exercise_goal_mapping_primary ON exercise_goal_mapping(goal_id, is_primary, relevance_score DESC);
+
+-- Compound index for goal filtering with relevance ordering (performance optimization)
+CREATE INDEX idx_exercise_goal_relevance_performance
+    ON exercise_goal_mapping(goal_id, relevance_score DESC, exercise_id);
+
 -- Composite indexes for complex queries
 CREATE INDEX idx_exercises_search ON exercises(exercise_type, difficulty_level, published);
 CREATE INDEX idx_workout_plans_search ON workout_plans(workout_type, difficulty_level, is_public);
 CREATE INDEX idx_exercises_popular ON exercises(usage_count, average_rating, published);
 CREATE INDEX idx_workout_plans_popular ON workout_plans(times_used, average_rating, is_public);
+
+-- =====================================================
+-- INITIAL GOALS DATA
+-- =====================================================
+
+-- Tier 1: Core Primary Goals (Most Common - Featured in UI)
+INSERT INTO fitness_goals (goal_code, goal_name, goal_emoji, goal_description, display_order) VALUES
+                                                                                                  ('build-muscle', 'Build Muscle', '💪', 'Increase muscle mass, size, and definition through resistance training', 1),
+                                                                                                  ('lose-weight', 'Lose Weight', '🔥', 'Burn calories, reduce body fat, and achieve weight loss goals', 2),
+                                                                                                  ('gain-strength', 'Gain Strength', '🏋️', 'Develop maximum strength, power, and lifting capacity', 3),
+                                                                                                  ('improve-endurance', 'Improve Endurance', '⚡', 'Build cardiovascular fitness and muscular stamina', 4),
+                                                                                                  ('increase-flexibility', 'Increase Flexibility', '🧘‍♀️', 'Improve mobility, range of motion, and joint health', 5),
+                                                                                                  ('athletic-performance', 'Athletic Performance', '🎯', 'Sport-specific training, speed, and agility development', 6);
+
+-- Tier 2: Specialized Goals (Advanced Users)
+INSERT INTO fitness_goals (goal_code, goal_name, goal_emoji, goal_description, display_order) VALUES
+                                                                                                  ('functional-fitness', 'Functional Fitness', '⚙️', 'Real-world movement patterns for daily activities', 7),
+                                                                                                  ('hiit-conditioning', 'HIIT Training', '⚡', 'High-intensity interval training for conditioning', 8),
+                                                                                                  ('powerlifting', 'Powerlifting', '🏋️‍♂️', 'Maximum strength in squat, bench press, and deadlift', 9),
+                                                                                                  ('bodyweight-training', 'Bodyweight Training', '🤸', 'Calisthenics and exercises requiring no equipment', 10),
+                                                                                                  ('rehabilitation', 'Recovery & Rehab', '🛡️', 'Injury recovery and movement restoration', 11);
+
+-- Tier 3: Lifestyle Goals (Holistic Approach)
+INSERT INTO fitness_goals (goal_code, goal_name, goal_emoji, goal_description, display_order) VALUES
+                                                                                                  ('stress-relief', 'Stress Relief', '🧘', 'Mental health, stress management, and mindfulness', 12),
+                                                                                                  ('general-health', 'General Health', '❤️', 'Overall wellness and chronic disease prevention', 13),
+                                                                                                  ('event-preparation', 'Event Prep', '🏃', 'Training for marathons, competitions, or fitness challenges', 14);
 
 -- =====================================================
 -- UNIQUE CONSTRAINTS
@@ -274,3 +351,103 @@ ALTER TABLE exercises ADD CONSTRAINT uk_exercise_name_unique UNIQUE (exercise_na
 
 -- Ensure exercises appear only once per workout in same order
 ALTER TABLE plan_exercise ADD CONSTRAINT uk_plan_exercise_workout_order UNIQUE (workout_plan_id, order_in_workout);
+
+-- =============================================================================
+-- USER EXERCISE RATING AND HISTORY SYSTEM
+-- =============================================================================
+
+-- =====================================================
+-- USER EXERCISE RATINGS TABLE
+-- =====================================================
+
+CREATE TABLE user_exercise_ratings (
+                                       rating_id BIGSERIAL PRIMARY KEY,
+
+    -- Relationships
+                                       user_id BIGINT NOT NULL,
+                                       exercise_id BIGINT NOT NULL,
+
+    -- Rating data
+                                       rating DOUBLE PRECISION NOT NULL,
+                                       comment VARCHAR(500),
+
+    -- Timestamps
+                                       rated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Foreign key constraints
+                                       CONSTRAINT fk_user_exercise_rating_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                                       CONSTRAINT fk_user_exercise_rating_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE,
+
+    -- Prevent duplicate ratings
+                                       CONSTRAINT uk_user_exercise_rating_unique UNIQUE (user_id, exercise_id)
+);
+
+-- Add constraints for ratings
+ALTER TABLE user_exercise_ratings ADD CONSTRAINT chk_rating_range
+    CHECK (rating >= 0.0 AND rating <= 5.0);
+
+-- =====================================================
+-- USER RATING TAGS TABLE (ElementCollection)
+-- =====================================================
+
+CREATE TABLE user_rating_tags (
+                                  rating_id BIGINT NOT NULL,
+                                  tag VARCHAR(50) NOT NULL,
+                                  CONSTRAINT fk_rating_tags_rating FOREIGN KEY (rating_id) REFERENCES user_exercise_ratings(rating_id) ON DELETE CASCADE
+);
+
+-- =====================================================
+-- USER EXERCISE HISTORY TABLE
+-- =====================================================
+
+CREATE TABLE user_exercise_history (
+                                       history_id BIGSERIAL PRIMARY KEY,
+
+    -- Relationships
+                                       user_id BIGINT NOT NULL,
+                                       exercise_id BIGINT NOT NULL,
+
+    -- Usage data
+                                       used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                       duration_minutes INTEGER,
+                                       context VARCHAR(20) NOT NULL DEFAULT 'view',
+                                       notes VARCHAR(200),
+                                       workout_plan_id BIGINT, -- For future workout plan integration
+
+    -- Foreign key constraints
+                                       CONSTRAINT fk_user_exercise_history_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                                       CONSTRAINT fk_user_exercise_history_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE
+);
+
+-- Add constraints for history
+ALTER TABLE user_exercise_history ADD CONSTRAINT chk_history_context
+    CHECK (context IN ('view', 'workout', 'favorite', 'rate', 'share'));
+
+ALTER TABLE user_exercise_history ADD CONSTRAINT chk_history_duration
+    CHECK (duration_minutes IS NULL OR (duration_minutes >= 1 AND duration_minutes <= 480));
+
+-- =====================================================
+-- ADDITIONAL INDEXES FOR USER EXERCISE SYSTEM
+-- =====================================================
+
+-- User Exercise Ratings indexes
+CREATE INDEX idx_user_exercise_ratings_user ON user_exercise_ratings(user_id);
+CREATE INDEX idx_user_exercise_ratings_exercise ON user_exercise_ratings(exercise_id);
+CREATE INDEX idx_user_exercise_ratings_rating ON user_exercise_ratings(rating);
+CREATE INDEX idx_user_exercise_ratings_rated_at ON user_exercise_ratings(rated_at);
+
+-- User Rating Tags indexes
+CREATE INDEX idx_user_rating_tags_rating ON user_rating_tags(rating_id);
+CREATE INDEX idx_user_rating_tags_tag ON user_rating_tags(tag);
+
+-- User Exercise History indexes
+CREATE INDEX idx_user_exercise_history_user ON user_exercise_history(user_id);
+CREATE INDEX idx_user_exercise_history_exercise ON user_exercise_history(exercise_id);
+CREATE INDEX idx_user_exercise_history_used_at ON user_exercise_history(used_at);
+CREATE INDEX idx_user_exercise_history_context ON user_exercise_history(context);
+
+-- Composite indexes for common queries
+CREATE INDEX idx_user_exercise_history_user_date ON user_exercise_history(user_id, used_at DESC);
+CREATE INDEX idx_user_exercise_history_user_context ON user_exercise_history(user_id, context);
+CREATE INDEX idx_user_exercise_ratings_exercise_rating ON user_exercise_ratings(exercise_id, rating DESC);

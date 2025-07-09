@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 
@@ -18,7 +21,7 @@ public class Exercise {
 
     @NotBlank(message = "Exercise name is required")
     @Size(min = 2, max = 100, message = "Exercise name must be 2-100 characters")
-    @Column(nullable = false, length = 100)
+    @Column(name = "exercise_name", nullable = false, length = 100)
     private String exerciseName;
 
     @Size(max = 10, message = "Emoji too long")
@@ -26,7 +29,7 @@ public class Exercise {
     private String emoji;
 
     @Size(max = 2000, message = "Description too long")
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", length = 2000)
     private String description;
 
     @Enumerated(EnumType.STRING)
@@ -77,9 +80,6 @@ public class Exercise {
     @Column(name = "created_by_professional")
     private Boolean createdByProfessional = false;
 
-//    @Column(name = "verified_exercise")
-//    private Boolean verifiedExercise = false; // Admin or professional verified
-
     @Min(value = 0, message = "Usage count cannot be negative")
     @Column(name = "usage_count")
     private Integer usageCount = 0; // Popularity tracking
@@ -101,6 +101,11 @@ public class Exercise {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // 🎯 FITNESS GOALS RELATIONSHIP
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinColumn(name = "exercise_id") // Use JoinColumn instead of mappedBy for composite keys
+    private List<ExerciseGoalMapping> goalMappings;
 
     // 📱 ENUMS
     public enum ExerciseType {
@@ -161,8 +166,6 @@ public class Exercise {
         return createdByProfessional != null && createdByProfessional;
     }
 
-    // Removed subscription gating - all exercises are free to access
-
     public String getEquipmentSummary() {
         if (!requiresEquipment()) {
             return "No equipment needed";
@@ -209,6 +212,194 @@ public class Exercise {
                 "resistance_band", "bodyweight");
         return equipmentRequired.stream()
                 .allMatch(equipment -> homeEquipment.contains(equipment.toLowerCase().trim()));
+    }
+
+    // 🎯 FITNESS GOALS METHODS
+
+    /**
+     * Get all fitness goals associated with this exercise
+     */
+    public List<FitnessGoal> getFitnessGoals() {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return List.of();
+        }
+        return goalMappings.stream()
+                .map(ExerciseGoalMapping::getFitnessGoal)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get the primary fitness goal for this exercise
+     */
+    public Optional<FitnessGoal> getPrimaryGoal() {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return Optional.empty();
+        }
+        return goalMappings.stream()
+                .filter(ExerciseGoalMapping::isPrimaryGoal)
+                .map(ExerciseGoalMapping::getFitnessGoal)
+                .findFirst();
+    }
+
+    /**
+     * Get primary goal display text for UI
+     */
+    public String getPrimaryGoalDisplay() {
+        return getPrimaryGoal()
+                .map(FitnessGoal::getDisplayText)
+                .orElse("General Fitness");
+    }
+
+    /**
+     * Get primary goal code for API responses
+     */
+    public String getPrimaryGoalCode() {
+        return getPrimaryGoal()
+                .map(FitnessGoal::getGoalCode)
+                .orElse("general-fitness");
+    }
+
+    /**
+     * Get primary goal emoji for UI
+     */
+    public String getPrimaryGoalEmoji() {
+        return getPrimaryGoal()
+                .map(FitnessGoal::getGoalEmoji)
+                .orElse("🎯");
+    }
+
+    /**
+     * Check if exercise supports a specific goal (relevance >= 3)
+     */
+    public boolean supportsGoal(String goalCode) {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return false;
+        }
+        return goalMappings.stream()
+                .filter(mapping -> mapping.getRelevanceScore() >= 3) // Only good fits or better
+                .map(ExerciseGoalMapping::getFitnessGoal)
+                .filter(Objects::nonNull)
+                .anyMatch(goal -> goalCode.equals(goal.getGoalCode()));
+    }
+
+    /**
+     * Check if exercise is excellent fit for a goal (relevance >= 4)
+     */
+    public boolean isExcellentForGoal(String goalCode) {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return false;
+        }
+        return goalMappings.stream()
+                .filter(mapping -> mapping.getFitnessGoal() != null)
+                .filter(mapping -> goalCode.equals(mapping.getFitnessGoal().getGoalCode()))
+                .anyMatch(mapping -> mapping.getRelevanceScore() >= 4);
+    }
+
+    /**
+     * Get relevance score for a specific goal
+     */
+    public int getRelevanceForGoal(String goalCode) {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return 0;
+        }
+        return goalMappings.stream()
+                .filter(mapping -> mapping.getFitnessGoal() != null)
+                .filter(mapping -> goalCode.equals(mapping.getFitnessGoal().getGoalCode()))
+                .mapToInt(ExerciseGoalMapping::getRelevanceScore)
+                .findFirst()
+                .orElse(0);
+    }
+
+    /**
+     * Get all goal codes this exercise supports (relevance >= 3)
+     */
+    public List<String> getSupportedGoalCodes() {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return List.of();
+        }
+        return goalMappings.stream()
+                .filter(mapping -> mapping.getRelevanceScore() >= 3)
+                .map(ExerciseGoalMapping::getFitnessGoal)
+                .filter(Objects::nonNull)
+                .map(FitnessGoal::getGoalCode)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all goal codes with their relevance scores
+     */
+    public List<String> getAllGoalCodesWithRelevance() {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return List.of();
+        }
+        return goalMappings.stream()
+                .filter(mapping -> mapping.getFitnessGoal() != null)
+                .map(mapping -> mapping.getFitnessGoal().getGoalCode() + ":" + mapping.getRelevanceScore())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Check if exercise has any goal mappings
+     */
+    public boolean hasGoalMappings() {
+        return goalMappings != null && !goalMappings.isEmpty();
+    }
+
+    /**
+     * Get goal count for this exercise
+     */
+    public int getGoalCount() {
+        return goalMappings != null ? goalMappings.size() : 0;
+    }
+
+    /**
+     * Get highest relevance score across all goals
+     */
+    public int getHighestRelevanceScore() {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return 0;
+        }
+        return goalMappings.stream()
+                .mapToInt(ExerciseGoalMapping::getRelevanceScore)
+                .max()
+                .orElse(0);
+    }
+
+    /**
+     * Check if this exercise is perfect for any goal (has any 5-star relevance)
+     */
+    public boolean isPerfectForAnyGoal() {
+        return getHighestRelevanceScore() == 5;
+    }
+
+    /**
+     * Get goals this exercise is excellent for (relevance >= 4)
+     */
+    public List<FitnessGoal> getExcellentGoals() {
+        if (goalMappings == null || goalMappings.isEmpty()) {
+            return List.of();
+        }
+        return goalMappings.stream()
+                .filter(mapping -> mapping.getRelevanceScore() >= 4)
+                .map(ExerciseGoalMapping::getFitnessGoal)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get a summary of goals for display (e.g., "💪 Build Muscle, 🔥 Lose Weight")
+     */
+    public String getGoalsSummary() {
+        List<FitnessGoal> excellentGoals = getExcellentGoals();
+        if (excellentGoals.isEmpty()) {
+            return getPrimaryGoalDisplay();
+        }
+
+        return excellentGoals.stream()
+                .limit(3) // Show max 3 goals to avoid clutter
+                .map(FitnessGoal::getDisplayText)
+                .collect(Collectors.joining(", "));
     }
 
     // ⏰ JPA LIFECYCLE METHODS

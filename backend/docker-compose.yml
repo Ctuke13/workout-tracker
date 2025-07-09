@@ -1,16 +1,15 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:16
     container_name: workout-tracker-db
     environment:
       POSTGRES_DB: workout_tracker
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: workout_user
+      POSTGRES_PASSWORD: myPassword123
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-
+      - ./init-permissions.sql:/docker-entrypoint-initdb.d/init-permissions.sql
 volumes:
   postgres-data:

@@ -2,12 +2,45 @@ import React, { useState } from 'react';
 import { Button } from '@mui/material';
 import { useNavigate } from "react-router-dom";
 
-const ExerciseLibrary = () => {
-    const [activeGoal, setActiveGoal] = useState('fat-burn');
+// Types
+interface Exercise {
+    name: string;
+    duration: string;
+    difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+    emoji: string;
+    caloriesBurn: string;
+    benefits: string[];
+    category?: string;
+}
+
+interface Goal {
+    id: string;
+    name: string;
+    emoji: string;
+    color: string;
+    count: string;
+}
+
+interface ExerciseCardProps {
+    exercise: Exercise;
+    index: number;
+    onViewWorkout: (exercise: Exercise) => void;
+}
+
+interface GoalTabProps {
+    goal: Goal;
+    isActive: boolean;
+    onClick: (goalId: string) => void;
+}
+
+type GoalId = 'fat-burn' | 'muscle-building' | 'endurance' | 'flexibility';
+
+const ExerciseLibrary: React.FC = () => {
+    const [activeGoal, setActiveGoal] = useState<GoalId>('fat-burn');
     const navigate = useNavigate();
 
     // Goal-based exercise preview (2 exercises per goal for teaser)
-    const exercises = {
+    const exercises: Record<GoalId, Exercise[]> = {
         'fat-burn': [
             {
                 name: "HIIT Circuit",
@@ -83,14 +116,15 @@ const ExerciseLibrary = () => {
     };
 
     // Goal categories with updated theming
-    const goals = [
+    const goals: Goal[] = [
         { id: 'fat-burn', name: 'Fat Burn', emoji: '🔥', color: 'red', count: '45+' },
         { id: 'muscle-building', name: 'Muscle Building', emoji: '💪', color: 'blue', count: '120+' },
         { id: 'endurance', name: 'Endurance', emoji: '⚡', color: 'orange', count: '65+' },
         { id: 'flexibility', name: 'Flexibility', emoji: '🧘‍♀️', color: 'green', count: '40+' }
     ];
 
-    const getDifficultyColor = (difficulty) => {
+    // Utility functions
+    const getDifficultyColor = (difficulty: Exercise['difficulty']): string => {
         switch (difficulty.toLowerCase()) {
             case 'beginner':
                 return 'text-green-600';
@@ -102,6 +136,92 @@ const ExerciseLibrary = () => {
                 return 'text-text-muted';
         }
     };
+
+    const handleGoalSelect = (goalId: string): void => {
+        setActiveGoal(goalId as GoalId);
+    };
+
+    const handleViewWorkout = (exercise: Exercise): void => {
+        navigate(`/exercises/${exercise.category}#${exercise.name}`);
+    };
+
+    const goToExerciseLibrary = (): void => {
+        navigate('/exercises');
+    };
+
+    // Goal Tab Component
+    const GoalTab: React.FC<GoalTabProps> = ({ goal, isActive, onClick }) => (
+        <button
+            onClick={() => onClick(goal.id)}
+            className={`flex items-center space-x-2 px-4 md:px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 ${
+                isActive
+                    ? 'bg-electric-blue text-white shadow-lg shadow-electric-blue/20'
+                    : 'bg-light-card text-text-secondary hover:text-text-primary hover:bg-light-card-hover border border-light-border'
+            }`}
+        >
+            <span className="text-xl">{goal.emoji}</span>
+            <span className="hidden sm:inline">{goal.name}</span>
+            <span className={`text-xs px-2 py-1 rounded-full ${
+                isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-electric-blue/10 text-electric-blue'
+            }`}>
+                {goal.count}
+            </span>
+        </button>
+    );
+
+    // Exercise Card Component
+    const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, index, onViewWorkout }) => (
+        <div className="group bg-light-card border border-light-border rounded-xl p-6 hover:border-electric-blue/30 hover:shadow-light-card-hover hover:shadow-electric-blue/10 transition-all duration-300 hover:transform hover:scale-105">
+            {/* Exercise Header */}
+            <div className="flex items-center justify-between mb-4">
+                <div className="text-3xl">{exercise.emoji}</div>
+                <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getDifficultyColor(exercise.difficulty)} bg-gray-100`}>
+                    {exercise.difficulty}
+                </span>
+            </div>
+
+            {/* Exercise Name */}
+            <h3 className="text-lg font-semibold text-text-primary mb-3 group-hover:text-electric-blue transition-colors">
+                {exercise.name}
+            </h3>
+
+            {/* Quick Stats */}
+            <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                    <span className="text-text-muted">Duration:</span>
+                    <span className="text-text-secondary font-medium">{exercise.duration}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                    <span className="text-text-muted">Calories:</span>
+                    <span className="text-electric-blue font-medium">{exercise.caloriesBurn}</span>
+                </div>
+            </div>
+
+            {/* Benefits */}
+            <div className="mb-4">
+                {exercise.benefits.map((benefit: string, i: number) => (
+                    <div key={i} className="flex items-center text-xs text-text-muted mb-1">
+                        <span className="text-neon-green mr-2">✓</span>
+                        {benefit}
+                    </div>
+                ))}
+            </div>
+
+            {/* Hover Action */}
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => onViewWorkout(exercise)}
+                    className="border-electric-blue text-electric-blue hover:bg-electric-blue/10 text-xs w-full"
+                >
+                    View Full Workout
+                </Button>
+            </div>
+        </div>
+    );
 
     return (
         <section id="exercises" className="py-8 md:py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-blue-50 to-gray-100 animate-on-scroll">
@@ -128,83 +248,25 @@ const ExerciseLibrary = () => {
 
                 {/* Goal Tabs */}
                 <div className="flex flex-wrap justify-center gap-2 md:gap-4 mb-12">
-                    {goals.map((goal) => (
-                        <button
+                    {goals.map((goal: Goal) => (
+                        <GoalTab
                             key={goal.id}
-                            onClick={() => setActiveGoal(goal.id)}
-                            className={`flex items-center space-x-2 px-4 md:px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 ${
-                                activeGoal === goal.id
-                                    ? 'bg-electric-blue text-white shadow-lg shadow-electric-blue/20'
-                                    : 'bg-light-card text-text-secondary hover:text-text-primary hover:bg-light-card-hover border border-light-border'
-                            }`}
-                        >
-                            <span className="text-xl">{goal.emoji}</span>
-                            <span className="hidden sm:inline">{goal.name}</span>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                                activeGoal === goal.id
-                                    ? 'bg-white/20 text-white'
-                                    : 'bg-electric-blue/10 text-electric-blue'
-                            }`}>
-                                {goal.count}
-                            </span>
-                        </button>
+                            goal={goal}
+                            isActive={activeGoal === goal.id}
+                            onClick={handleGoalSelect}
+                        />
                     ))}
                 </div>
 
                 {/* Exercise Preview Grid (Only 2 per goal) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12 max-w-4xl mx-auto">
-                    {exercises[activeGoal].map((exercise, index) => (
-                        <div
+                    {exercises[activeGoal].map((exercise: Exercise, index: number) => (
+                        <ExerciseCard
                             key={index}
-                            className="group bg-light-card border border-light-border rounded-xl p-6 hover:border-electric-blue/30 hover:shadow-light-card-hover hover:shadow-electric-blue/10 transition-all duration-300 hover:transform hover:scale-105"
-                        >
-                            {/* Exercise Header */}
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="text-3xl">{exercise.emoji}</div>
-                                <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getDifficultyColor(exercise.difficulty)} bg-gray-100`}>
-                                    {exercise.difficulty}
-                                </span>
-                            </div>
-
-                            {/* Exercise Name */}
-                            <h3 className="text-lg font-semibold text-text-primary mb-3 group-hover:text-electric-blue transition-colors">
-                                {exercise.name}
-                            </h3>
-
-                            {/* Quick Stats */}
-                            <div className="space-y-2 mb-4">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-text-muted">Duration:</span>
-                                    <span className="text-text-secondary font-medium">{exercise.duration}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-text-muted">Calories:</span>
-                                    <span className="text-electric-blue font-medium">{exercise.caloriesBurn}</span>
-                                </div>
-                            </div>
-
-                            {/* Benefits */}
-                            <div className="mb-4">
-                                {exercise.benefits.map((benefit, i) => (
-                                    <div key={i} className="flex items-center text-xs text-text-muted mb-1">
-                                        <span className="text-neon-green mr-2">✓</span>
-                                        {benefit}
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Hover Action */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => navigate(`/exercises/${exercise.category}#${exercise.name}`)}
-                                    className="border-electric-blue text-electric-blue hover:bg-electric-blue/10 text-xs w-full"
-                                >
-                                    View Full Workout
-                                </Button>
-                            </div>
-                        </div>
+                            exercise={exercise}
+                            index={index}
+                            onViewWorkout={handleViewWorkout}
+                        />
                     ))}
                 </div>
 
@@ -221,7 +283,7 @@ const ExerciseLibrary = () => {
 
                         {/* Goal Summary */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                            {goals.map((goal) => (
+                            {goals.map((goal: Goal) => (
                                 <div key={goal.id} className="text-center">
                                     <div className="text-2xl mb-2">{goal.emoji}</div>
                                     <div className="text-sm text-text-secondary font-medium">{goal.count} workouts</div>
@@ -233,7 +295,7 @@ const ExerciseLibrary = () => {
                             <Button
                                 variant="contained"
                                 size="large"
-                                onClick={() => navigate('/exercises')}
+                                onClick={goToExerciseLibrary}
                                 className="bg-gradient-to-r from-electric-blue to-neon-green text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
                             >
                                 🔍 Browse Full Exercise Library

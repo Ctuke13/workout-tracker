@@ -6,8 +6,26 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import FitnessCenterIcon from '@mui/icons-material/FitnessCenter';
 import TimerIcon from '@mui/icons-material/Timer';
 
-const HeroSection = () => {
-    const [animatedStats, setAnimatedStats] = useState({
+// Types
+interface AnimatedStats {
+    setsCompleted: number;
+    sessionVolume: number;
+    exercisesDone: number;
+}
+
+interface StatCardProps {
+    icon: React.ReactNode;
+    label: string;
+    value: string | number;
+    color: string;
+}
+
+interface TrustIndicator {
+    text: string;
+}
+
+const HeroSection: React.FC = () => {
+    const [animatedStats, setAnimatedStats] = useState<AnimatedStats>({
         setsCompleted: 0,
         sessionVolume: 0,
         exercisesDone: 0
@@ -25,12 +43,44 @@ const HeroSection = () => {
             });
         }, 500);
 
-        return () => clearTimeout(timer);
+        return (): void => {
+            clearTimeout(timer);
+        };
     }, []);
 
-    const scrollToBeta = () => {
-        document.getElementById('beta')?.scrollIntoView({ behavior: 'smooth' });
+    // Navigation handlers
+    const scrollToBeta = (): void => {
+        const betaElement = document.getElementById('beta');
+        if (betaElement) {
+            betaElement.scrollIntoView({ behavior: 'smooth' });
+        }
     };
+
+    const goToExercises = (): void => {
+        navigate('/exercises');
+    };
+
+    // Trust indicators data
+    const trustIndicators: TrustIndicator[] = [
+        { text: "No credit card required" },
+        { text: "Your data stays yours" },
+        { text: "Cancel anytime" }
+    ];
+
+    // Stat card component
+    const StatCard: React.FC<StatCardProps> = ({ icon, label, value, color }) => (
+        <div className="bg-light-bg-secondary rounded-lg p-3">
+            <div className="flex items-center mb-1">
+                <div className={`${color} w-4 h-4 mr-2`}>
+                    {icon}
+                </div>
+                <span className="text-text-muted text-xs">{label}</span>
+            </div>
+            <div className="text-xl font-bold text-text-primary">
+                {typeof value === 'number' ? value.toLocaleString() : value}
+            </div>
+        </div>
+    );
 
     return (
         <section className="pt-20 pb-16 md:pb-24 px-4 sm:px-6 lg:px-8 bg-light-bg animate-on-scroll">
@@ -73,7 +123,7 @@ const HeroSection = () => {
                             <Button
                                 variant="outlined"
                                 size="large"
-                                onClick={() => navigate('/exercises')}
+                                onClick={goToExercises}
                                 className="border-electric-blue text-electric-blue hover:bg-electric-blue/10 px-8 py-4 rounded-lg font-semibold text-lg transition-all"
                             >
                                 View Exercise Library
@@ -83,9 +133,9 @@ const HeroSection = () => {
                         {/* Trust Indicators */}
                         <div className="mt-8 pt-8 border-t border-light-border">
                             <div className="flex flex-wrap justify-center lg:justify-start gap-6 text-sm text-text-muted">
-                                <span>✅ No credit card required</span>
-                                <span>✅ Your data stays yours</span>
-                                <span>✅ Cancel anytime</span>
+                                {trustIndicators.map((indicator, index) => (
+                                    <span key={index}>✅ {indicator.text}</span>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -144,43 +194,30 @@ const HeroSection = () => {
 
                                         {/* Session Stats Grid */}
                                         <div className="grid grid-cols-2 gap-3 mb-6">
-                                            <div className="bg-light-bg-secondary rounded-lg p-3">
-                                                <div className="flex items-center mb-1">
-                                                    <FitnessCenterIcon className="text-electric-blue w-4 h-4 mr-2" />
-                                                    <span className="text-text-muted text-xs">Sets Done</span>
-                                                </div>
-                                                <div className="text-xl font-bold text-text-primary">
-                                                    {animatedStats.setsCompleted}
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-light-bg-secondary rounded-lg p-3">
-                                                <div className="flex items-center mb-1">
-                                                    <TrendingUpIcon className="text-neon-green w-4 h-4 mr-2" />
-                                                    <span className="text-text-muted text-xs">Volume Today</span>
-                                                </div>
-                                                <div className="text-xl font-bold text-text-primary">
-                                                    {animatedStats.sessionVolume.toLocaleString()}
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-light-bg-secondary rounded-lg p-3">
-                                                <div className="flex items-center mb-1">
-                                                    <TimerIcon className="text-orange-gradient-start w-4 h-4 mr-2" />
-                                                    <span className="text-text-muted text-xs">Session Time</span>
-                                                </div>
-                                                <div className="text-xl font-bold text-text-primary">1h 15m</div>
-                                            </div>
-
-                                            <div className="bg-light-bg-secondary rounded-lg p-3">
-                                                <div className="flex items-center mb-1">
-                                                    <TrendingUpIcon className="text-electric-blue w-4 h-4 mr-2" />
-                                                    <span className="text-text-muted text-xs">Exercises</span>
-                                                </div>
-                                                <div className="text-xl font-bold text-neon-green">
-                                                    {animatedStats.exercisesDone}
-                                                </div>
-                                            </div>
+                                            <StatCard
+                                                icon={<FitnessCenterIcon />}
+                                                label="Sets Done"
+                                                value={animatedStats.setsCompleted}
+                                                color="text-electric-blue"
+                                            />
+                                            <StatCard
+                                                icon={<TrendingUpIcon />}
+                                                label="Volume Today"
+                                                value={animatedStats.sessionVolume}
+                                                color="text-neon-green"
+                                            />
+                                            <StatCard
+                                                icon={<TimerIcon />}
+                                                label="Session Time"
+                                                value="1h 15m"
+                                                color="text-orange-gradient-start"
+                                            />
+                                            <StatCard
+                                                icon={<TrendingUpIcon />}
+                                                label="Exercises"
+                                                value={animatedStats.exercisesDone}
+                                                color="text-electric-blue"
+                                            />
                                         </div>
 
                                         {/* Current Exercise */}

@@ -1,0 +1,28 @@
+//===== User Enums =====//
+export enum UserType {
+    REGULAR = 'REGULAR',
+    PROFESSIONAL = 'PROFESSIONAL',
+    ADMIN = 'ADMIN'
+}
+
+export enum Gender {
+    MALE = 'MALE',
+    FEMALE = 'FEMALE',
+    OTHER = 'OTHER',
+    PREFER_NOT_TO_SAY = 'PREFER_NOT_TO_SAY'
+}
+
+export enum AccountStatus {
+    ACTIVE = 'ACTIVE',
+    SUSPENDED = 'SUSPENDED',
+    INACTIVE = 'INACTIVE',
+    PENDING_VERIFICATION = 'PENDING_VERIFICATION'
+}
+
+export enum ActivityLevel {
+    SEDENTARY = 'SEDENTARY',
+    LIGHTLY_ACTIVE = 'LIGHTLY_ACTIVE',
+    MODERATELY_ACTIVE = 'MODERATELY_ACTIVE',
+    VERY_ACTIVE = 'VERY_ACTIVE',
+    EXTREMELY_ACTIVE = 'EXTREMELY_ACTIVE'
+}

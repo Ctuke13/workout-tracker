@@ -1,19 +1,38 @@
 import React, { useState } from 'react';
 import { Button, TextField } from '@mui/material';
 
-const BetaAccess = () => {
-    const [email, setEmail] = useState('');
-    const [isSubmitted, setIsSubmitted] = useState(false);
+// Types
+interface BetaBenefit {
+    icon: string;
+    title: string;
+    description: string;
+}
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        // TODO: Connect to your backend API for email signup
-        console.log('Beta signup:', email);
-        setIsSubmitted(true);
-        setEmail('');
+interface BetaStat {
+    number: string;
+    label: string;
+}
+
+interface BenefitCardProps {
+    benefit: BetaBenefit;
+    index: number;
+}
+
+interface Testimonial {
+    quote: string;
+    author: {
+        name: string;
+        title: string;
+        avatar: string;
     };
+}
 
-    const benefits = [
+const BetaAccess: React.FC = () => {
+    const [email, setEmail] = useState<string>('');
+    const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+
+    // Beta benefits configuration
+    const benefits: BetaBenefit[] = [
         {
             icon: "🚀",
             title: "First Access",
@@ -36,13 +55,57 @@ const BetaAccess = () => {
         }
     ];
 
-    const stats = [
+    // Beta stats configuration
+    const stats: BetaStat[] = [
         { number: "500+", label: "Beta Testers" },
         { number: "12K+", label: "Workouts Logged" },
         { number: "4.9/5", label: "User Rating" },
         { number: "99%", label: "Would Recommend" }
     ];
 
+    // Testimonial data
+    const testimonial: Testimonial = {
+        quote: "This beta has completely changed how I track my workouts. The analytics are incredible and the community is amazing!",
+        author: {
+            name: "Mike R.",
+            title: "Beta Tester since Day 1",
+            avatar: "M"
+        }
+    };
+
+    // Event handlers
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+        e.preventDefault();
+        // TODO: Connect to your backend API for email signup
+        console.log('Beta signup:', email);
+        setIsSubmitted(true);
+        setEmail('');
+    };
+
+    const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+        setEmail(e.target.value);
+    };
+
+    // Benefit Card Component
+    const BenefitCard: React.FC<BenefitCardProps> = ({ benefit, index }) => (
+        <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-electric-blue/10 rounded-lg flex items-center justify-center">
+                    <span className="text-2xl">{benefit.icon}</span>
+                </div>
+            </div>
+            <div>
+                <h4 className="text-lg font-semibold text-text-primary mb-2">
+                    {benefit.title}
+                </h4>
+                <p className="text-text-muted">
+                    {benefit.description}
+                </p>
+            </div>
+        </div>
+    );
+
+    // Success State Component
     if (isSubmitted) {
         return (
             <section id="beta" className="py-4 md:py-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-electric-blue/5 via-light-bg-secondary to-neon-green/5 animate-on-scroll">
@@ -101,7 +164,7 @@ const BetaAccess = () => {
 
                 {/* Beta Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-                    {stats.map((stat, index) => (
+                    {stats.map((stat: BetaStat, index: number) => (
                         <div key={index} className="text-center">
                             <div className="text-3xl md:text-4xl font-bold text-electric-blue mb-2">
                                 {stat.number}
@@ -123,38 +186,27 @@ const BetaAccess = () => {
                         </h3>
 
                         <div className="space-y-6">
-                            {benefits.map((benefit, index) => (
-                                <div key={index} className="flex items-start space-x-4">
-                                    <div className="flex-shrink-0">
-                                        <div className="w-12 h-12 bg-electric-blue/10 rounded-lg flex items-center justify-center">
-                                            <span className="text-2xl">{benefit.icon}</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-lg font-semibold text-text-primary mb-2">
-                                            {benefit.title}
-                                        </h4>
-                                        <p className="text-text-muted">
-                                            {benefit.description}
-                                        </p>
-                                    </div>
-                                </div>
+                            {benefits.map((benefit: BetaBenefit, index: number) => (
+                                <BenefitCard
+                                    key={index}
+                                    benefit={benefit}
+                                    index={index}
+                                />
                             ))}
                         </div>
 
                         {/* Testimonial */}
                         <div className="mt-8 p-6 bg-light-card border border-light-border rounded-lg shadow-light-card">
                             <p className="text-text-muted italic mb-4">
-                                "This beta has completely changed how I track my workouts.
-                                The analytics are incredible and the community is amazing!"
+                                "{testimonial.quote}"
                             </p>
                             <div className="flex items-center">
                                 <div className="w-10 h-10 bg-gradient-to-r from-electric-blue to-neon-green rounded-full flex items-center justify-center text-white font-bold mr-3">
-                                    M
+                                    {testimonial.author.avatar}
                                 </div>
                                 <div>
-                                    <div className="text-text-primary font-semibold">Mike R.</div>
-                                    <div className="text-text-muted text-sm">Beta Tester since Day 1</div>
+                                    <div className="text-text-primary font-semibold">{testimonial.author.name}</div>
+                                    <div className="text-text-muted text-sm">{testimonial.author.title}</div>
                                 </div>
                             </div>
                         </div>
@@ -179,7 +231,7 @@ const BetaAccess = () => {
                                         type="email"
                                         label="Email Address"
                                         value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
+                                        onChange={handleEmailChange}
                                         required
                                         variant="outlined"
                                         sx={{

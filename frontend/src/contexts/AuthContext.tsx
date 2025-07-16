@@ -108,7 +108,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const response = await authService.login(credentials);
             dispatch({ type: 'LOGIN_SUCCESS', payload: response });
 
-            navigate('/dashboard');
+            navigate('/welcome');
             console.log('✅ Login successful, redirecting to dashboard')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Login failed';
@@ -123,7 +123,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const response = await authService.register(userData);
             dispatch({ type: 'REGISTER_SUCCESS', payload: response });
 
-            navigate('/dashboard', { state: { fromRegistration: true } });
+            navigate('/welcome', { state: { fromRegistration: true } });
             console.log('✅ Registration successful, redirecting to dashboard');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Registration failed';

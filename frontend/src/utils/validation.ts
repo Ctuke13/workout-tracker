@@ -72,3 +72,91 @@ export function validateDateOfBirth(dateOfBirth: string): string | null {
 
     return null;
 }
+
+export function validateZipcode(zipcode: string): string | null {
+    if (!zipcode) return 'Zipcode is required';
+    if (!ZIPCODE_REGEX.test(zipcode)) return 'Zipcode must be 5 digits';
+    return null;
+}
+
+export function validateGender(gender: string): string | null {
+    if (!gender) return 'Please select your gender';
+    return null;
+}
+
+export function validateTermsAgreement(agreeToTerms: boolean): string | null {
+    if (!agreeToTerms) return 'You must agree to the terms of service';
+    return null;
+}
+
+// ==================== COMPLETE FORM VALIDATION ====================
+
+export function validateLoginForm(formData: LoginFormData): FormErrors {
+    const errors: FormErrors = {};
+
+    const emailOrUsernameError = formData.emailOrUsername.includes('@')
+        ? validateEmail(formData.emailOrUsername)
+        : validateUsername(formData.emailOrUsername);
+
+    if (emailOrUsernameError) errors.emailOrUsername = emailOrUsernameError;
+
+    const passwordError = validatePassword(formData.password);
+    if (passwordError) errors.password = passwordError;
+
+    return errors;
+}
+
+export function validateRegisterForm(formData: RegisterFormData): FormErrors {
+    const errors: FormErrors = {};
+
+    // Validate all required backend fields
+    const emailError = validateEmail(formData.email);
+    if (emailError) errors.email = emailError;
+
+    const usernameError = validateUsername(formData.username);
+    if (usernameError) errors.username = usernameError;
+
+    const passwordError = validatePassword(formData.password);
+    if (passwordError) errors.password = passwordError;
+
+    const confirmPasswordError = validateConfirmPassword(formData.password, formData.confirmPassword);
+    if (confirmPasswordError) errors.confirmPassword = confirmPasswordError;
+
+    const firstNameError = validateFirstName(formData.firstName);
+    if (firstNameError) errors.firstName = firstNameError;
+
+    const lastNameError = validateLastName(formData.lastName);
+    if (lastNameError) errors.lastName = lastNameError;
+
+    const dateOfBirthError = validateDateOfBirth(formData.dateOfBirth);
+    if (dateOfBirthError) errors.dateOfBirth = dateOfBirthError;
+
+    const genderError = validateGender(formData.gender);
+    if (genderError) errors.gender = genderError;
+
+    const zipcodeError = validateZipcode(formData.zipcode);
+    if (zipcodeError) errors.zipcode = zipcodeError;
+
+    const termsError = validateTermsAgreement(formData.agreeToTerms);
+    if (termsError) errors.agreeToTerms = termsError;
+
+    return errors;
+}
+
+// ==================== UTILITY FUNCTIONS ====================
+
+export function hasErrors(errors: FormErrors): boolean {
+    return Object.keys(errors).length > 0;
+}
+
+// Debounce function for real-time validation
+export function debounce<T extends (...args: any[]) => any>(
+    func: T,
+    wait: number
+): (...args: Parameters<T>) => void {
+    let timeout: NodeJS.Timeout;
+    return (...args: Parameters<T>) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
+}

@@ -10,9 +10,6 @@ import {
     FinalCTA
 } from '../components/LandingPage';
 
-// Temporary test - add to any existing component
-import authService from '../services/authService';
-
 
 
 // Types for Intersection Observer

@@ -83,17 +83,26 @@ export interface LoginFormData {
     rememberMe: boolean;
 }
 
+// Updated to match your backend exactly + frontend-only fields
 export interface RegisterFormData {
+    // Backend fields (these will be sent to API)
     email: string;
     username: string;
     password: string;
-    confirmPassword: string;
     firstName: string;
     lastName: string;
     dateOfBirth: string;
     gender: Gender | '';
     zipcode: string;
     agreeToTerms: boolean;
+
+    // Frontend-only fields (for validation/UX)
+    confirmPassword: string;
+
+    // Optional frontend preference fields (not sent to backend)
+    fitnessGoal?: string;
+    experienceLevel?: string;
+    subscribeNewsletter?: boolean;
 }
 
 export interface FormErrors {

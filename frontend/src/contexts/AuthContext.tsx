@@ -22,14 +22,14 @@ type AuthAction =
     | { type: 'LOGOUT' }
     | { type: 'REFRESH_TOKEN_SUCCESS'; payload: JwtResponse }
     | { type: 'CLEAR_ERROR' }
-    | { type: 'SET_LOADING'; payload: boolean };
+    | { type: 'SET_LOADING'; payload: boolean }
+    | { type: 'INIT_COMPLETE' }; // NEW: Separate action for initialization completion
 
 const initialState: AuthState = {
     isAuthenticated: false,
     user: null,
     token: null,
-    loading: true
-    ,
+    loading: true, // Start with loading true for initialization
     error: null,
 };
 
@@ -69,6 +69,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         case 'LOGOUT':
             return {
                 ...initialState,
+                loading: false, // Don't show loading after logout
             };
 
         case 'CLEAR_ERROR':
@@ -81,6 +82,12 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
             return {
                 ...state,
                 loading: action.payload,
+            };
+
+        case 'INIT_COMPLETE': // NEW: Always finish initialization
+            return {
+                ...state,
+                loading: false,
             };
 
         default:
@@ -136,7 +143,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         authService.logout();
         dispatch({ type: 'LOGOUT' });
 
-        // ADD THESE LINES:
         navigate('/');
         console.log('✅ Logout successful, redirecting to home');
     };
@@ -152,10 +158,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const checkAvailability = async (type: 'email' | 'username', value: string): Promise<boolean> => {
-        if (type === 'email') {
-            return authService.checkEmailAvailability(value);
-        } else {
-            return authService.checkUsernameAvailability(value);
+        // IMPORTANT: Don't affect main loading state for availability checks
+        try {
+            if (type === 'email') {
+                return await authService.checkEmailAvailability(value);
+            } else {
+                return await authService.checkUsernameAvailability(value);
+            }
+        } catch (error) {
+            console.error(`Availability check failed for ${type}:`, error);
+            return false; // Assume available on error to not block user
         }
     };
 
@@ -172,24 +184,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     useEffect(() => {
         const initializeAuth = async () => {
             console.log('🔄 Initializing auth...');
-            const token = authService.getToken();
-            console.log('🔑 Token from localStorage:', token ? 'Found' : 'Not found');
-
-            if (!token) {
-                console.log('❌ No token found, user not authenticated');
-                return;
-            }
-
-            if (authService.isTokenExpired(token)) {
-                console.log('⏰ Token expired, removing...');
-                authService.removeToken();
-                return;
-            }
-
-            console.log('✅ Valid token found, getting user data...');
-            dispatch({ type: 'SET_LOADING', payload: true });
 
             try {
+                const token = authService.getToken();
+                console.log('🔑 Token from localStorage:', token ? 'Found' : 'Not found');
+
+                if (!token) {
+                    console.log('❌ No token found, user not authenticated');
+                    return; // Will hit finally block
+                }
+
+                if (authService.isTokenExpired(token)) {
+                    console.log('⏰ Token expired, removing...');
+                    authService.removeToken();
+                    return; // Will hit finally block
+                }
+
+                console.log('✅ Valid token found, getting user data...');
+
                 // Try to get current user to validate token
                 const user = await authService.getCurrentUser();
                 console.log('👤 User data retrieved:', user.username);
@@ -210,10 +222,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 dispatch({ type: 'LOGIN_SUCCESS', payload: jwtResponse });
                 console.log('✅ Auth initialization successful');
             } catch (error) {
-                console.error('Auth initialization failed:', error);
+                console.error('❌ Auth initialization failed:', error);
                 authService.removeToken();
+                // Don't dispatch failure here - just let initialization complete
             } finally {
-                dispatch({ type: 'SET_LOADING', payload: false });
+                // CRITICAL: Always finish initialization regardless of outcome
+                dispatch({ type: 'INIT_COMPLETE' });
+                console.log('🏁 Auth initialization complete');
             }
         };
 

@@ -18,6 +18,9 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
     // Hide bottom nav on certain pages (login, register, etc.)
     const hideBottomNav = ['/login', '/register', '/'].includes(location.pathname);
 
+    // Hide the general FAB on calendar page since it has its own specific FAB
+    const hideGeneralFAB = location.pathname === '/calendar';
+
     return (
         <div className="flex flex-col h-screen bg-gray-50">
             {/* Top Navigation - Always visible */}
@@ -31,8 +34,8 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
             {/* Bottom Navigation - Hidden on auth pages */}
             {!hideBottomNav && <BottomNavigation />}
 
-            {/* Floating Action Button - Only on main app pages */}
-            {!hideBottomNav && (
+            {/* Floating Action Button - Only on main app pages (except calendar) */}
+            {!hideBottomNav && !hideGeneralFAB && (
                 <FloatingActionButton
                     onClick={() => setShowWorkoutModal(true)}
                     isWorkoutMode={isWorkoutMode}

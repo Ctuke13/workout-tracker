@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     validateEmail,
@@ -33,6 +33,9 @@ export const RegisterForm: React.FC = () => {
     const [errors, setErrors] = useState<FormErrors>({});
     const [availability, setAvailability] = useState({ email: true, username: true });
 
+    // Add debouncing state
+    const [availabilityLoading, setAvailabilityLoading] = useState({ email: false, username: false });
+
     const fitnessGoals = [
         { id: 'weight_loss', label: 'Lose Weight', emoji: '🔥' },
         { id: 'muscle_gain', label: 'Build Muscle', emoji: '💪' },
@@ -48,6 +51,36 @@ export const RegisterForm: React.FC = () => {
         { id: 'advanced', label: 'Advanced', description: '2+ years' },
         { id: 'expert', label: 'Expert/Coach', description: 'Professional level' }
     ];
+
+    // Debounced availability check function
+    const debouncedAvailabilityCheck = useCallback(
+        (type: 'email' | 'username', value: string) => {
+            // Clear any existing timeout
+            const timeoutKey = `${type}Timeout`;
+            if ((window as any)[timeoutKey]) {
+                clearTimeout((window as any)[timeoutKey]);
+            }
+
+            // Set loading state for this field
+            setAvailabilityLoading(prev => ({ ...prev, [type]: true }));
+
+            // Set new timeout
+            (window as any)[timeoutKey] = setTimeout(async () => {
+                try {
+                    console.log(`🔍 Checking ${type} availability:`, value);
+                    const available = await checkAvailability(type, value);
+                    setAvailability(prev => ({ ...prev, [type]: available }));
+                    console.log(`✅ ${type} availability result:`, available);
+                } catch (err) {
+                    console.error(`❌ ${type} availability check failed:`, err);
+                    setAvailability(prev => ({ ...prev, [type]: true })); // Assume available on error
+                } finally {
+                    setAvailabilityLoading(prev => ({ ...prev, [type]: false }));
+                }
+            }, 500); // Wait 500ms after user stops typing
+        },
+        [checkAvailability]
+    );
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -97,13 +130,9 @@ export const RegisterForm: React.FC = () => {
             }
         }
 
-        // Check availability for email/username
+        // DEBOUNCED availability check for email/username
         if ((name === 'email' || name === 'username') && value.length > 2) {
-            checkAvailability(name as 'email' | 'username', value).then(available => {
-                setAvailability(prev => ({ ...prev, [name]: available }));
-            }).catch(err => {
-                console.error('Availability check failed:', err);
-            });
+            debouncedAvailabilityCheck(name as 'email' | 'username', value);
         }
     };
 
@@ -147,6 +176,9 @@ export const RegisterForm: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // DEBUG: Check loading state
+        console.log('🚀 Form submission - loading state:', loading);
 
         const validationErrors = validateRegisterForm(formData);
         if (Object.keys(validationErrors).length > 0) {
@@ -225,21 +257,31 @@ export const RegisterForm: React.FC = () => {
                 <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
                     Email Address
                 </label>
-                <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full max-w-full min-w-0 px-3 sm:px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent box-border"
-                    placeholder="your@email.com"
-                    autoComplete="email"
-                />
+                <div className="relative">
+                    <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="w-full max-w-full min-w-0 px-3 sm:px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent box-border"
+                        placeholder="your@email.com"
+                        autoComplete="email"
+                    />
+                    {availabilityLoading.email && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                        </div>
+                    )}
+                </div>
                 <div className="mt-1 text-xs text-gray-500">
                     We'll never share your email with anyone else
                 </div>
-                {!availability.email && formData.email && (
+                {!availability.email && formData.email && !availabilityLoading.email && (
                     <p className="mt-1 text-sm text-red-600">Email already taken</p>
+                )}
+                {availability.email && formData.email.length > 2 && !availabilityLoading.email && (
+                    <p className="mt-1 text-sm text-green-600">✓ Email available</p>
                 )}
                 {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
             </div>
@@ -248,21 +290,31 @@ export const RegisterForm: React.FC = () => {
                 <label htmlFor="username" className="block text-sm font-medium text-gray-900 mb-2">
                     Username
                 </label>
-                <input
-                    id="username"
-                    name="username"
-                    type="text"
-                    value={formData.username}
-                    onChange={handleInputChange}
-                    className="w-full max-w-full min-w-0 px-3 sm:px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent box-border"
-                    placeholder="your_username"
-                    autoComplete="username"
-                />
+                <div className="relative">
+                    <input
+                        id="username"
+                        name="username"
+                        type="text"
+                        value={formData.username}
+                        onChange={handleInputChange}
+                        className="w-full max-w-full min-w-0 px-3 sm:px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent box-border"
+                        placeholder="your_username"
+                        autoComplete="username"
+                    />
+                    {availabilityLoading.username && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                        </div>
+                    )}
+                </div>
                 <div className="mt-1 text-xs text-gray-500">
                     3-30 characters, letters, numbers, dots, underscores, hyphens only
                 </div>
-                {!availability.username && formData.username && (
+                {!availability.username && formData.username && !availabilityLoading.username && (
                     <p className="mt-1 text-sm text-red-600">Username already taken</p>
+                )}
+                {availability.username && formData.username.length > 2 && !availabilityLoading.username && (
+                    <p className="mt-1 text-sm text-green-600">✓ Username available</p>
                 )}
                 {errors.username && <p className="mt-1 text-sm text-red-600">{errors.username}</p>}
             </div>
@@ -544,6 +596,13 @@ export const RegisterForm: React.FC = () => {
             {error && (
                 <div className="mb-4 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-red-700 text-sm">{error}</p>
+                </div>
+            )}
+
+            {/* DEBUG: Show loading state */}
+            {loading && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-blue-700 text-sm">🔄 Loading state active: {loading ? 'true' : 'false'}</p>
                 </div>
             )}
 

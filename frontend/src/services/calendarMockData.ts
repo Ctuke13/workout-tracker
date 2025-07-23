@@ -1,5 +1,6 @@
-// src/services/calendarMockData.ts
+// src/services/calendarMockData.ts - Fixed date handling
 import { mockExercises } from './mockData';
+import { DateUtils } from '../utils/dateUtils';
 
 // Calendar-specific types
 export interface ScheduledExercise {
@@ -34,7 +35,7 @@ let mockScheduledExercises: ScheduledExercise[] = [
         id: 'sched_1',
         exerciseId: 1, // Push-ups
         exercise: mockExercises[0],
-        scheduledDate: new Date().toISOString().split('T')[0], // Today
+        scheduledDate: DateUtils.getTodayString(), // Fixed: Use local timezone
         sets: 3,
         reps: '12',
         weight: undefined,
@@ -49,7 +50,7 @@ let mockScheduledExercises: ScheduledExercise[] = [
         id: 'sched_2',
         exerciseId: 2, // Yoga Flow
         exercise: mockExercises[1],
-        scheduledDate: new Date().toISOString().split('T')[0], // Today
+        scheduledDate: DateUtils.getTodayString(), // Fixed: Use local timezone
         sets: 1,
         reps: '25 minutes',
         weight: undefined,
@@ -106,7 +107,7 @@ export const calendarMockApi = {
             id: `sched_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             exerciseId: exerciseData.exerciseId,
             exercise: exercise,
-            scheduledDate: exerciseData.scheduledDate,
+            scheduledDate: exerciseData.scheduledDate, // Keep the date as provided
             sets: exerciseData.sets,
             reps: exerciseData.reps,
             weight: exerciseData.weight,
@@ -149,6 +150,35 @@ export const calendarMockApi = {
 
         mockScheduledExercises[index] = { ...mockScheduledExercises[index], ...updates };
         return mockScheduledExercises[index];
+    },
+
+    // Mark exercise as completed (NEW - for workout completion)
+    markExerciseCompleted: async (exerciseId: string): Promise<ScheduledExercise> => {
+        console.log('✅ Mock API: Marking exercise as completed:', exerciseId);
+
+        const index = mockScheduledExercises.findIndex(ex => ex.id === exerciseId);
+        if (index === -1) {
+            throw new Error('Scheduled exercise not found');
+        }
+
+        mockScheduledExercises[index] = {
+            ...mockScheduledExercises[index],
+            completed: true
+        };
+
+        return mockScheduledExercises[index];
+    },
+
+    // Get exercises for a specific date (NEW - for workout history)
+    getExercisesForDate: async (dateString: string): Promise<ScheduledExercise[]> => {
+        console.log('📅 Mock API: Getting exercises for date:', dateString);
+
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        return mockScheduledExercises.filter(exercise =>
+            exercise.scheduledDate === dateString &&
+            exercise.userId === 'current_user'
+        );
     },
 
     // Get available exercises (for search/selection)
@@ -211,36 +241,35 @@ export const calendarMockApi = {
     }
 };
 
-// Helper function to generate calendar days with mock data
+// Helper function to generate calendar days with mock data - FIXED DATE HANDLING
 export const generateCalendarDays = async (startDate: Date, daysCount: number = 7): Promise<CalendarDay[]> => {
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + daysCount - 1);
 
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+    const startDateStr = DateUtils.getDateString(startDate); // Fixed: Use DateUtils
+    const endDateStr = DateUtils.getDateString(endDate);     // Fixed: Use DateUtils
 
     // Get scheduled exercises for date range
     const scheduledExercises = await calendarMockApi.getCalendarExercises(startDateStr, endDateStr);
 
     // Generate calendar days
     const days: CalendarDay[] = [];
-    const today = new Date();
-    const todayString = today.toISOString().split('T')[0];
+    const todayString = DateUtils.getTodayString(); // Fixed: Use DateUtils
 
     for (let i = 0; i < daysCount; i++) {
         const date = new Date(startDate);
         date.setDate(startDate.getDate() + i);
 
-        const dateString = date.toISOString().split('T')[0];
+        const dateString = DateUtils.getDateString(date); // Fixed: Use DateUtils
         const dayExercises = scheduledExercises.filter(ex => ex.scheduledDate === dateString);
 
         days.push({
             date,
             dateString,
             exercises: dayExercises,
-            isToday: dateString === todayString,
-            isPast: dateString < todayString,
-            isFuture: dateString > todayString
+            isToday: DateUtils.isToday(dateString),    // Fixed: Use DateUtils
+            isPast: DateUtils.isPast(dateString),      // Fixed: Use DateUtils
+            isFuture: DateUtils.isFuture(dateString)   // Fixed: Use DateUtils
         });
     }
 

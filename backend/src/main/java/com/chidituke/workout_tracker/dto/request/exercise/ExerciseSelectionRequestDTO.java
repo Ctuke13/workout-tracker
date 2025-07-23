@@ -7,7 +7,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class WorkoutPlanRequestDTO {
+public class ExerciseSelectionRequestDTO {
     @NotEmpty(message = "At least one target muscle group is required")
     @Size(max = 10, message = "Cannot target more than 10 muscle groups")
     private List<String> targetMuscleGroups;
@@ -28,4 +28,7 @@ public class WorkoutPlanRequestDTO {
     private Boolean homeWorkout = false; // Only bodyweight/home equipment
 
     private Boolean quickWorkout = false; // Under 30 minutes, high intensity
+
+    @Size(max = 3, message = "Cannot specify more than 3 workout modes")
+    private List<Exercise.WorkoutTrackingMode> preferredWorkoutModes;
 }

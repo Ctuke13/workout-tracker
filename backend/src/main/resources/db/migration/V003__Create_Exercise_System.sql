@@ -2,6 +2,7 @@
 -- V003__Create_Exercise_System.sql
 -- Creates exercises, workout_plans, plan_exercise tables + FITNESS GOALS SYSTEM
 -- EXACTLY MATCHES the JPA entity definitions with explicit column names
+-- INCLUDES isIsometric support for complete workout tracking modalities
 -- =============================================================================
 
 -- =====================================================
@@ -16,6 +17,8 @@ CREATE TABLE exercises (
                            emoji VARCHAR(10),
                            description TEXT,
                            exercise_type VARCHAR(30) NOT NULL DEFAULT 'STRENGTH',
+                           is_cardio BOOLEAN NOT NULL DEFAULT FALSE,
+                           is_isometric BOOLEAN NOT NULL DEFAULT FALSE,
                            difficulty_level VARCHAR(20) NOT NULL DEFAULT 'BEGINNER',
 
     -- Duration and calories
@@ -48,6 +51,14 @@ ALTER TABLE exercises ADD CONSTRAINT chk_exercise_type
 
 ALTER TABLE exercises ADD CONSTRAINT chk_exercise_difficulty_level
     CHECK (difficulty_level IN ('BEGINNER', 'INTERMEDIATE', 'ADVANCED'));
+
+-- CRITICAL: Exercise modality consistency constraint
+ALTER TABLE exercises ADD CONSTRAINT chk_exercise_modality_consistency
+    CHECK (
+        (is_cardio = TRUE AND is_isometric = FALSE) OR   -- Cardio exercises
+        (is_cardio = FALSE AND is_isometric = TRUE) OR   -- Isometric exercises
+        (is_cardio = FALSE AND is_isometric = FALSE)     -- Regular strength exercises
+        );
 
 ALTER TABLE exercises ADD CONSTRAINT chk_exercise_duration
     CHECK (estimated_duration_minutes IS NULL OR (estimated_duration_minutes >= 1 AND estimated_duration_minutes <= 480));
@@ -254,10 +265,22 @@ CREATE TABLE exercise_goal_mapping (
 -- INDEXES FOR PERFORMANCE (Based on Expected Queries)
 -- =====================================================
 
--- Exercises table indexes
+-- Exercises table indexes (including workout tracking modality indexes)
 CREATE INDEX idx_exercises_name ON exercises(exercise_name);
 CREATE INDEX idx_exercises_type ON exercises(exercise_type);
 CREATE INDEX idx_exercises_difficulty ON exercises(difficulty_level);
+
+-- WORKOUT TRACKING MODALITY INDEXES (Critical for performance)
+CREATE INDEX idx_exercises_is_cardio ON exercises(is_cardio);
+CREATE INDEX idx_exercises_is_isometric ON exercises(is_isometric);
+CREATE INDEX idx_exercises_modality_combined ON exercises(is_cardio, is_isometric);
+
+-- Additional optimized indexes for workout filtering
+CREATE INDEX idx_exercises_cardio_only ON exercises(is_cardio) WHERE is_cardio = TRUE;
+CREATE INDEX idx_exercises_isometric_only ON exercises(is_isometric) WHERE is_isometric = TRUE;
+CREATE INDEX idx_exercises_strength_only ON exercises(is_cardio, is_isometric) WHERE is_cardio = FALSE AND is_isometric = FALSE;
+
+-- Standard exercise indexes
 CREATE INDEX idx_exercises_published ON exercises(published);
 CREATE INDEX idx_exercises_creator ON exercises(created_by_user_id);
 CREATE INDEX idx_exercises_professional ON exercises(created_by_professional);
@@ -309,11 +332,18 @@ CREATE INDEX idx_exercise_goal_mapping_primary ON exercise_goal_mapping(goal_id,
 CREATE INDEX idx_exercise_goal_relevance_performance
     ON exercise_goal_mapping(goal_id, relevance_score DESC, exercise_id);
 
--- Composite indexes for complex queries
+-- Composite indexes for complex queries (including modality-aware searches)
 CREATE INDEX idx_exercises_search ON exercises(exercise_type, difficulty_level, published);
+CREATE INDEX idx_exercises_search_cardio ON exercises(is_cardio, exercise_type, difficulty_level, published);
+CREATE INDEX idx_exercises_search_isometric ON exercises(is_isometric, exercise_type, difficulty_level, published);
+CREATE INDEX idx_exercises_search_strength ON exercises(is_cardio, is_isometric, exercise_type, difficulty_level, published);
+
 CREATE INDEX idx_workout_plans_search ON workout_plans(workout_type, difficulty_level, is_public);
 CREATE INDEX idx_exercises_popular ON exercises(usage_count, average_rating, published);
 CREATE INDEX idx_workout_plans_popular ON workout_plans(times_used, average_rating, is_public);
+
+-- Performance optimization for workout tracking interface queries
+CREATE INDEX idx_exercises_tracking_performance ON exercises(is_cardio, is_isometric, published, average_rating DESC);
 
 -- =====================================================
 -- INITIAL GOALS DATA
@@ -451,3 +481,21 @@ CREATE INDEX idx_user_exercise_history_context ON user_exercise_history(context)
 CREATE INDEX idx_user_exercise_history_user_date ON user_exercise_history(user_id, used_at DESC);
 CREATE INDEX idx_user_exercise_history_user_context ON user_exercise_history(user_id, context);
 CREATE INDEX idx_user_exercise_ratings_exercise_rating ON user_exercise_ratings(exercise_id, rating DESC);
+
+-- =============================================================================
+-- PERFORMANCE VERIFICATION AND LOGGING
+-- =============================================================================
+
+-- Log successful migration completion with modality tracking support
+DO $$
+BEGIN
+    RAISE NOTICE '========================================';
+    RAISE NOTICE 'V003 Migration completed successfully!';
+    RAISE NOTICE 'Exercise system created with workout tracking modality support:';
+    RAISE NOTICE '  - TIME_BASED tracking (is_cardio = TRUE)';
+    RAISE NOTICE '  - HOLD_BASED tracking (is_isometric = TRUE)';
+    RAISE NOTICE '  - REP_BASED tracking (both FALSE)';
+    RAISE NOTICE 'Total indexes created: % (optimized for workout tracking)',
+                 (SELECT count(*) FROM pg_indexes WHERE tablename LIKE 'exercise%' OR tablename LIKE 'workout%');
+    RAISE NOTICE '========================================';
+END $$;

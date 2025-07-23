@@ -21,7 +21,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -274,47 +273,29 @@ public class ExerciseController {
             @CurrentUser(required = false) UserPrincipal userPrincipal) {
 
         try {
-            System.out.println("🔍 DEBUG: getExerciseById called with ID: " + id);
-            System.out.println("🔍 DEBUG: UserPrincipal: " + userPrincipal);
-
-            // ✅ Use repository directly instead of service
             Optional<Exercise> exerciseOpt = exerciseRepository.findById(id);
 
             if (exerciseOpt.isEmpty()) {
-                System.out.println("🔍 DEBUG: Exercise not found");
                 return ResponseEntity.notFound().build();
             }
 
             Exercise exercise = exerciseOpt.get();
-            System.out.println("🔍 DEBUG: Exercise found: " + exercise.getExerciseName());
-            System.out.println("🔍 DEBUG: Exercise published: " + exercise.isPublished());
 
-            // Check if exercise is published
             if (!exercise.isPublished()) {
-                System.out.println("🔍 DEBUG: Exercise not published, returning 404");
                 return ResponseEntity.notFound().build();
             }
 
             // Record usage only if user is logged in
             if (userPrincipal != null) {
-                System.out.println("🔍 DEBUG: Recording usage for user ID: " + userPrincipal.getId());
                 try {
                     User currentUser = userService.getUserById(userPrincipal.getId());
-                    System.out.println("🔍 DEBUG: User found: " + currentUser.getUsername());
-
-                    // ✅ Try the usage recording - this might be where the error occurs
                     exerciseService.recordExerciseUsage(id, currentUser);
-                    System.out.println("🔍 DEBUG: Usage recorded successfully");
                 } catch (Exception e) {
-                    System.err.println("🔍 DEBUG: Error recording usage: " + e.getMessage());
-                    e.printStackTrace();
                     // Continue without failing the request
                 }
-            } else {
-                System.out.println("🔍 DEBUG: No user logged in, skipping usage recording");
             }
 
-            // ✅ Create simple response map instead of DTO conversion
+            // 🔧 FIXED: Include isIsometric and workoutTrackingMode in response
             Map<String, Object> response = new HashMap<>();
             response.put("id", exercise.getId());
             response.put("name", exercise.getExerciseName());
@@ -327,12 +308,15 @@ public class ExerciseController {
             response.put("averageRating", exercise.getAverageRating());
             response.put("totalRatings", exercise.getTotalRatings());
 
-            System.out.println("🔍 DEBUG: Response created successfully");
+            // 🆕 ADD: New fields for workout tracking
+            response.put("isCardio", exercise.getIsCardio());
+            response.put("isIsometric", exercise.getIsIsometric());
+            response.put("workoutTrackingMode", exercise.getWorkoutTrackingMode().toString());
+            response.put("trackingInstructions", exercise.getTrackingInstructions());
+
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            System.err.println("🔍 DEBUG: Exception in getExerciseById: " + e.getClass().getSimpleName() + ": " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
@@ -482,31 +466,74 @@ public class ExerciseController {
 
     @PostMapping("/workout-plan")
     public ResponseEntity<List<ExerciseResponseDTO>> generateWorkoutPlan(
-            @Valid @RequestBody WorkoutPlanRequestDTO planRequest,
+            @Valid @RequestBody ExerciseSelectionRequestDTO planRequest,
             @CurrentUser UserPrincipal userPrincipal) {
 
         User currentUser = userService.getUserById(userPrincipal.getId());
 
-        // Convert DTO to service request
-        ExerciseService.WorkoutPlanRequest serviceRequest = new ExerciseService.WorkoutPlanRequest();
-        serviceRequest.setTargetMuscleGroups(planRequest.getTargetMuscleGroups());
-        serviceRequest.setAvailableEquipment(planRequest.getAvailableEquipment());
-        serviceRequest.setMaxDifficulty(planRequest.getMaxDifficulty());
-        serviceRequest.setTargetDurationMinutes(planRequest.getTargetDurationMinutes());
-        serviceRequest.setExercisesPerMuscleGroup(planRequest.getExercisesPerMuscleGroup());
-
-        // ✅ No try-catch needed - GlobalExceptionHandler handles InvalidExerciseDataException
-        List<Exercise> workoutPlan = exerciseService.buildWorkoutPlan(currentUser, serviceRequest);
+        // 🔧 FIXED: Use DTO directly instead of converting to inner class
+        List<Exercise> workoutPlan = exerciseService.buildWorkoutPlan(currentUser, planRequest);
         List<ExerciseResponseDTO> response = ExerciseResponseDTO.fromEntityList(workoutPlan);
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/workout-modes")
+    public ResponseEntity<List<Map<String, Object>>> getWorkoutTrackingModes() {
+        List<Map<String, Object>> modes = new ArrayList<>();
+
+        for (Exercise.WorkoutTrackingMode mode : Exercise.WorkoutTrackingMode.values()) {
+            Map<String, Object> modeInfo = new HashMap<>();
+            modeInfo.put("mode", mode.name());
+            modeInfo.put("description", mode.getDescription());
+            modeInfo.put("displayName", getWorkoutModeDisplayName(mode));
+            modes.add(modeInfo);
+        }
+
+        return ResponseEntity.ok(modes);
+    }
+
+    @GetMapping("/by-workout-mode/{mode}")
+    public ResponseEntity<List<ExerciseResponseDTO>> getExercisesByWorkoutMode(
+            @PathVariable String mode,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        List<Exercise> exercises;
+
+        switch (mode.toUpperCase()) {
+            case "TIME_BASED":
+                exercises = exerciseService.findCardioExercises();
+                break;
+            case "HOLD_BASED":
+                exercises = exerciseService.findIsometricExercises();
+                break;
+            case "REP_BASED":
+                exercises = exerciseService.findRepBasedExercises();
+                break;
+            default:
+                return ResponseEntity.badRequest().build();
+        }
+
+        List<ExerciseResponseDTO> response = exercises.stream()
+                .limit(limit)
+                .map(ExerciseResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(response);
+    }
+
+    private String getWorkoutModeDisplayName(Exercise.WorkoutTrackingMode mode) {
+        return switch (mode) {
+            case TIME_BASED -> "Cardio/Time-Based";
+            case HOLD_BASED -> "Isometric/Hold-Based";
+            case REP_BASED -> "Strength/Rep-Based";
+        };
     }
 
     // ===================================================================
     // 👨‍💼 PROFESSIONAL ENDPOINTS (Your existing endpoints - unchanged)
     // ===================================================================
 
-    // 🔧 FIXED - Clean version without try-catch
     @PostMapping
     @PreAuthorize("hasRole('PROFESSIONAL') or hasRole('ADMIN')")
     public ResponseEntity<ExerciseResponseDTO> createExercise(
@@ -515,19 +542,8 @@ public class ExerciseController {
 
         User currentUser = userService.getUserById(userPrincipal.getId());
 
-        // Convert DTO to service request
-        ExerciseService.ExerciseCreationRequest serviceRequest = new ExerciseService.ExerciseCreationRequest();
-        serviceRequest.setName(createRequest.getName());
-        serviceRequest.setDescription(createRequest.getDescription());
-        serviceRequest.setExerciseType(createRequest.getExerciseType());
-        serviceRequest.setDifficultyLevel(createRequest.getDifficultyLevel());
-        serviceRequest.setTargetMuscleGroups(createRequest.getTargetMuscleGroups());
-        serviceRequest.setEquipmentRequired(createRequest.getEquipmentRequired());
-        serviceRequest.setBenefits(createRequest.getBenefits());
-        serviceRequest.setTips(createRequest.getTips());
-        serviceRequest.setVideoUrl(createRequest.getVideoUrl());
-
-        Exercise exercise = exerciseService.createProfessionalExercise(currentUser, serviceRequest);
+        // 🔧 FIXED: Use DTO directly instead of converting to inner class
+        Exercise exercise = exerciseService.createProfessionalExercise(currentUser, createRequest);
         ExerciseResponseDTO response = ExerciseResponseDTO.fromEntity(exercise);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

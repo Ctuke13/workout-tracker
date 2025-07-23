@@ -1,5 +1,7 @@
 package com.chidituke.workout_tracker.service.workout;
 
+import com.chidituke.workout_tracker.dto.request.exercise.ExerciseCreateRequestDTO;
+import com.chidituke.workout_tracker.dto.request.exercise.ExerciseSelectionRequestDTO;
 import com.chidituke.workout_tracker.dto.response.exercise.ExerciseFiltersDTO;
 import com.chidituke.workout_tracker.exceptions.exercise.ExerciseNotFoundException;
 import com.chidituke.workout_tracker.exceptions.exercise.InvalidExerciseDataException;
@@ -107,10 +109,27 @@ public class ExerciseService {
                 .collect(Collectors.toList());
     }
 
-    // 🔧 FIXED - Now throws custom exception instead of returning null
     public Exercise findById(Long id) {
         return exerciseRepository.findById(id)
                 .orElseThrow(() -> new ExerciseNotFoundException(id));
+    }
+
+    public List<Exercise> findCardioExercises() {
+        return exerciseRepository.findPublishedExercises().stream()
+                .filter(Exercise::getIsCardio)
+                .collect(Collectors.toList());
+    }
+
+    public List<Exercise> findIsometricExercises() {
+        return exerciseRepository.findPublishedExercises().stream()
+                .filter(Exercise::getIsIsometric)
+                .collect(Collectors.toList());
+    }
+
+    public List<Exercise> findRepBasedExercises() {
+        return exerciseRepository.findPublishedExercises().stream()
+                .filter(exercise -> !exercise.getIsCardio() && !exercise.getIsIsometric())
+                .collect(Collectors.toList());
     }
 
     @Cacheable(value = "popular-exercises", key = "#limit")
@@ -208,15 +227,14 @@ public class ExerciseService {
     // 👥 PROFESSIONAL CONTENT MANAGEMENT
 
     @Transactional
-    public Exercise createProfessionalExercise(User professional, ExerciseCreationRequest request) {
-        // 🔧 FIXED - Added validation calls
+    public Exercise createProfessionalExercise(User professional, ExerciseCreateRequestDTO createRequest) {
         validateProfessionalCanCreateContent(professional);
-        validateExerciseCreationRequest(request);
+        validateExerciseCreateRequestDTO(createRequest); // 🔧 FIXED: Updated method name
 
         Exercise exercise = new Exercise();
 
-        // Use mapper to set fields from request
-        exerciseMapper.mapRequestToEntity(request, exercise);
+        // Use mapper instead of manual mapping
+        exerciseMapper.mapRequestToEntity(createRequest, exercise);
 
         // Professional content settings
         exercise.setCreatedByUserId(professional.getId());
@@ -437,9 +455,8 @@ public class ExerciseService {
 
     // 🏋️ WORKOUT INTEGRATION
 
-    public List<Exercise> buildWorkoutPlan(User user, WorkoutPlanRequest request) {
-        // 🔧 FIXED - Added validation
-        validateWorkoutPlanRequest(request);
+    public List<Exercise> buildWorkoutPlan(User user, ExerciseSelectionRequestDTO request) {
+        validateExerciseSelectionRequestDTO(request); // 🔧 Changed method name
 
         // Use optimized repository query instead of multiple calls
         List<Exercise> candidateExercises = exerciseRepository.findOptimizedForWorkoutPlan(
@@ -453,13 +470,30 @@ public class ExerciseService {
                 .filter(ex -> hasRequiredEquipment(ex, request.getAvailableEquipment()))
                 .collect(Collectors.toList());
 
-        // 🔧 FIXED - Added error check for empty results
         if (availableExercises.isEmpty()) {
             throw new InvalidExerciseDataException("availableEquipment",
                     "No exercises found matching your equipment and difficulty requirements");
         }
 
-        // Distribute exercises across muscle groups
+        // 🔧 COMMENT OUT: This functionality doesn't exist in WorkoutPlanRequest yet
+
+    if (request.getPreferredWorkoutModes() != null && !request.getPreferredWorkoutModes().isEmpty()) {
+        availableExercises = availableExercises.stream()
+                .filter(exercise -> {
+                    Exercise.WorkoutTrackingMode mode = exercise.getWorkoutTrackingMode();
+                    return request.getPreferredWorkoutModes().contains(mode);
+                })
+                .collect(Collectors.toList());
+    }
+
+        if (request.getHomeWorkout() != null && request.getHomeWorkout()) {
+            availableExercises = availableExercises.stream()
+                    .filter(Exercise::canDoAtHome)
+                    .collect(Collectors.toList());
+        }
+
+
+        // Rest of your existing logic stays the same...
         Map<String, List<Exercise>> exercisesByMuscleGroup = availableExercises.stream()
                 .flatMap(ex -> ex.getTargetMuscleGroups().stream()
                         .filter(request.getTargetMuscleGroups()::contains)
@@ -497,6 +531,39 @@ public class ExerciseService {
             return false; // Safe default - user hasn't rated if user is null
         }
         return ratingRepository.existsByUserIdAndExerciseId(user.getId(), exercise.getId());
+    }
+
+    private void validateExerciseSelectionRequestDTO(ExerciseSelectionRequestDTO request) {
+        if (request.getTargetMuscleGroups() == null || request.getTargetMuscleGroups().isEmpty()) {
+            throw new InvalidExerciseDataException("targetMuscleGroups", "At least one target muscle group is required");
+        }
+
+        if (request.getMaxDifficulty() == null) {
+            throw new InvalidExerciseDataException("maxDifficulty", "Maximum difficulty level is required");
+        }
+
+        if (request.getExercisesPerMuscleGroup() != null &&
+                (request.getExercisesPerMuscleGroup() < 1 || request.getExercisesPerMuscleGroup() > 10)) {
+            throw new InvalidExerciseDataException("exercisesPerMuscleGroup",
+                    "Exercises per muscle group must be between 1 and 10");
+        }
+    }
+
+    private boolean determineIfIsometric(Exercise exercise) {
+        if (exercise.getExerciseName() == null) {
+            return false;
+        }
+
+        String exerciseName = exercise.getExerciseName().toLowerCase();
+
+        // List of isometric exercise patterns
+        List<String> isometricPatterns = List.of(
+                "plank", "wall sit", "dead hang", "bridge hold", "static hold",
+                "isometric", "hold", "static", "wall squat", "glute bridge"
+        );
+
+        return isometricPatterns.stream()
+                .anyMatch(pattern -> exerciseName.contains(pattern));
     }
 
     private void updateExerciseRating(Exercise exercise, double newRating) {
@@ -654,42 +721,17 @@ public class ExerciseService {
     }
 
     /**
-     * Validates exercise creation request data
+     * Validates exercise creation DTO data
      */
-    private void validateExerciseCreationRequest(ExerciseCreationRequest request) {
-        if (request.getName() == null || request.getName().trim().isEmpty()) {
-            throw new InvalidExerciseDataException("name", "Exercise name is required");
-        }
-
-        if (request.getExerciseType() == null) {
-            throw new InvalidExerciseDataException("exerciseType", "Exercise type is required");
-        }
-
-        if (request.getDifficultyLevel() == null) {
-            throw new InvalidExerciseDataException("difficultyLevel", "Difficulty level is required");
-        }
-
-        if (request.getTargetMuscleGroups() == null || request.getTargetMuscleGroups().isEmpty()) {
-            throw new InvalidExerciseDataException("targetMuscleGroups", "At least one target muscle group is required");
-        }
-    }
-
-    /**
-     * Validates workout plan request data
-     */
-    private void validateWorkoutPlanRequest(WorkoutPlanRequest request) {
+    private void validateExerciseCreateRequestDTO(ExerciseCreateRequestDTO request) {
+        // Additional validation beyond the DTO annotations if needed
         if (request.getTargetMuscleGroups() == null || request.getTargetMuscleGroups().isEmpty()) {
             throw new InvalidExerciseDataException("targetMuscleGroups", "At least one target muscle group is required");
         }
 
-        if (request.getMaxDifficulty() == null) {
-            throw new InvalidExerciseDataException("maxDifficulty", "Maximum difficulty level is required");
-        }
-
-        if (request.getExercisesPerMuscleGroup() != null &&
-                (request.getExercisesPerMuscleGroup() < 1 || request.getExercisesPerMuscleGroup() > 10)) {
-            throw new InvalidExerciseDataException("exercisesPerMuscleGroup",
-                    "Exercises per muscle group must be between 1 and 10");
+        // Additional business logic validation can go here
+        if (request.getEstimatedDurationMinutes() != null && request.getEstimatedDurationMinutes() > 480) {
+            throw new InvalidExerciseDataException("estimatedDurationMinutes", "Duration cannot exceed 8 hours");
         }
     }
 
@@ -745,73 +787,6 @@ public class ExerciseService {
     }
 
     // 📋 INNER CLASSES (Keep for now - can be moved to separate DTOs later)
-
-    public static class ExerciseCreationRequest {
-        private String name;
-        private String description;
-        private Exercise.ExerciseType exerciseType;
-        private Exercise.DifficultyLevel difficultyLevel;
-        private List<String> targetMuscleGroups;
-        private List<String> equipmentRequired;
-        private List<String> benefits;
-        private List<String> tips;
-        private String videoUrl;
-
-        public ExerciseCreationRequest() {}
-
-        // Getters and setters
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-
-        public String getDescription() { return description; }
-        public void setDescription(String description) { this.description = description; }
-
-        public Exercise.ExerciseType getExerciseType() { return exerciseType; }
-        public void setExerciseType(Exercise.ExerciseType exerciseType) { this.exerciseType = exerciseType; }
-
-        public Exercise.DifficultyLevel getDifficultyLevel() { return difficultyLevel; }
-        public void setDifficultyLevel(Exercise.DifficultyLevel difficultyLevel) { this.difficultyLevel = difficultyLevel; }
-
-        public List<String> getTargetMuscleGroups() { return targetMuscleGroups; }
-        public void setTargetMuscleGroups(List<String> targetMuscleGroups) { this.targetMuscleGroups = targetMuscleGroups; }
-
-        public List<String> getEquipmentRequired() { return equipmentRequired; }
-        public void setEquipmentRequired(List<String> equipmentRequired) { this.equipmentRequired = equipmentRequired; }
-
-        public List<String> getBenefits() { return benefits; }
-        public void setBenefits(List<String> benefits) { this.benefits = benefits; }
-
-        public List<String> getTips() { return tips; }
-        public void setTips(List<String> tips) { this.tips = tips; }
-
-        public String getVideoUrl() { return videoUrl; }
-        public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
-    }
-
-    public static class WorkoutPlanRequest {
-        private List<String> targetMuscleGroups;
-        private List<String> availableEquipment;
-        private Exercise.DifficultyLevel maxDifficulty;
-        private Integer targetDurationMinutes;
-        private Integer exercisesPerMuscleGroup = 2;
-
-        public WorkoutPlanRequest() {}
-
-        public List<String> getTargetMuscleGroups() { return targetMuscleGroups; }
-        public void setTargetMuscleGroups(List<String> targetMuscleGroups) { this.targetMuscleGroups = targetMuscleGroups; }
-
-        public List<String> getAvailableEquipment() { return availableEquipment; }
-        public void setAvailableEquipment(List<String> availableEquipment) { this.availableEquipment = availableEquipment; }
-
-        public Exercise.DifficultyLevel getMaxDifficulty() { return maxDifficulty; }
-        public void setMaxDifficulty(Exercise.DifficultyLevel maxDifficulty) { this.maxDifficulty = maxDifficulty; }
-
-        public Integer getTargetDurationMinutes() { return targetDurationMinutes; }
-        public void setTargetDurationMinutes(Integer targetDurationMinutes) { this.targetDurationMinutes = targetDurationMinutes; }
-
-        public Integer getExercisesPerMuscleGroup() { return exercisesPerMuscleGroup; }
-        public void setExercisesPerMuscleGroup(Integer exercisesPerMuscleGroup) { this.exercisesPerMuscleGroup = exercisesPerMuscleGroup; }
-    }
 
     public static class ExerciseAnalytics {
         private Long exerciseId;

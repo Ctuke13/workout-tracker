@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.service.workout;
 
-import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutPlanRequest;
+import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutTemplateRequestDTO;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanResponse;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanAnalyticsResponse;
 import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
@@ -183,7 +183,7 @@ public class WorkoutPlanService {
 
     @Transactional
     @CacheEvict(value = {"public-workout-plans", "popular-workout-plans"}, allEntries = true)
-    public WorkoutPlanResponse createWorkoutPlan(String username, WorkoutPlanRequest request) {
+    public WorkoutPlanResponse createWorkoutPlan(String username, WorkoutTemplateRequestDTO request) {
         User user = findUserByUsername(username);
 
         WorkoutPlan workoutPlan = new WorkoutPlan();
@@ -201,7 +201,7 @@ public class WorkoutPlanService {
 
     @Transactional
     @CacheEvict(value = {"public-workout-plans", "popular-workout-plans"}, allEntries = true)
-    public WorkoutPlanResponse updateWorkoutPlan(Long id, String username, WorkoutPlanRequest request) {
+    public WorkoutPlanResponse updateWorkoutPlan(Long id, String username, WorkoutTemplateRequestDTO request) {
         WorkoutPlan workoutPlan = findWorkoutPlanById(id);
         validateOwnership(workoutPlan, username);
 

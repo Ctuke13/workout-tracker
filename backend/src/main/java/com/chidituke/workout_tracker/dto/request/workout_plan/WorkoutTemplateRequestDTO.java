@@ -4,7 +4,7 @@ import jakarta.validation.constraints.*;
 import lombok.Data;
 
 @Data
-public class WorkoutPlanRequest {
+public class WorkoutTemplateRequestDTO {
 
     @NotBlank(message = "Workout name is required")
     @Size(min = 2, max = 100, message = "Workout name must be 2-100 characters")

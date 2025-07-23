@@ -44,4 +44,15 @@ public class ExerciseUpdateRequestDTO {
     private String videoUrl;
 
     private Boolean published;
+
+    private Boolean isCardio;
+
+    private Boolean isIsometric;
+
+    private Exercise.WorkoutTrackingMode workoutTrackingMode;
+
+    @Size(max = 1000, message = "Tracking instructions too long")
+    private String trackingInstructions;
+
+    private Boolean canDoAtHome;
 }

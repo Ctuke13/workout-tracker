@@ -1,6 +1,7 @@
 // src/components/CalendarPage/ExerciseSelector.tsx - Mobile-First with Compact Search
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { Exercise } from '../../types/exercise';
 import {
     MagnifyingGlassIcon,
     XMarkIcon,
@@ -14,28 +15,6 @@ import {
 
 // Import mock data services
 import { calendarMockApi, CalendarDay } from '../../services/calendarMockData';
-
-// Types based on your backend
-interface Exercise {
-    id: number;
-    exerciseName?: string;
-    name?: string;
-    emoji?: string;
-    description?: string;
-    exerciseType: string;
-    difficultyLevel: string;
-    estimatedDurationMinutes?: number;
-    estimatedCalories?: number;
-    targetMuscleGroups?: string[];
-    equipmentRequired?: string[];
-    benefits?: string[];
-    tips?: string[];
-    videoUrl?: string;
-    averageRating?: number;
-    totalRatings?: number;
-    usageCount?: number;
-    createdByProfessional?: boolean;
-}
 
 interface ExerciseCategory {
     id: string;

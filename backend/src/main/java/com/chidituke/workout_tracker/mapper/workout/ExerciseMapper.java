@@ -1,23 +1,28 @@
 package com.chidituke.workout_tracker.mapper.workout;
 
+import com.chidituke.workout_tracker.dto.request.exercise.ExerciseCreateRequestDTO;
 import com.chidituke.workout_tracker.model.workout.Exercise;
-import com.chidituke.workout_tracker.service.workout.ExerciseService;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class ExerciseMapper {
 
     /**
-     * Maps ExerciseCreationRequest DTO to Exercise entity
+     * Maps ExerciseCreateRequestDTO to Exercise entity
      */
-    public void mapRequestToEntity(ExerciseService.ExerciseCreationRequest request, Exercise exercise) {
+    public void mapRequestToEntity(ExerciseCreateRequestDTO request, Exercise exercise) {
         exercise.setExerciseName(request.getName());
+        exercise.setEmoji(request.getEmoji());
         exercise.setDescription(request.getDescription());
         exercise.setExerciseType(request.getExerciseType());
         exercise.setDifficultyLevel(request.getDifficultyLevel());
+        exercise.setEstimatedDurationMinutes(request.getEstimatedDurationMinutes());
+        exercise.setEstimatedCalories(request.getEstimatedCalories());
+        exercise.setVideoUrl(request.getVideoUrl());
 
         // Handle list fields
         if (request.getTargetMuscleGroups() != null) {
@@ -33,7 +38,34 @@ public class ExerciseMapper {
             exercise.setTips(new ArrayList<>(request.getTips()));
         }
 
-        exercise.setVideoUrl(request.getVideoUrl());
+        // 🆕 Handle isIsometric field
+        if (request.getIsIsometric() != null) {
+            exercise.setIsIsometric(request.getIsIsometric());
+        } else {
+            // Auto-determine if not explicitly set
+            exercise.setIsIsometric(determineIfIsometric(request.getName(), request.getExerciseType()));
+        }
+    }
+
+    /**
+     * 🆕 Helper method to auto-determine if exercise is isometric
+     */
+    private boolean determineIfIsometric(String exerciseName, Exercise.ExerciseType exerciseType) {
+        if (exerciseName == null) {
+            return false;
+        }
+
+        String name = exerciseName.toLowerCase();
+
+        // List of isometric exercise patterns
+        List<String> isometricPatterns = List.of(
+                "plank", "wall sit", "dead hang", "bridge hold", "static hold",
+                "isometric", "hold", "static", "wall squat", "glute bridge",
+                "wall push", "tree pose", "warrior pose", "mountain pose"
+        );
+
+        return isometricPatterns.stream()
+                .anyMatch(pattern -> name.contains(pattern));
     }
 
     /**
@@ -67,5 +99,31 @@ public class ExerciseMapper {
         }
 
         return score;
+    }
+
+    /**
+     * 🆕 Helper method to determine optimal tracking mode for an exercise
+     */
+    public Exercise.WorkoutTrackingMode determineOptimalTrackingMode(Exercise exercise) {
+        if (exercise.getIsCardio()) {
+            return Exercise.WorkoutTrackingMode.TIME_BASED;
+        }
+        if (exercise.getIsIsometric()) {
+            return Exercise.WorkoutTrackingMode.HOLD_BASED;
+        }
+        return Exercise.WorkoutTrackingMode.REP_BASED;
+    }
+
+    /**
+     * 🆕 Helper method to suggest exercise duration based on tracking mode
+     */
+    public Integer suggestExerciseDuration(Exercise exercise) {
+        Exercise.WorkoutTrackingMode mode = exercise.getWorkoutTrackingMode();
+
+        return switch (mode) {
+            case TIME_BASED -> 20; // 20 minutes for cardio
+            case HOLD_BASED -> 5;  // 5 minutes for isometric holds
+            case REP_BASED -> 10;  // 10 minutes for strength exercises
+        };
     }
 }

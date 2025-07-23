@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.controller.workout;
 
-import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutPlanRequest;
+import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutTemplateRequestDTO;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanAnalyticsResponse;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanListResponse;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanResponse;
@@ -358,7 +358,7 @@ public class WorkoutPlanController {
             @ApiResponse(responseCode = "400", description = "Invalid request data")
     })
     public ResponseEntity<WorkoutPlanResponse> createWorkoutPlan(
-            @Valid @RequestBody WorkoutPlanRequest request,
+            @Valid @RequestBody WorkoutTemplateRequestDTO request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         WorkoutPlanResponse response = workoutPlanService.createWorkoutPlan(userDetails.getUsername(), request);
@@ -374,7 +374,7 @@ public class WorkoutPlanController {
     })
     public ResponseEntity<WorkoutPlanResponse> updateWorkoutPlan(
             @Parameter(description = "Workout plan ID") @PathVariable Long id,
-            @Valid @RequestBody WorkoutPlanRequest request,
+            @Valid @RequestBody WorkoutTemplateRequestDTO request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         WorkoutPlanResponse response = workoutPlanService.updateWorkoutPlan(id, userDetails.getUsername(), request);

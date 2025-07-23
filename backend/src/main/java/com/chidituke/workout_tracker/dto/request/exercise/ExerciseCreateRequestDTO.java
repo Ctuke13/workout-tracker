@@ -45,4 +45,6 @@ public class ExerciseCreateRequestDTO {
     @Pattern(regexp = "^(https?://)?(www\\.)?(youtube\\.com|youtu\\.be|vimeo\\.com).*",
             message = "Video URL must be from YouTube or Vimeo")
     private String videoUrl;
+
+    private Boolean isIsometric = false;
 }

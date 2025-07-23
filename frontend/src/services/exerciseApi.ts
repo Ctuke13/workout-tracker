@@ -1,21 +1,35 @@
-// src/services/exerciseApi.ts - Typed API service for your backend
-
+// src/services/exerciseApi.ts - Enhanced version that uses your infrastructure
+import {
+    Exercise,
+    ExerciseType,
+    DifficultyLevel,
+    ExerciseFilters as DomainExerciseFilters
+} from '../types/exercise';
 import {
     BackendExercise,
+    ExerciseFilters as ApiExerciseFilters,
     GoalData,
     FiltersData,
-    ExerciseFilters,
-    Exercise,
-    Goal,
-    ExerciseApiClient
+    Goal
 } from '../types/api';
+import {
+    transformBackendExerciseToFrontend,
+    logTransformation,
+    validateTransformationResult
+} from './transformers';
+import apiClient from './apiClient';
 
-class ExerciseApiService implements ExerciseApiClient {
-    private readonly baseUrl = 'http://localhost:8080/api/exercises';
+class ExerciseApiService {
+    private readonly useAuthenticatedClient = true; // Feature flag to control which HTTP client to use
 
-    // Helper method for making API calls with error handling
-    private async fetchWithErrorHandling<T>(url: string): Promise<T> {
-        try {
+    // Enhanced HTTP client method that can use either approach
+    private async fetchWithErrorHandling<T>(endpoint: string, params?: any): Promise<T> {
+        if (this.useAuthenticatedClient) {
+            // Use your sophisticated API client with JWT auth and error handling
+            return apiClient.get<T>(endpoint, params);
+        } else {
+            // Fallback to the original fetch-based approach
+            const url = this.buildUrl(endpoint, params);
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -23,17 +37,13 @@ class ExerciseApiService implements ExerciseApiClient {
             }
 
             return await response.json();
-        } catch (error) {
-            if (error instanceof Error) {
-                throw new Error(`API Error: ${error.message}`);
-            }
-            throw new Error('Unknown API error occurred');
         }
     }
 
-    // Build URL with query parameters
-    private buildUrl(endpoint: string, params?: ExerciseFilters): string {
-        const url = new URL(`${this.baseUrl}${endpoint}`);
+    // Keep your existing URL building logic (it's good!)
+    private buildUrl(endpoint: string, params?: any): string {
+        const baseUrl = 'http://localhost:8080/api/exercises';
+        const url = new URL(`${baseUrl}${endpoint}`);
 
         if (params) {
             Object.entries(params).forEach(([key, value]) => {
@@ -46,51 +56,101 @@ class ExerciseApiService implements ExerciseApiClient {
         return url.toString();
     }
 
-    // Get all public exercises (with optional filters)
-    async getPublicExercises(filters?: ExerciseFilters): Promise<BackendExercise[]> {
-        const url = this.buildUrl('/public', filters);
-        return this.fetchWithErrorHandling<BackendExercise[]>(url);
+    // Enhanced public exercises method using your transformation layer
+    async getPublicExercises(filters?: DomainExerciseFilters): Promise<Exercise[]> {
+        try {
+            // Transform frontend filters to backend API format
+            const apiFilters = this.transformFiltersForBackend(filters);
+
+            const backendExercises = await this.fetchWithErrorHandling<BackendExercise[]>(
+                '/api/exercises/public',
+                apiFilters
+            );
+
+            // Use your sophisticated transformation layer
+            const transformedExercises = backendExercises.map(backendExercise => {
+                const frontendExercise = transformBackendExerciseToFrontend(backendExercise);
+                logTransformation('BackendExercise -> Exercise', backendExercise, frontendExercise);
+                return validateTransformationResult(frontendExercise, backendExercise.id);
+            });
+
+            console.log(
+                `✅ Successfully fetched ${transformedExercises.length} exercises. ` +
+                `Cardio: ${transformedExercises.filter(ex => ex.isCardio).length}, ` +
+                `Strength: ${transformedExercises.filter(ex => !ex.isCardio).length}`
+            );
+
+            return transformedExercises;
+        } catch (error) {
+            console.error('Failed to fetch public exercises:', error);
+            throw new Error('Unable to load exercises. Please try again.');
+        }
     }
 
-    // Search exercises
-    async searchExercises(query: string, filters?: ExerciseFilters): Promise<BackendExercise[]> {
-        const searchFilters = { ...filters, q: query };
-        const url = this.buildUrl('/public/search', searchFilters);
-        return this.fetchWithErrorHandling<BackendExercise[]>(url);
+    // Enhanced search with your transformation layer
+    async searchExercises(query: string, filters?: DomainExerciseFilters): Promise<Exercise[]> {
+        const apiFilters = this.transformFiltersForBackend(filters);
+        apiFilters.q = query;
+
+        const backendExercises = await this.fetchWithErrorHandling<BackendExercise[]>(
+            '/api/exercises/public/search',
+            apiFilters
+        );
+
+        return backendExercises.map(transformBackendExerciseToFrontend);
     }
 
-    // Get available goals with counts
+    // Enhanced single exercise fetch
+    async getExerciseById(id: number): Promise<Exercise> {
+        const backendExercise = await this.fetchWithErrorHandling<BackendExercise>(
+            `/api/exercises/public/${id}`
+        );
+
+        const transformedExercise = transformBackendExerciseToFrontend(backendExercise);
+
+        console.log(
+            `✅ Fetched exercise "${transformedExercise.name}" ` +
+            `(${transformedExercise.isCardio ? 'Cardio' : 'Strength'} exercise)`
+        );
+
+        return transformedExercise;
+    }
+
+    // New method: Transform frontend filters to backend API format
+    private transformFiltersForBackend(filters?: DomainExerciseFilters): ApiExerciseFilters {
+        if (!filters) return {};
+
+        return {
+            goal: filters.activeGoal !== 'all' ? filters.activeGoal : undefined,
+            difficulty: filters.selectedDifficulty !== 'all' ? filters.selectedDifficulty.toUpperCase() as any : undefined,
+            equipment: filters.selectedEquipment !== 'all' ? filters.selectedEquipment : undefined,
+            exercise_type: filters.selectedExerciseType !== 'all' ? filters.selectedExerciseType.toUpperCase() as any : undefined,
+            q: filters.searchTerm || undefined,
+            page: 0,
+            size: 50
+        };
+    }
+
+    // Keep your existing goal and filter methods, but enhance them with transformation
     async getGoals(): Promise<GoalData[]> {
-        const url = `${this.baseUrl}/goals`;
-        return this.fetchWithErrorHandling<GoalData[]>(url);
+        return this.fetchWithErrorHandling<GoalData[]>('/api/exercises/goals');
     }
 
-    // Get filter options (equipment, difficulties, etc.)
     async getFilters(): Promise<FiltersData> {
-        const url = `${this.baseUrl}/public/filters`;
-        return this.fetchWithErrorHandling<FiltersData>(url);
+        return this.fetchWithErrorHandling<FiltersData>('/api/exercises/public/filters');
     }
 
-    // Get single exercise by ID
-    async getExerciseById(id: number): Promise<BackendExercise> {
-        const url = `${this.baseUrl}/public/${id}`;
-        return this.fetchWithErrorHandling<BackendExercise>(url);
-    }
-
-    // Get exercises based on current filters (handles both search and filter logic)
-    async getFilteredExercises(filters: ExerciseFilters): Promise<BackendExercise[]> {
-        if (filters.q?.trim()) {
-            // Use search endpoint if there's a search query
-            return this.searchExercises(filters.q.trim(), filters);
+    // Keep your convenient utility methods
+    async getFilteredExercises(filters: DomainExerciseFilters): Promise<Exercise[]> {
+        if (filters.searchTerm?.trim()) {
+            return this.searchExercises(filters.searchTerm.trim(), filters);
         } else {
-            // Use regular filtered endpoint
             return this.getPublicExercises(filters);
         }
     }
 
-    // Fetch all initial data in parallel
     async getInitialData(): Promise<{
-        exercises: BackendExercise[];
+        exercises: Exercise[];
         goals: GoalData[];
         filters: FiltersData;
     }> {
@@ -108,140 +168,7 @@ class ExerciseApiService implements ExerciseApiClient {
     }
 }
 
-// Data transformation utilities
-export class ExerciseDataTransformer {
-    static transformExercise(exercise: BackendExercise): Exercise {
-        return {
-            id: exercise.id,
-            name: exercise.name,  // Already correct field name
-            emoji: exercise.emoji || '💪',
-            difficulty: this.formatDifficulty(exercise.difficultyLevel),
-            description: exercise.description,
-            duration: this.formatDuration(exercise.estimatedDurationMinutes),
-            calories: this.formatCalories(exercise.estimatedCalories),
-            equipment: this.formatEquipment(exercise.equipmentRequired),
-            benefits: exercise.benefits || [],
-            tips: exercise.tips || [],
-            videoUrl: exercise.videoUrl,
-            type: exercise.exerciseTypeDisplay,
-            exerciseType: exercise.exerciseType,
-            muscleGroups: exercise.targetMuscleGroups || [],
-            rating: exercise.averageRating || 0,
-            totalRatings: exercise.totalRatings || 0,
-            usageCount: exercise.usageCount || 0,
-            isPopular: exercise.isPopular,
-            isHighlyRated: exercise.isHighlyRated,
-            canDoAtHome: exercise.canDoAtHome,
-            requiresEquipment: exercise.requiresEquipment,
-            createdBy: exercise.createdBy
-        };
-    }
-
-    static transformGoals(goalsData: GoalData[], totalExercises: number): Goal[] {
-        const baseGoals: Goal[] = [
-            { id: 'all', name: 'All Goals', emoji: '🎯', count: totalExercises }
-        ];
-
-        const transformedGoals = goalsData.map(goal => ({
-            id: goal.goal,
-            name: this.formatGoalName(goal.goal),
-            emoji: this.getGoalEmoji(goal.goal),
-            count: goal.count
-        }));
-
-        return [...baseGoals, ...transformedGoals];
-    }
-
-    private static formatDuration(durationMinutes?: number | null): string {
-        if (!durationMinutes) return "20 mins";
-
-        if (durationMinutes <= 60) {
-            return `${durationMinutes} mins`;
-        }
-
-        const hours = Math.floor(durationMinutes / 60);
-        const mins = durationMinutes % 60;
-        return `${hours}h${mins > 0 ? ` ${mins}m` : ''}`;
-    }
-
-    private static formatCalories(calories?: number | null): string {
-        if (!calories) return "200-400/hr";
-
-        const lower = Math.floor(calories * 0.8);
-        const upper = Math.floor(calories * 1.2);
-        return `${lower}-${upper}/hr`;
-    }
-
-    private static formatDifficulty(difficulty: string): string {
-        switch (difficulty) {
-            case 'BEGINNER':
-                return 'Beginner';
-            case 'INTERMEDIATE':
-                return 'Intermediate';
-            case 'ADVANCED':
-                return 'Advanced';
-            default:
-                return 'Beginner';
-        }
-    }
-
-    private static formatEquipment(equipmentList?: string[] | null): string {
-        if (!equipmentList || equipmentList.length === 0) {
-            return "No Equipment";
-        }
-
-        if (equipmentList.length === 1) {
-            return this.formatSingleEquipment(equipmentList[0]);
-        }
-
-        return `${this.formatSingleEquipment(equipmentList[0])} (+more)`;
-    }
-
-    private static formatSingleEquipment(equipment: string): string {
-        const equipmentMap: Record<string, string> = {
-            'dumbbells': 'Dumbbells',
-            'dumbbell': 'Dumbbells',
-            'barbell': 'Barbell',
-            'resistance_bands': 'Resistance Bands',
-            'resistance_band': 'Resistance Bands',
-            'kettlebell': 'Kettlebell',
-            'yoga_mat': 'Yoga Mat',
-            'jump_rope': 'Jump Rope',
-            'pull_up_bar': 'Pull-up Bar',
-            'exercise_bike': 'Exercise Bike',
-            'rowing_machine': 'Rowing Machine',
-            'foam_roller': 'Foam Roller',
-            'cones': 'Training Cones',
-            'bodyweight': 'No Equipment',
-            'none': 'No Equipment'
-        };
-        return equipmentMap[equipment.toLowerCase()] || equipment;
-    }
-
-    private static formatGoalName(goal: string): string {
-        const goalMap: Record<string, string> = {
-            'fat-burn': 'Fat Burn',
-            'muscle-building': 'Muscle Building',
-            'endurance': 'Endurance',
-            'flexibility': 'Flexibility',
-            'sport-specific': 'Sport-Specific',
-            'recovery': 'Recovery & Rehab'
-        };
-        return goalMap[goal.toLowerCase()] || goal;
-    }
-
-    private static getGoalEmoji(goal: string): string {
-        const emojiMap: Record<string, string> = {
-            'fat-burn': '🔥',
-            'muscle-building': '💪',
-            'endurance': '⚡',
-            'flexibility': '🧘‍♀️',
-            'sport-specific': '🎯',
-            'recovery': '🛡️'
-        };
-        return emojiMap[goal.toLowerCase()] || '🎯';
-    }
-}
+// Remove the old ExerciseDataTransformer class since you now have the sophisticated transformers module
 
 // Export singleton instance
 export const exerciseApi = new ExerciseApiService();

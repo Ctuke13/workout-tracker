@@ -11,7 +11,7 @@ import com.chidituke.workout_tracker.controller.workout.ProgramPlanController;
 import com.chidituke.workout_tracker.controller.workout.ScheduledWorkoutController;
 import com.chidituke.workout_tracker.dto.request.program_plan.BulkAddRequest;
 import com.chidituke.workout_tracker.dto.request.program_plan.WorkoutScheduleRequest;
-import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutPlanRequest;
+import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutTemplateRequestDTO;
 import com.chidituke.workout_tracker.dto.request.workout_program.WorkoutProgramRequest;
 import com.chidituke.workout_tracker.dto.response.program_plan.ProgramPlanResponse;
 import com.chidituke.workout_tracker.dto.response.program_plan.ProgramStructureAnalyticsResponse;
@@ -78,7 +78,7 @@ public class TestController {
             steps.add("3. Creating workout plans");
             List<Long> workoutPlanIds = new ArrayList<>();
             for (int i = 1; i <= 3; i++) {
-                WorkoutPlanRequest planRequest = createWorkoutPlanRequest("Plan " + i);
+                WorkoutTemplateRequestDTO planRequest = createWorkoutPlanRequest("Plan " + i);
                 ResponseEntity<?> planResponse = workoutPlanController.createWorkoutPlan(planRequest, userPrincipal);
                 workoutPlanIds.add(extractId(planResponse));
             }
@@ -452,8 +452,8 @@ public class TestController {
         return request;
     }
 
-    private WorkoutPlanRequest createWorkoutPlanRequest(String suffix) {
-        WorkoutPlanRequest request = new WorkoutPlanRequest();
+    private WorkoutTemplateRequestDTO createWorkoutPlanRequest(String suffix) {
+        WorkoutTemplateRequestDTO request = new WorkoutTemplateRequestDTO();
         request.setWorkoutName("Test Workout " + suffix);
         request.setWorkoutDescription("Test workout plan for structure testing");
         request.setWorkoutCategory("STRENGTH");

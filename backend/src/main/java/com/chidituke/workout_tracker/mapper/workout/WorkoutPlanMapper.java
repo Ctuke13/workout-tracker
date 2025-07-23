@@ -1,6 +1,6 @@
 package com.chidituke.workout_tracker.mapper.workout;
 
-import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutPlanRequest;
+import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutTemplateRequestDTO;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanResponse;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan;
 import org.springframework.stereotype.Component;
@@ -47,7 +47,7 @@ public class WorkoutPlanMapper {
                 .collect(Collectors.toList());
     }
 
-    public void mapRequestToEntity(WorkoutPlanRequest request, WorkoutPlan entity) {
+    public void mapRequestToEntity(WorkoutTemplateRequestDTO request, WorkoutPlan entity) {
         if (request == null || entity == null) {
             return;
         }

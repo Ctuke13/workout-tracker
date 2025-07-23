@@ -32,6 +32,12 @@ public class Exercise {
     @Column(name = "description", length = 2000)
     private String description;
 
+    @Column(name = "is_cardio", nullable = false)
+    private Boolean isCardio = false;
+
+    @Column(name = "is_isometric", nullable = false)
+    private Boolean isIsometric = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "exercise_type", nullable = false)
     private ExerciseType exerciseType = ExerciseType.STRENGTH;
@@ -144,7 +150,24 @@ public class Exercise {
         }
     }
 
-    // 🛠️ SIMPLE DOMAIN METHODS (Keep in Model)
+    // 🔄 WORKOUT TRACKING MODALITY ENUM
+    public enum WorkoutTrackingMode {
+        TIME_BASED("Track time, distance, pace"),           // Cardio exercises
+        HOLD_BASED("Track hold duration and sets"),         // Isometric exercises
+        REP_BASED("Track sets, reps, and weight");          // Traditional strength
+
+        private final String description;
+
+        WorkoutTrackingMode(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+    }
+
+    // 🛠️ ENHANCED DOMAIN METHODS
 
     public boolean requiresEquipment() {
         return equipmentRequired != null && !equipmentRequired.isEmpty();
@@ -214,7 +237,108 @@ public class Exercise {
                 .allMatch(equipment -> homeEquipment.contains(equipment.toLowerCase().trim()));
     }
 
-    // 🎯 FITNESS GOALS METHODS
+    // 🔄 ENHANCED EXERCISE TYPE AND TRACKING METHODS
+
+    public void setExerciseType(ExerciseType exerciseType) {
+        this.exerciseType = exerciseType;
+        // Automatically set isCardio based on exercise type
+        this.isCardio = (exerciseType == ExerciseType.CARDIO);
+
+        // Note: isIsometric should be set manually based on specific exercise characteristics
+        // since it's not directly derivable from ExerciseType alone
+    }
+
+    public Boolean getIsCardio() {
+        // Always derive from exerciseType to ensure consistency
+        return this.exerciseType == ExerciseType.CARDIO;
+    }
+
+    public Boolean getIsIsometric() {
+        return this.isIsometric != null ? this.isIsometric : false;
+    }
+
+    /**
+     * Determines the workout tracking mode based on exercise characteristics
+     */
+    public WorkoutTrackingMode getWorkoutTrackingMode() {
+        if (this.isCardio != null && this.isCardio) {
+            return WorkoutTrackingMode.TIME_BASED;
+        }
+        if (this.isIsometric != null && this.isIsometric) {
+            return WorkoutTrackingMode.HOLD_BASED;
+        }
+        return WorkoutTrackingMode.REP_BASED;
+    }
+
+    /**
+     * Get tracking mode description for UI display
+     */
+    public String getTrackingModeDescription() {
+        return getWorkoutTrackingMode().getDescription();
+    }
+
+    /**
+     * Check if this is a time-based exercise (cardio)
+     */
+    public boolean isTimeBased() {
+        return getWorkoutTrackingMode() == WorkoutTrackingMode.TIME_BASED;
+    }
+
+    /**
+     * Check if this is a hold-based exercise (isometric)
+     */
+    public boolean isHoldBased() {
+        return getWorkoutTrackingMode() == WorkoutTrackingMode.HOLD_BASED;
+    }
+
+    /**
+     * Check if this is a rep-based exercise (traditional strength)
+     */
+    public boolean isRepBased() {
+        return getWorkoutTrackingMode() == WorkoutTrackingMode.REP_BASED;
+    }
+
+    /**
+     * Get tracking instructions for users
+     */
+    public String getTrackingInstructions() {
+        switch (getWorkoutTrackingMode()) {
+            case TIME_BASED:
+                return "Track your time, distance, and pace during this exercise.";
+            case HOLD_BASED:
+                return "Track how long you can hold the position and rest between holds.";
+            case REP_BASED:
+                return "Track sets, repetitions, and weight used for this exercise.";
+            default:
+                return "Follow the exercise instructions and track your progress.";
+        }
+    }
+
+    /**
+     * Validate that isCardio and isIsometric settings are consistent
+     */
+    public boolean hasValidModalitySettings() {
+        // Only one tracking mode should be true
+        boolean cardio = this.isCardio != null && this.isCardio;
+        boolean isometric = this.isIsometric != null && this.isIsometric;
+
+        // Both cannot be true at the same time
+        return !(cardio && isometric);
+    }
+
+    /**
+     * Auto-correct modality settings if inconsistent
+     */
+    public void validateAndCorrectModality() {
+        if (!hasValidModalitySettings()) {
+            // If both are true, prioritize cardio (since it's derived from exerciseType)
+            if (this.isCardio != null && this.isCardio) {
+                this.isIsometric = false;
+            }
+        }
+    }
+
+    // 🎯 FITNESS GOALS METHODS (unchanged from original)
 
     /**
      * Get all fitness goals associated with this exercise
@@ -407,10 +531,12 @@ public class Exercise {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        validateAndCorrectModality(); // Ensure consistent modality settings
     }
 
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        validateAndCorrectModality(); // Ensure consistent modality settings
     }
 }

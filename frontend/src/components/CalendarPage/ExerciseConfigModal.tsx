@@ -1,5 +1,6 @@
 // src/components/CalendarPage/ExerciseConfigModal.tsx - With Day Navigation
 import React from 'react';
+import { Exercise } from '../../types/exercise';
 import {
     XMarkIcon,
     BookmarkIcon,
@@ -16,26 +17,6 @@ import {
 // Import calendar day type for navigation
 import { CalendarDay } from '../../services/calendarMockData';
 
-// Types
-interface Exercise {
-    id: number;
-    exerciseName?: string;
-    name?: string;
-    emoji?: string;
-    description?: string;
-    exerciseType: string;
-    difficultyLevel: string;
-    estimatedDurationMinutes?: number;
-    estimatedCalories?: number;
-    targetMuscleGroups?: string[];
-    equipmentRequired?: string[];
-    benefits?: string[];
-    tips?: string[];
-    videoUrl?: string;
-    averageRating?: number;
-    totalRatings?: number;
-    usageCount?: number;
-}
 
 interface ExerciseConfiguration {
     sets: number;

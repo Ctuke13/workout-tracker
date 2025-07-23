@@ -29,6 +29,12 @@ public class ExerciseSearchRequestDTO {
 
     private Boolean isProfessionalContent;
 
+    private Boolean isCardio;
+
+    private Boolean isIsometric;
+
+    private Exercise.WorkoutTrackingMode workoutTrackingMode;
+
     @Min(value = 0, message = "Page cannot be negative")
     private Integer page = 0;
 

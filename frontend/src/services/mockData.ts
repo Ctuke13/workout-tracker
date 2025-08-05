@@ -9,6 +9,7 @@ export const mockExercises: Exercise[] = [
         description: "Classic upper body strength exercise that builds chest, shoulder, and tricep strength",
         exerciseType: "STRENGTH",
         isCardio: false,  // Strength exercise = sets/reps tracking interface
+        isIsometric: false,
         exerciseTypeDisplay: "Strength Training",
         difficultyLevel: "BEGINNER",
         estimatedDurationMinutes: 10,
@@ -38,6 +39,7 @@ export const mockExercises: Exercise[] = [
         description: "Dynamic yoga flow to improve flexibility and mind-body connection",
         exerciseType: "FLEXIBILITY",
         isCardio: false,  // Flexibility exercise = sets/reps or duration tracking
+        isIsometric: false,
         exerciseTypeDisplay: "Flexibility & Mobility",
         difficultyLevel: "INTERMEDIATE",
         estimatedDurationMinutes: 25,
@@ -67,6 +69,7 @@ export const mockExercises: Exercise[] = [
         description: "Progressive balance training to improve stability and coordination",
         exerciseType: "BALANCE",
         isCardio: false,  // Balance exercise = duration or reps tracking
+        isIsometric: false,
         exerciseTypeDisplay: "Balance & Stability",
         difficultyLevel: "INTERMEDIATE",
         estimatedDurationMinutes: 12,
@@ -96,6 +99,7 @@ export const mockExercises: Exercise[] = [
         description: "Sport-specific drills to improve tennis serve technique and power",
         exerciseType: "SPORTS_SPECIFIC",
         isCardio: false,  // Sports-specific = reps/sets tracking
+        isIsometric: false,
         exerciseTypeDisplay: "Sports Specific",
         difficultyLevel: "ADVANCED",
         estimatedDurationMinutes: 30,
@@ -125,6 +129,7 @@ export const mockExercises: Exercise[] = [
         description: "High-intensity cardiovascular training with sprint intervals",
         exerciseType: "CARDIO",
         isCardio: true,   // CRITICAL: Cardio exercise = time/distance/pace tracking interface
+        isIsometric: true,
         exerciseTypeDisplay: "Cardiovascular",
         difficultyLevel: "ADVANCED",
         estimatedDurationMinutes: 18,
@@ -154,6 +159,7 @@ export const mockExercises: Exercise[] = [
         description: "Plyometric training for explosive lower body power development",
         exerciseType: "PLYOMETRIC",
         isCardio: false,  // Plyometric = reps/sets tracking (explosive movements)
+        isIsometric: false,
         exerciseTypeDisplay: "Plyometric & Power",
         difficultyLevel: "ADVANCED",
         estimatedDurationMinutes: 15,
@@ -183,6 +189,7 @@ export const mockExercises: Exercise[] = [
         description: "Gentle rehabilitation movements for muscle recovery and injury prevention",
         exerciseType: "REHABILITATION",
         isCardio: false,  // Rehabilitation = duration or gentle reps tracking
+        isIsometric: false,
         exerciseTypeDisplay: "Rehabilitation",
         difficultyLevel: "BEGINNER",
         estimatedDurationMinutes: 20,

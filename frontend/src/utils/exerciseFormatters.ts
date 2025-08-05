@@ -1,4 +1,4 @@
-import { DifficultyLevel } from '../types/exercise';
+import {DifficultyLevel, Exercise} from '../types/exercise';
 
 // Equipment name formatting
 export const formatEquipmentName = (equipment: string): string => {
@@ -69,4 +69,22 @@ export const getPopularityLevel = (usageCount: number): string => {
 export const truncateText = (text: string, maxLength: number): string => {
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + '...';
+};
+
+export const getWorkoutTrackingMode = (exercise: Exercise): 'cardio' | 'isometric' | 'strength' => {
+    if (exercise.isCardio) return 'cardio';
+    if (exercise.isIsometric) return 'isometric';
+    return 'strength';
+};
+
+export const getWorkoutTrackingModeDisplay = (exercise: Exercise): string => {
+    if (exercise.isCardio) return 'Time/Distance Tracking';
+    if (exercise.isIsometric) return 'Hold Duration Tracking';
+    return 'Sets/Reps Tracking';
+};
+
+export const getWorkoutTrackingModeColor = (exercise: Exercise): string => {
+    if (exercise.isCardio) return 'text-red-600 bg-red-100';
+    if (exercise.isIsometric) return 'text-purple-600 bg-purple-100';
+    return 'text-blue-600 bg-blue-100';
 };

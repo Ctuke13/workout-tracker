@@ -73,6 +73,22 @@ public class FitnessGoal {
         return goalName;
     }
 
+    // ✅ ADDED MISSING METHODS THAT Exercise.java EXPECTS:
+
+    /**
+     * Get the goal code (accessor method for Exercise.java)
+     */
+    public String getGoalCode() {
+        return this.goalCode;
+    }
+
+    /**
+     * Get the goal emoji (accessor method for Exercise.java)
+     */
+    public String getGoalEmoji() {
+        return this.goalEmoji;
+    }
+
     // 📱 CONVENIENCE CONSTRUCTORS
     public FitnessGoal(String goalCode, String goalName, String goalEmoji, String goalDescription, Integer displayOrder) {
         this.goalCode = goalCode;

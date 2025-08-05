@@ -23,6 +23,38 @@ public class ScheduledWorkout {
     @NotNull(message = "User is required")
     private User user;
 
+    @Column(name = "sets")
+    private Integer sets;
+
+    @Column(name = "reps")
+    private String reps;
+
+    @Column(name = "weight")
+    private Double weight;
+
+    @Column(name = "rest_seconds")
+    private Integer restSeconds;
+
+    @Column(name = "tempo")
+    private String tempo;
+
+    @Column(name = "target_rpe")
+    private Integer targetRpe;
+
+    // Cardio fields
+    @Column(name = "target_duration_minutes")
+    private Integer targetDurationMinutes;
+
+    @Column(name = "target_distance_km")
+    private Double targetDistanceKm;
+
+    @Column(name = "target_pace")
+    private Double targetPace;
+
+    // Isometric fields
+    @Column(name = "hold_duration_seconds")
+    private Integer holdDurationSeconds;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workout_plan_id", nullable = false)
     @NotNull(message = "Workout plan is required")

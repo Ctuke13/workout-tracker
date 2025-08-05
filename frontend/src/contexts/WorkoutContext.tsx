@@ -1,6 +1,5 @@
-// src/contexts/WorkoutContext.tsx - Workout State Management
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { ScheduledExercise } from '../services/calendarMockData';
+import { ScheduledExercise } from '../types/exercise';
 
 // ==================== TYPES ====================
 
@@ -84,6 +83,102 @@ export interface WorkoutContextType {
     canGoPrevious: boolean;
 }
 
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * ✅ NEW: Determines appropriate number of sets based on exercise type and scheduled data
+ */
+const getExerciseSetsCount = (scheduledExercise: ScheduledExercise): number => {
+    const exercise = scheduledExercise.exercise;
+
+    // If sets are explicitly defined in scheduled exercise, use that
+    if (scheduledExercise.sets && scheduledExercise.sets > 0) {
+        return scheduledExercise.sets;
+    }
+
+    // Otherwise, determine based on exercise type
+    if (exercise.isCardio) {
+        return 1; // Cardio typically has 1 "set" representing the entire duration
+    } else if (exercise.isIsometric) {
+        return 3; // Isometric exercises typically have 3 holds
+    } else {
+        return 3; // Strength exercises typically have 3 sets
+    }
+};
+
+/**
+ * ✅ NEW: Gets appropriate target reps based on exercise type
+ */
+const getExerciseTargetReps = (scheduledExercise: ScheduledExercise): string => {
+    const exercise = scheduledExercise.exercise;
+
+    // If reps are explicitly defined, use them
+    if (scheduledExercise.reps) {
+        return scheduledExercise.reps;
+    }
+
+    // Otherwise, provide sensible defaults based on exercise type
+    if (exercise.isCardio) {
+        return `${exercise.estimatedDurationMinutes || 20} min`; // Show duration for cardio
+    } else if (exercise.isIsometric) {
+        return `${scheduledExercise.holdDurationSeconds || 30}s hold`; // Show hold duration
+    } else {
+        return '8-12'; // Standard rep range for strength exercises
+    }
+};
+
+/**
+ * ✅ NEW: Gets appropriate rest seconds based on exercise type
+ */
+const getExerciseRestSeconds = (scheduledExercise: ScheduledExercise): number => {
+    const exercise = scheduledExercise.exercise;
+
+    // If rest is explicitly defined, use it
+    if (scheduledExercise.restSeconds && scheduledExercise.restSeconds > 0) {
+        return scheduledExercise.restSeconds;
+    }
+
+    // Otherwise, provide sensible defaults
+    if (exercise.isCardio) {
+        return 0; // Cardio typically doesn't have rest between "sets"
+    } else if (exercise.isIsometric) {
+        return 60; // Shorter rest for isometric holds
+    } else {
+        return 90; // Standard rest for strength exercises
+    }
+};
+
+/**
+ * ✅ NEW: Validates exercise configuration and logs warnings for missing data
+ */
+const validateScheduledExercise = (scheduledExercise: ScheduledExercise): void => {
+    const exercise = scheduledExercise.exercise;
+    const exerciseName = exercise.name || exercise.exerciseName || 'Unknown Exercise';
+
+    // Log missing configuration data (helps with debugging)
+    if (exercise.isCardio && !scheduledExercise.targetDurationMinutes && !exercise.estimatedDurationMinutes) {
+        console.warn(`⚠️ Cardio exercise "${exerciseName}" missing duration information`);
+    }
+
+    if (exercise.isIsometric && !scheduledExercise.holdDurationSeconds) {
+        console.warn(`⚠️ Isometric exercise "${exerciseName}" missing hold duration`);
+    }
+
+    if (!exercise.isCardio && !exercise.isIsometric && !scheduledExercise.sets) {
+        console.warn(`⚠️ Strength exercise "${exerciseName}" missing sets configuration`);
+    }
+
+    // Log what we're using for the workout
+    console.log(`🏋️‍♂️ Exercise "${exerciseName}" workout config:`, {
+        type: exercise.isCardio ? 'cardio' : exercise.isIsometric ? 'isometric' : 'strength',
+        sets: getExerciseSetsCount(scheduledExercise),
+        reps: getExerciseTargetReps(scheduledExercise),
+        rest: getExerciseRestSeconds(scheduledExercise),
+        weight: scheduledExercise.weight,
+        notes: scheduledExercise.notes
+    });
+};
+
 // ==================== WORKOUT REDUCER ====================
 
 type WorkoutAction =
@@ -116,17 +211,30 @@ function workoutReducer(
         case 'START_WORKOUT': {
             const { exercises, date } = action.payload;
 
-            // Convert scheduled exercises to workout exercises
+            console.log('🏋️‍♂️ Starting workout with', exercises.length, 'exercises');
+
+            // ✅ FIXED: Robust exercise conversion with proper type handling
             const workoutExercises: WorkoutExercise[] = exercises.map((scheduledExercise, index) => {
-                const sets: WorkoutSet[] = Array.from({ length: scheduledExercise.sets }, (_, setIndex) => ({
+                // Validate and log exercise configuration
+                validateScheduledExercise(scheduledExercise);
+
+                // Get appropriate configuration for this exercise type
+                const setsCount = getExerciseSetsCount(scheduledExercise);
+                const targetReps = getExerciseTargetReps(scheduledExercise);
+                const restSeconds = getExerciseRestSeconds(scheduledExercise);
+
+                // Create workout sets based on exercise type and configuration
+                const sets: WorkoutSet[] = Array.from({ length: setsCount }, (_, setIndex) => ({
                     id: `${scheduledExercise.id}-set-${setIndex + 1}`,
                     setNumber: setIndex + 1,
-                    targetReps: scheduledExercise.reps,
+                    targetReps,
                     targetWeight: scheduledExercise.weight,
                     targetRpe: scheduledExercise.targetRpe,
-                    restSeconds: scheduledExercise.restSeconds,
+                    restSeconds,
                     completed: false,
                 }));
+
+                console.log(`✅ Created ${sets.length} sets for "${scheduledExercise.exercise.name || scheduledExercise.exercise.exerciseName}"`);
 
                 return {
                     id: scheduledExercise.id,
@@ -146,6 +254,12 @@ function workoutReducer(
                 currentExerciseIndex: 0,
                 currentSetIndex: 0,
             };
+
+            console.log('🎯 Workout session created:', {
+                id: newWorkout.id,
+                exerciseCount: workoutExercises.length,
+                totalSets: workoutExercises.reduce((total, ex) => total + ex.sets.length, 0)
+            });
 
             return { currentWorkout: newWorkout };
         }
@@ -341,13 +455,14 @@ function workoutReducer(
             const newSetNumber = exercise.sets.length + 1;
             const lastSet = exercise.sets[exercise.sets.length - 1];
 
+            // ✅ FIXED: Create new set with proper defaults
             const newSet: WorkoutSet = {
                 id: `${exerciseId}-set-${newSetNumber}`,
                 setNumber: newSetNumber,
-                targetReps: lastSet.targetReps,
-                targetWeight: lastSet.targetWeight,
-                targetRpe: lastSet.targetRpe,
-                restSeconds: lastSet.restSeconds,
+                targetReps: lastSet?.targetReps || getExerciseTargetReps(exercise.scheduledExercise),
+                targetWeight: lastSet?.targetWeight || exercise.scheduledExercise.weight,
+                targetRpe: lastSet?.targetRpe || exercise.scheduledExercise.targetRpe,
+                restSeconds: lastSet?.restSeconds || getExerciseRestSeconds(exercise.scheduledExercise),
                 completed: false,
             };
 
@@ -356,6 +471,12 @@ function workoutReducer(
                     ? { ...ex, sets: [...ex.sets, newSet] }
                     : ex
             );
+
+            console.log('➕ Added new set to exercise:', {
+                exerciseId,
+                setNumber: newSetNumber,
+                targetReps: newSet.targetReps
+            });
 
             return {
                 currentWorkout: {
@@ -458,14 +579,22 @@ function workoutReducer(
 
             const { exercise, config } = action.payload;
 
+            console.log('🏋️‍♂️ Adding exercise to current workout:', exercise.name || exercise.exerciseName, config);
+
+            // ✅ FIXED: Robust configuration handling with defaults
+            const setsCount = config.sets || (exercise.isCardio ? 1 : exercise.isIsometric ? 3 : 3);
+            const targetReps = config.reps || (exercise.isCardio ? `${config.targetDurationMinutes || 20} min` :
+                exercise.isIsometric ? `${config.holdDurationSeconds || 30}s hold` : '8-12');
+            const restSeconds = config.restSeconds || (exercise.isCardio ? 0 : exercise.isIsometric ? 60 : 90);
+
             // Create sets based on configuration
-            const sets: WorkoutSet[] = Array.from({ length: config.sets }, (_, setIndex) => ({
+            const sets: WorkoutSet[] = Array.from({ length: setsCount }, (_, setIndex) => ({
                 id: `added-exercise-${Date.now()}-set-${setIndex + 1}`,
                 setNumber: setIndex + 1,
-                targetReps: config.reps,
+                targetReps,
                 targetWeight: config.weight ? parseFloat(config.weight) : undefined,
                 targetRpe: config.targetRpe,
-                restSeconds: config.restSeconds,
+                restSeconds,
                 completed: false,
             }));
 
@@ -475,10 +604,10 @@ function workoutReducer(
                 exerciseId: exercise.id,
                 exercise: exercise,
                 scheduledDate: state.currentWorkout.date,
-                sets: config.sets,
-                reps: config.reps,
+                sets: setsCount,
+                reps: targetReps,
                 weight: config.weight ? parseFloat(config.weight) : undefined,
-                restSeconds: config.restSeconds,
+                restSeconds,
                 targetRpe: config.targetRpe,
                 notes: config.notes,
                 completed: false,
@@ -494,6 +623,8 @@ function workoutReducer(
                 completed: false,
                 skipped: false,
             };
+
+            console.log('✅ Created workout exercise with', sets.length, 'sets');
 
             return {
                 currentWorkout: {
@@ -563,7 +694,26 @@ export function WorkoutProvider({ children }: WorkoutProviderProps) {
 
     const startWorkout = (exercises: ScheduledExercise[], date: string) => {
         console.log('🏋️‍♂️ Starting workout with', exercises.length, 'exercises');
-        dispatch({ type: 'START_WORKOUT', payload: { exercises, date } });
+
+        // ✅ NEW: Validate exercises before starting workout
+        const validExercises = exercises.filter(ex => {
+            if (!ex.exercise) {
+                console.error('❌ Exercise missing exercise data:', ex);
+                return false;
+            }
+            return true;
+        });
+
+        if (validExercises.length === 0) {
+            console.error('❌ No valid exercises found for workout');
+            return;
+        }
+
+        if (validExercises.length !== exercises.length) {
+            console.warn(`⚠️ Filtered out ${exercises.length - validExercises.length} invalid exercises`);
+        }
+
+        dispatch({ type: 'START_WORKOUT', payload: { exercises: validExercises, date } });
     };
 
     const pauseWorkout = () => {
@@ -636,6 +786,13 @@ export function WorkoutProvider({ children }: WorkoutProviderProps) {
 
     const addExerciseToCurrentWorkout = (exercise: any, config: any) => {
         console.log('🏋️‍♂️ Adding exercise to current workout:', exercise.name || exercise.exerciseName, config);
+
+        // ✅ NEW: Validate exercise and config before adding
+        if (!exercise || !config) {
+            console.error('❌ Invalid exercise or config provided:', { exercise, config });
+            return;
+        }
+
         dispatch({ type: 'ADD_EXERCISE_TO_WORKOUT', payload: { exercise, config } });
     };
 

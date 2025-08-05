@@ -1,15 +1,127 @@
-// TypeScript Interfaces and Enums for Exercise System
+// =============================================================================
+// CALENDAR AND SCHEDULING INTERFACES
+// =============================================================================
 
-// Enums matching your backend
+export interface ScheduledExercise {
+    id: string;
+    exerciseId: number;
+    exercise: Exercise;
+    scheduledDate: string;
+
+    // Strength fields
+    sets?: number;
+    reps?: string;
+    weight?: number;
+    restSeconds?: number;
+    tempo?: string;
+    targetRpe?: number;
+
+    //  Cardio fields
+    targetDurationMinutes?: number;
+    targetDistanceKm?: number;
+    targetPace?: number;
+
+    // Isometric fields
+    holdDurationSeconds?: number;
+
+    // Common fields
+    notes?: string;
+    completed: boolean;
+    status?: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'SKIPPED' | 'RESCHEDULED';
+    createdAt: string;
+    userId: string;
+}
+
+export interface CalendarDay {
+    date: Date;
+    dateString: string;
+    isToday: boolean;
+    isPast: boolean;
+    exercises: ScheduledExercise[];
+}
+
+export interface CalendarEvent {
+    id: string;
+    title: string;
+    date: Date;
+    exercise: Exercise;
+    completed: boolean;
+}
+
+export interface WorkoutStats {
+    totalWorkouts: number;
+    completedWorkouts: number;
+    completionRate: number;
+    weeklyGoal: number;
+    currentStreak: number;
+    bestStreak: number;
+    totalExercisesCompleted: number;
+    averageWorkoutDuration: number;
+}
+
+// =============================================================================
+// CORE ENUMS AND TYPES
+// =============================================================================
+
 export type ExerciseType = 'STRENGTH' | 'CARDIO' | 'FLEXIBILITY' | 'BALANCE' | 'PLYOMETRIC' | 'REHABILITATION' | 'SPORTS_SPECIFIC';
 export type DifficultyLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
 export type SortOption = 'relevance' | 'rating' | 'popularity' | 'duration' | 'calories' | 'newest';
-export type FilterType = 'goal' | 'difficulty' | 'equipment' | 'exerciseType' | 'rating' | 'duration' | 'professional';
+export type FilterType =
+    | 'goal'
+    | 'difficulty'
+    | 'equipment'
+    | 'exerciseType'
+    | 'rating'
+    | 'duration'
+    | 'professional'
+    | 'trackingType'
+    | 'search'
+    | 'favorites'
+    | 'muscleGroups';
+export type WorkoutTrackingType = 'cardio' | 'isometric' | 'strength';
+export type WorkoutSessionStatus = 'not_started' | 'in_progress' | 'paused' | 'completed' | 'cancelled';
 
-// NEW: Workout tracking type - determines which interface to show during workouts
-export type WorkoutTrackingType = 'cardio' | 'strength';
+// =============================================================================
+// EXERCISE CONFIGURATION INTERFACES - FIXED WITH DISCRIMINATED UNION
+// =============================================================================
 
-// Main Exercise interface based on your backend entity
+// Base interface with discriminator
+interface BaseExerciseConfiguration {
+    trackingMode: WorkoutTrackingType;
+    notes?: string;
+}
+
+export interface CardioConfiguration extends BaseExerciseConfiguration {
+    trackingMode: 'cardio';
+    targetDurationMinutes: number;
+    targetDistanceKm?: number;
+    targetPace?: number; // minutes per km
+}
+
+export interface IsometricConfiguration extends BaseExerciseConfiguration {
+    trackingMode: 'isometric';
+    sets: number;
+    holdDurationSeconds: number;
+    restSeconds: number;
+}
+
+export interface StrengthConfiguration extends BaseExerciseConfiguration {
+    trackingMode: 'strength';
+    sets: number;
+    reps: string;
+    weight?: number;
+    restSeconds: number;
+    targetRpe?: number;
+    tempo?: string;
+}
+
+// ✅ FIXED: Proper discriminated union type
+export type ExerciseConfiguration = CardioConfiguration | IsometricConfiguration | StrengthConfiguration;
+
+// =============================================================================
+// MAIN EXERCISE INTERFACE
+// =============================================================================
+
 export interface Exercise {
     id: number;
     name: string;
@@ -18,6 +130,7 @@ export interface Exercise {
     description: string;
     exerciseType: ExerciseType;
     isCardio: boolean; // Critical for workout tracking
+    isIsometric: boolean; // Critical for workout tracking
     exerciseTypeDisplay: string;
     difficultyLevel: DifficultyLevel;
     estimatedDurationMinutes: number;
@@ -37,7 +150,122 @@ export interface Exercise {
     canDoAtHome: boolean;
     requiresEquipment: boolean;
     createdBy: string;
+    isFavorite?: boolean;
 }
+
+// =============================================================================
+// WORKOUT TRACKING DATA STRUCTURES
+// =============================================================================
+
+// Individual set data for strength exercises
+export interface StrengthSet {
+    setNumber: number;
+    targetReps: number;
+    actualReps?: number;
+    targetWeight?: number;
+    actualWeight?: number;
+    targetRpe?: number; // Rate of Perceived Exertion (1-10)
+    actualRpe?: number;
+    restSeconds?: number;
+    tempo?: string; // e.g., "3-1-2-1" (eccentric-pause-concentric-pause)
+    completed: boolean;
+    notes?: string;
+    completedAt?: Date;
+}
+
+// Individual set data for isometric exercises
+export interface IsometricSet {
+    setNumber: number;
+    targetHoldSeconds: number;
+    actualHoldSeconds?: number;
+    restSeconds?: number;
+    completed: boolean;
+    notes?: string;
+    completedAt?: Date;
+}
+
+// Cardio workout tracking data
+export interface CardioWorkoutData {
+    exerciseId: number;
+    configuration: CardioConfiguration;
+    startTime: Date;
+    endTime?: Date;
+    actualDurationMinutes?: number;
+    actualDistanceKm?: number;
+    averagePace?: number; // minutes per km
+    maxHeartRate?: number;
+    averageHeartRate?: number;
+    caloriesBurned?: number;
+    notes?: string;
+    completed: boolean;
+}
+
+// Isometric workout tracking data
+export interface IsometricWorkoutData {
+    exerciseId: number;
+    configuration: IsometricConfiguration;
+    startTime: Date;
+    endTime?: Date;
+    completedSets: IsometricSet[];
+    notes?: string;
+    completed: boolean;
+}
+
+// Strength workout tracking data
+export interface StrengthWorkoutData {
+    exerciseId: number;
+    configuration: StrengthConfiguration;
+    startTime: Date;
+    endTime?: Date;
+    completedSets: StrengthSet[];
+    notes?: string;
+    completed: boolean;
+}
+
+// Unified workout data that handles all tracking modes
+export interface UnifiedWorkoutData {
+    exerciseId: number;
+    exercise: Exercise;
+    trackingMode: WorkoutTrackingType;
+    startTime: Date;
+    endTime?: Date;
+    completed: boolean;
+    notes?: string;
+
+    // Mode-specific data (only one will be populated)
+    cardioData?: CardioWorkoutData;
+    isometricData?: IsometricWorkoutData;
+    strengthData?: StrengthWorkoutData;
+}
+
+// =============================================================================
+// WORKOUT SESSION INTERFACE
+// =============================================================================
+
+export interface WorkoutSession {
+    id: string;
+    date: string; // ISO date string
+    exercises: UnifiedWorkoutData[];
+    status: WorkoutSessionStatus;
+    startTime?: Date;
+    endTime?: Date;
+    totalDurationMinutes?: number;
+    notes?: string;
+
+    // Progress tracking
+    currentExerciseIndex: number;
+    currentSetIndex: number; // Only relevant for strength/isometric exercises
+
+    // Session metadata
+    estimatedCalories?: number;
+    actualCalories?: number;
+    mood?: string;
+    location?: string;
+}
+
+// =============================================================================
+// UI AND FILTERING INTERFACES
+// =============================================================================
 
 // Goal interface
 export interface Goal {
@@ -56,6 +284,12 @@ export interface ExerciseTypeOption {
     count?: number;
 }
 
+// Enhanced exercise type option with tracking information
+export interface EnhancedExerciseTypeOption extends ExerciseTypeOption {
+    trackingType: WorkoutTrackingType;
+    description: string;
+}
+
 // Active filter interface
 export interface ActiveFilter {
     type: FilterType;
@@ -63,7 +297,7 @@ export interface ActiveFilter {
     emoji?: string;
 }
 
-// Exercise filters state - ENHANCED with cardio filtering capability
+// Exercise filters state
 export interface ExerciseFilters {
     activeGoal: string;
     searchTerm: string;
@@ -72,17 +306,30 @@ export interface ExerciseFilters {
     selectedExerciseType: string;
     minRating: number;
     maxDuration: number;
+    onlyFavorites: boolean;
+    includeCompleted: boolean;
+    muscleGroups: string[];
+    availableEquipment: string[];
+    fitnessLevel: string;
     sortBy: SortOption;
     showProfessionalOnly: boolean;
-    exerciseType?: string;
+    trackingType?: WorkoutTrackingType | 'all';
+    professionalOnly?: boolean;
     difficulty?: string;
     equipment?: string;
-    professionalOnly?: boolean;
-    // NEW: Filter by workout tracking type
-    trackingType?: WorkoutTrackingType | 'all';  // 'cardio', 'strength', or 'all'
+    exerciseType?: string;
 }
 
-// API Response types (for future backend integration)
+// Sort option type
+export interface SortOptionType {
+    value: SortOption;
+    label: string;
+}
+
+// =============================================================================
+// API RESPONSE INTERFACES
+// =============================================================================
+
 export interface ExerciseApiResponse {
     exercises: Exercise[];
     totalCount: number;
@@ -100,71 +347,11 @@ export interface FilterOptionsResponse {
     exerciseTypeOptions: ExerciseTypeOption[];
 }
 
-export interface SortOptionType {
-    value: SortOption;
-    label: string;
-}
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
-// NEW: Workout-specific interfaces that leverage the isCardio field
-
-// Cardio exercise tracking data structure
-export interface CardioWorkoutData {
-    exerciseId: number;
-    startTime: Date;
-    endTime?: Date;
-    durationMinutes?: number;
-    durationSeconds?: number;
-    distanceKm?: number;
-    averagePace?: number;  // minutes per km
-    maxHeartRate?: number;
-    averageHeartRate?: number;
-    caloriesBurned?: number;
-    notes?: string;
-    completed: boolean;
-}
-
-// Strength exercise tracking data structure
-export interface StrengthWorkoutData {
-    exerciseId: number;
-    sets: WorkoutSet[];
-    startTime: Date;
-    endTime?: Date;
-    notes?: string;
-    completed: boolean;
-}
-
-// Individual set data for strength exercises
-export interface WorkoutSet {
-    setNumber: number;
-    targetReps: number;
-    actualReps?: number;
-    targetWeight?: number;
-    actualWeight?: number;
-    targetRpe?: number;  // Rate of Perceived Exertion (1-10)
-    actualRpe?: number;
-    restSeconds?: number;
-    tempo?: string;  // e.g., "3-1-2-1" (eccentric-pause-concentric-pause)
-    completed: boolean;
-    notes?: string;
-    completedAt?: Date;
-}
-
-// Unified workout data that can handle both cardio and strength
-export interface UnifiedWorkoutData {
-    exerciseId: number;
-    exercise: Exercise;  // Includes isCardio flag
-    startTime: Date;
-    endTime?: Date;
-    completed: boolean;
-    notes?: string;
-
-    // Cardio-specific fields (populated when exercise.isCardio === true)
-    cardioData?: CardioWorkoutData;
-
-    // Strength-specific fields (populated when exercise.isCardio === false)
-    strengthData?: StrengthWorkoutData;
-}
-
+// Exercise name helpers
 export const getExerciseName = (exercise: Exercise): string => {
     return exercise.exerciseName || exercise.name || 'Unknown Exercise';
 };
@@ -173,21 +360,38 @@ export const getExerciseDisplayName = (exercise: Exercise): string => {
     return exercise.name || exercise.exerciseName || 'Unknown Exercise';
 };
 
-// Type guards to help with type safety during workout tracking
+// Workout tracking mode helpers
+export const getWorkoutTrackingType = (exercise: Exercise): WorkoutTrackingType => {
+    if (exercise.isCardio) return 'cardio';
+    if (exercise.isIsometric) return 'isometric';
+    return 'strength';
+};
+
 export const isCardioExercise = (exercise: Exercise): boolean => {
     return exercise.isCardio === true;
 };
 
+export const isIsometricExercise = (exercise: Exercise): boolean => {
+    return exercise.isIsometric === true;
+};
+
 export const isStrengthExercise = (exercise: Exercise): boolean => {
-    return exercise.isCardio === false;
+    return !exercise.isCardio && !exercise.isIsometric;
 };
 
-// Helper function to determine what type of workout interface to show
-export const getWorkoutTrackingType = (exercise: Exercise): WorkoutTrackingType => {
-    return exercise.isCardio ? 'cardio' : 'strength';
+export const isCardioConfiguration = (config: ExerciseConfiguration): config is CardioConfiguration => {
+    return config.trackingMode === 'cardio';
 };
 
-// Filter helper functions for exercise lists
+export const isIsometricConfiguration = (config: ExerciseConfiguration): config is IsometricConfiguration => {
+    return config.trackingMode === 'isometric';
+};
+
+export const isStrengthConfiguration = (config: ExerciseConfiguration): config is StrengthConfiguration => {
+    return config.trackingMode === 'strength';
+};
+
+// Filter helper functions
 export const filterExercisesByTrackingType = (
     exercises: Exercise[],
     trackingType: WorkoutTrackingType | 'all'
@@ -196,14 +400,19 @@ export const filterExercisesByTrackingType = (
         return exercises;
     }
 
-    if (trackingType === 'cardio') {
-        return exercises.filter(isCardioExercise);
+    switch (trackingType) {
+        case 'cardio':
+            return exercises.filter(isCardioExercise);
+        case 'isometric':
+            return exercises.filter(isIsometricExercise);
+        case 'strength':
+            return exercises.filter(isStrengthExercise);
+        default:
+            return exercises;
     }
-
-    return exercises.filter(isStrengthExercise);
 };
 
-// Validation helpers to ensure data consistency
+// Validation helpers
 export const validateExerciseData = (exercise: Exercise): boolean => {
     // Ensure isCardio consistency with exerciseType
     const shouldBeCardio = exercise.exerciseType === 'CARDIO';
@@ -216,23 +425,31 @@ export const validateExerciseData = (exercise: Exercise): boolean => {
         return false;
     }
 
+    // Ensure exercises can't be both cardio and isometric
+    if (exercise.isCardio && exercise.isIsometric) {
+        console.warn(
+            `Exercise "${exercise.name}" cannot be both cardio and isometric`
+        );
+        return false;
+    }
+
     return true;
 };
 
-// Exercise creation helper that automatically sets isCardio based on exerciseType
-export const createExercise = (exerciseData: Omit<Exercise, 'isCardio'>): Exercise => {
+// Exercise creation helper
+export const createExercise = (exerciseData: Omit<Exercise, 'isCardio' | 'isIsometric'>): Exercise => {
     return {
         ...exerciseData,
         // Automatically determine isCardio based on exerciseType
-        isCardio: exerciseData.exerciseType === 'CARDIO'
+        isCardio: exerciseData.exerciseType === 'CARDIO',
+        // Default isIsometric to false (would need to be set manually for specific exercises)
+        isIsometric: false
     };
 };
 
-// NEW: Enhanced exercise type options that include tracking type information
-export interface EnhancedExerciseTypeOption extends ExerciseTypeOption {
-    trackingType: WorkoutTrackingType;  // Whether this type uses cardio or strength tracking
-    description: string;  // User-friendly description of what this type involves
-}
+// =============================================================================
+// CONSTANTS AND PREDEFINED DATA
+// =============================================================================
 
 // Enhanced exercise type options with tracking information
 export const enhancedExerciseTypeOptions: EnhancedExerciseTypeOption[] = [
@@ -254,14 +471,14 @@ export const enhancedExerciseTypeOptions: EnhancedExerciseTypeOption[] = [
         value: 'FLEXIBILITY',
         display: 'Flexibility & Mobility',
         emoji: '🤸‍♀️',
-        trackingType: 'strength',
+        trackingType: 'isometric', // Most flexibility exercises are hold-based
         description: 'Enhance flexibility with holds and stretches'
     },
     {
         value: 'BALANCE',
         display: 'Balance & Stability',
         emoji: '⚖️',
-        trackingType: 'strength',
+        trackingType: 'isometric', // Balance exercises are typically hold-based
         description: 'Improve stability with timed holds and challenges'
     },
     {
@@ -287,27 +504,45 @@ export const enhancedExerciseTypeOptions: EnhancedExerciseTypeOption[] = [
     }
 ];
 
-// Workout session status types
-export type WorkoutSessionStatus = 'not_started' | 'in_progress' | 'paused' | 'completed' | 'cancelled';
+// ✅ FIXED: Default configurations with proper tracking mode
+export const DEFAULT_CARDIO_CONFIG: CardioConfiguration = {
+    trackingMode: 'cardio',
+    targetDurationMinutes: 20,
+    targetDistanceKm: undefined,
+    targetPace: undefined,
+    notes: ''
+};
 
-// Complete workout session interface
-export interface WorkoutSession {
-    id: string;
-    date: string;  // ISO date string
-    exercises: UnifiedWorkoutData[];
-    status: WorkoutSessionStatus;
-    startTime?: Date;
-    endTime?: Date;
-    totalDurationMinutes?: number;
-    notes?: string;
+export const DEFAULT_ISOMETRIC_CONFIG: IsometricConfiguration = {
+    trackingMode: 'isometric',
+    sets: 3,
+    holdDurationSeconds: 30,
+    restSeconds: 60,
+    notes: ''
+};
 
-    // Progress tracking
-    currentExerciseIndex: number;
-    currentSetIndex: number;  // Only relevant for strength exercises
+export const DEFAULT_STRENGTH_CONFIG: StrengthConfiguration = {
+    trackingMode: 'strength',
+    sets: 3,
+    reps: '8-12',
+    weight: undefined,
+    restSeconds: 90,
+    targetRpe: 7,
+    tempo: undefined,
+    notes: ''
+};
 
-    // Session metadata
-    estimatedCalories?: number;
-    actualCalories?: number;
-    mood?: string;
-    location?: string;
-}
+// ✅ FIXED: Helper to get default config based on exercise
+export const getDefaultConfigForExercise = (exercise: Exercise): ExerciseConfiguration => {
+    const trackingMode = getWorkoutTrackingType(exercise);
+    switch (trackingMode) {
+        case 'cardio':
+            return { ...DEFAULT_CARDIO_CONFIG };
+        case 'isometric':
+            return { ...DEFAULT_ISOMETRIC_CONFIG };
+        case 'strength':
+            return { ...DEFAULT_STRENGTH_CONFIG };
+        default:
+            return { ...DEFAULT_STRENGTH_CONFIG };
+    }
+};

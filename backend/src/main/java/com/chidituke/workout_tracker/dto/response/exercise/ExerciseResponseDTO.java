@@ -17,6 +17,8 @@ public class ExerciseResponseDTO {
     private String description;
     private String exerciseType;
     private String exerciseTypeDisplay;
+    private Boolean isCardio;
+    private Boolean isIsometric;
     private String difficultyLevel;
     private String difficultyDescription;
     private Integer estimatedDurationMinutes;
@@ -66,6 +68,8 @@ public class ExerciseResponseDTO {
                 .description(exercise.getDescription())
                 .exerciseType(exercise.getExerciseType().name())
                 .exerciseTypeDisplay(exercise.getExerciseType().getDisplayName())
+                .isCardio(exercise.getIsCardio())
+                .isIsometric(exercise.getIsIsometric())
                 .difficultyLevel(exercise.getDifficultyLevel().name())
                 .difficultyDescription(exercise.getDifficultyDescription())
                 .estimatedDurationMinutes(exercise.getEstimatedDurationMinutes())

@@ -2,6 +2,7 @@
 -- V007__Create_Program_System.sql
 -- Creates workout program management system tables with explicit column names
 -- EXACTLY MATCHES WorkoutProgram.java, ProgramPlan.java, and ScheduledWorkout.java entity field mappings
+-- ✅ UPDATED: Added exercise configuration fields to scheduled_workouts table
 -- =============================================================================
 
 -- =====================================================
@@ -89,6 +90,7 @@ CREATE TABLE program_plans (
 
 -- =====================================================
 -- SCHEDULED WORKOUTS TABLE - MATCHES ScheduledWorkout.java EXACTLY
+-- ✅ UPDATED: Added exercise configuration fields for workout tracking
 -- =====================================================
 CREATE TABLE scheduled_workouts (
                                     scheduled_workout_id BIGSERIAL PRIMARY KEY,
@@ -124,6 +126,25 @@ CREATE TABLE scheduled_workouts (
                                     reminder_time TIMESTAMP WITH TIME ZONE,               -- @Column(name = "reminder_time")
                                     estimated_duration_minutes INTEGER,                   -- @Column(name = "estimated_duration_minutes")
 
+    -- =============================================================================
+    -- ✅ NEW: EXERCISE CONFIGURATION FIELDS (Step 6 of Solution)
+    -- =============================================================================
+    -- Strength exercise fields
+                                    sets INTEGER,                                          -- @Column(name = "sets")
+                                    reps VARCHAR(50),                                      -- @Column(name = "reps")
+                                    weight DOUBLE PRECISION,                               -- @Column(name = "weight")
+                                    rest_seconds INTEGER,                                  -- @Column(name = "rest_seconds")
+                                    tempo VARCHAR(20),                                     -- @Column(name = "tempo")
+                                    target_rpe INTEGER,                                    -- @Column(name = "target_rpe")
+
+    -- Cardio exercise fields
+                                    target_duration_minutes INTEGER,                      -- @Column(name = "target_duration_minutes")
+                                    target_distance_km DOUBLE PRECISION,                  -- @Column(name = "target_distance_km")
+                                    target_pace DOUBLE PRECISION,                         -- @Column(name = "target_pace")
+
+    -- Isometric exercise fields
+                                    hold_duration_seconds INTEGER,                        -- @Column(name = "hold_duration_seconds")
+
     -- Foreign key constraints
                                     CONSTRAINT fk_scheduled_workouts_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
                                     CONSTRAINT fk_scheduled_workouts_program FOREIGN KEY (program_id) REFERENCES workout_programs(workout_program_id),
@@ -141,7 +162,17 @@ CREATE TABLE scheduled_workouts (
                                     CHECK (current_participants IS NULL OR max_participants IS NULL OR current_participants <= max_participants),
                                     CHECK (day_of_week IS NULL OR (day_of_week >= 1 AND day_of_week <= 7)),
                                     CHECK (week_number IS NULL OR week_number >= 1),
-                                    CHECK (estimated_duration_minutes IS NULL OR estimated_duration_minutes > 0)
+                                    CHECK (estimated_duration_minutes IS NULL OR estimated_duration_minutes > 0),
+
+    -- ✅ NEW: Check constraints for exercise configuration fields
+                                    CHECK (sets IS NULL OR sets > 0),
+                                    CHECK (weight IS NULL OR weight >= 0),
+                                    CHECK (rest_seconds IS NULL OR rest_seconds >= 0),
+                                    CHECK (target_rpe IS NULL OR (target_rpe >= 1 AND target_rpe <= 10)),
+                                    CHECK (target_duration_minutes IS NULL OR target_duration_minutes > 0),
+                                    CHECK (target_distance_km IS NULL OR target_distance_km > 0),
+                                    CHECK (target_pace IS NULL OR target_pace > 0),
+                                    CHECK (hold_duration_seconds IS NULL OR hold_duration_seconds > 0)
 );
 
 -- =====================================================
@@ -193,6 +224,11 @@ CREATE INDEX idx_scheduled_workouts_created_by_user ON scheduled_workouts(create
 CREATE INDEX idx_scheduled_workouts_week_day ON scheduled_workouts(week_number, day_of_week);
 CREATE INDEX idx_scheduled_workouts_reminder_time ON scheduled_workouts(reminder_time);
 
+-- ✅ NEW: Indexes for exercise configuration fields
+CREATE INDEX idx_scheduled_workouts_sets ON scheduled_workouts(sets) WHERE sets IS NOT NULL;
+CREATE INDEX idx_scheduled_workouts_weight ON scheduled_workouts(weight) WHERE weight IS NOT NULL;
+CREATE INDEX idx_scheduled_workouts_target_duration ON scheduled_workouts(target_duration_minutes) WHERE target_duration_minutes IS NOT NULL;
+
 -- =====================================================
 -- UNIQUE CONSTRAINTS - FIXED
 -- =====================================================
@@ -209,7 +245,7 @@ ALTER TABLE program_plans ADD CONSTRAINT uk_program_plan_week_day UNIQUE (progra
 
 COMMENT ON TABLE workout_programs IS 'Workout program templates created by users and professionals';
 COMMENT ON TABLE program_plans IS 'Links specific workout plans to specific days/weeks within programs';
-COMMENT ON TABLE scheduled_workouts IS 'Individual scheduled workout instances for users';
+COMMENT ON TABLE scheduled_workouts IS 'Individual scheduled workout instances for users with exercise configuration support';
 
 -- ✅ FIXED: Column comments to match entity
 COMMENT ON COLUMN workout_programs.name IS 'Program name (2-100 characters)';
@@ -242,3 +278,15 @@ COMMENT ON COLUMN scheduled_workouts.custom_notes IS 'User-specific notes for th
 COMMENT ON COLUMN scheduled_workouts.day_of_week IS 'Day of week (1=Monday, 7=Sunday)';
 COMMENT ON COLUMN scheduled_workouts.reminder_time IS 'When to send reminder for this workout';
 COMMENT ON COLUMN scheduled_workouts.estimated_duration_minutes IS 'Estimated duration for this specific workout instance';
+
+-- ✅ NEW: Comments for exercise configuration fields
+COMMENT ON COLUMN scheduled_workouts.sets IS 'Number of sets for strength exercises';
+COMMENT ON COLUMN scheduled_workouts.reps IS 'Number of reps per set (e.g., "8-12", "15", "AMRAP")';
+COMMENT ON COLUMN scheduled_workouts.weight IS 'Weight to use for exercise (in kg or lbs)';
+COMMENT ON COLUMN scheduled_workouts.rest_seconds IS 'Rest time between sets in seconds';
+COMMENT ON COLUMN scheduled_workouts.tempo IS 'Exercise tempo (e.g., "3-1-2-1")';
+COMMENT ON COLUMN scheduled_workouts.target_rpe IS 'Target Rate of Perceived Exertion (1-10)';
+COMMENT ON COLUMN scheduled_workouts.target_duration_minutes IS 'Target duration for cardio exercises';
+COMMENT ON COLUMN scheduled_workouts.target_distance_km IS 'Target distance for cardio exercises';
+COMMENT ON COLUMN scheduled_workouts.target_pace IS 'Target pace for cardio exercises (min/km)';
+COMMENT ON COLUMN scheduled_workouts.hold_duration_seconds IS 'Hold duration for isometric exercises';

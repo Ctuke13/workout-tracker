@@ -4,6 +4,10 @@ import com.chidituke.workout_tracker.dto.request.scheduled_workouts.*;
 import com.chidituke.workout_tracker.dto.response.scheduled_workouts.*;
 import com.chidituke.workout_tracker.dto.request.scheduled_workouts.ScheduledWorkoutRequest;
 import com.chidituke.workout_tracker.dto.response.scheduled_workouts.ScheduledWorkoutResponse;
+import com.chidituke.workout_tracker.exceptions.scheduled_workout.ScheduledWorkoutNotFoundException;
+import com.chidituke.workout_tracker.exceptions.scheduled_workout.UnauthorizedScheduledWorkoutAccessException;
+import com.chidituke.workout_tracker.exceptions.scheduled_workout.WorkoutInProgressException;
+import com.chidituke.workout_tracker.exceptions.scheduled_workout.InvalidWorkoutStateException;
 import com.chidituke.workout_tracker.service.workout.ScheduledWorkoutService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -161,24 +165,51 @@ public class ScheduledWorkoutController {
     }
 
     /**
-     * Cancel a scheduled workout
+     * Delete a scheduled workout permanently
      */
     @DeleteMapping("/{scheduledWorkoutId}")
-    @Operation(summary = "Cancel a scheduled workout",
-            description = "Cancel a scheduled workout")
+    @Operation(summary = "Delete a scheduled workout",
+            description = "Permanently delete a scheduled workout from the user's calendar")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Workout cancelled successfully"),
+            @ApiResponse(responseCode = "204", description = "Workout deleted successfully"),
             @ApiResponse(responseCode = "403", description = "User does not own this scheduled workout"),
-            @ApiResponse(responseCode = "404", description = "Scheduled workout not found")
+            @ApiResponse(responseCode = "404", description = "Scheduled workout not found"),
+            @ApiResponse(responseCode = "409", description = "Cannot delete workout in current state")
     })
-    public ResponseEntity<Void> cancelScheduledWorkout(
+    public ResponseEntity<Void> deleteScheduledWorkout(
             @Parameter(description = "Scheduled workout ID") @PathVariable Long scheduledWorkoutId,
             Authentication authentication) {
 
         String username = authentication.getName();
-        scheduledWorkoutService.cancelScheduledWorkout(username, scheduledWorkoutId);
+        log.info("User {} requesting deletion of scheduled workout {}", username, scheduledWorkoutId);
 
-        return ResponseEntity.noContent().build();
+        try {
+            // ✅ CHANGED: Actually delete the workout instead of just cancelling
+            scheduledWorkoutService.permanentlyDeleteScheduledWorkout(username, scheduledWorkoutId);
+
+            log.info("Successfully deleted scheduled workout {} for user {}", scheduledWorkoutId, username);
+            return ResponseEntity.noContent().build();
+
+        } catch (ScheduledWorkoutNotFoundException e) {
+            log.warn("Scheduled workout {} not found for user {}", scheduledWorkoutId, username);
+            return ResponseEntity.notFound().build();
+
+        } catch (UnauthorizedScheduledWorkoutAccessException e) {
+            log.warn("User {} attempted to delete workout {} they don't own", username, scheduledWorkoutId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        } catch (WorkoutInProgressException e) {
+            log.warn("Cannot delete workout {} - in progress: {}", scheduledWorkoutId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .header("X-Error-Reason", e.getMessage())
+                    .build();
+
+        } catch (InvalidWorkoutStateException e) {
+            log.warn("Cannot delete workout {} in current state: {}", scheduledWorkoutId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .header("X-Error-Reason", e.getMessage())
+                    .build();
+        }
     }
 
     // =======================

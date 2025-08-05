@@ -26,6 +26,26 @@ public class ScheduledWorkoutResponse {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate scheduledDate;
 
+    private Integer sets;
+
+    private String reps;
+
+    private Double weight;
+
+    private Integer restSeconds;
+
+    private String tempo;
+
+    private Integer targetRpe;
+
+    private Integer targetDurationMinutes;
+
+    private Double targetDistanceKm;
+
+    private Double targetPace;
+
+    private Integer holdDurationSeconds;
+
     private String status; // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, SKIPPED, RESCHEDULED
 
     // Program context (optional)

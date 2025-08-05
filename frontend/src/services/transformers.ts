@@ -1,4 +1,4 @@
-// src/services/transformers.ts - Data Transformation Layer
+// src/services/transformers.ts - Fixed by removing ScheduledExerciseResponse function
 
 import {
     // Backend types (what Spring Boot sends) - keep these from api.ts
@@ -7,9 +7,7 @@ import {
     WorkoutSessionResponse,
     PerformanceResponse,
     WorkoutPlanInfo,
-
-    // Frontend types from API layer - only the ones that represent API contracts
-    ScheduledExercise,
+    WorkoutStatsResponse,
     WorkoutSession,
     WorkoutSet,
     WorkoutExercise,
@@ -19,8 +17,15 @@ import {
     DateTimeString
 } from '../types/api';
 
-// Import the authoritative Exercise interface from your domain model
-import { Exercise, DifficultyLevel, ExerciseType } from '../types/exercise';
+// Import frontend domain types from exercise.ts
+import {
+    Exercise,
+    DifficultyLevel,
+    ExerciseType,
+    WorkoutStats,
+    ScheduledExercise
+} from '../types/exercise';
+
 // ==================== EXERCISE TRANSFORMATIONS ====================
 
 /**
@@ -39,6 +44,7 @@ export const transformBackendExerciseToFrontend = (backendExercise: BackendExerc
 
         // The critical field that determines workout tracking behavior
         isCardio: backendExercise.isCardio,
+        isIsometric: backendExercise.isIsometric,
 
         // Exercise classification fields - keep these as raw enum values
         exerciseType: backendExercise.exerciseType,
@@ -58,7 +64,7 @@ export const transformBackendExerciseToFrontend = (backendExercise: BackendExerc
         // Optional fields
         videoUrl: backendExercise.videoUrl,
 
-        // Rating and popularity fields - use exact field names from Exercise interface
+        // Rating and popularity fields - use exact field names from Exercise
         averageRating: backendExercise.averageRating,
         totalRatings: backendExercise.totalRatings,
         usageCount: backendExercise.usageCount,
@@ -143,97 +149,288 @@ const formatEquipmentName = (equipment: string): string => {
 // ==================== SCHEDULED WORKOUT TRANSFORMATIONS ====================
 
 /**
- * Transforms backend scheduled workout data into frontend scheduled exercises
- * This is complex because backend thinks in terms of "workout plans with multiple exercises"
- * while frontend thinks in terms of "individual scheduled exercises"
+ * ✅ FIXED: Handle both individual exercises and workout plan responses
+ * Based on actual ScheduledWorkoutResponse structure from BOTH GET and POST calls
  */
 export const transformScheduledWorkoutToExercises = (
     scheduledWorkout: ScheduledWorkoutResponse
 ): ScheduledExercise[] => {
-    // If this scheduled workout doesn't have a workout plan, we can't transform it
-    if (!scheduledWorkout.workoutPlan) {
-        console.warn('ScheduledWorkout has no workoutPlan:', scheduledWorkout.id);
-        return [];
+
+    console.log('🔍 Transforming workout:', scheduledWorkout); // ← DEBUG LOG
+
+    if (scheduledWorkout.workoutPlan) {
+        const workoutPlan = scheduledWorkout.workoutPlan;
+
+        // Create exercise representation
+        const exercise: Exercise = {
+            id: workoutPlan.id,
+            name: workoutPlan.name,
+            exerciseName: workoutPlan.name,
+            emoji: workoutPlan.exerciseCount === 1 ? '💪' : '📋',
+            description: workoutPlan.description || 'Scheduled workout',
+            difficultyLevel: (workoutPlan.difficulty || 'INTERMEDIATE') as DifficultyLevel,
+            exerciseType: 'STRENGTH' as ExerciseType,
+            isCardio: false,
+            isIsometric: false,
+            exerciseTypeDisplay: workoutPlan.exerciseCount === 1 ? 'Exercise' : 'Workout Plan',
+            estimatedDurationMinutes: workoutPlan.estimatedDurationMinutes || 15,
+            estimatedCalories: Math.round((workoutPlan.estimatedDurationMinutes || 15) * 8),
+            targetMuscleGroups: [],
+            equipmentRequired: [],
+            benefits: [],
+            tips: [],
+            videoUrl: null,
+            averageRating: 0,
+            totalRatings: 0,
+            usageCount: 0,
+            isPopular: false,
+            isHighlyRated: false,
+            canDoAtHome: true,
+            requiresEquipment: false,
+            createdByProfessional: false,
+            createdBy: 'Platform',
+            published: true
+        };
+
+        const scheduledExercise: ScheduledExercise = {
+            id: scheduledWorkout.id.toString(),
+            exerciseId: workoutPlan.id,
+            exercise: exercise,
+            scheduledDate: scheduledWorkout.scheduledDate,
+
+            // ✅ FIXED: Try multiple possible locations for configuration data
+            // First try direct properties, then try nested locations
+            sets: scheduledWorkout.sets ||
+                (scheduledWorkout as any).configuration?.sets ||
+                (scheduledWorkout as any).exerciseConfiguration?.sets ||
+                workoutPlan.exerciseCount || 1,
+
+            reps: scheduledWorkout.reps ||
+                (scheduledWorkout as any).configuration?.reps ||
+                (scheduledWorkout as any).exerciseConfiguration?.reps ||
+                (workoutPlan.exerciseCount === 1 ? '8-12' : `${workoutPlan.exerciseCount} exercises`),
+
+            weight: scheduledWorkout.weight ||
+                (scheduledWorkout as any).configuration?.weight ||
+                (scheduledWorkout as any).exerciseConfiguration?.weight,
+
+            restSeconds: scheduledWorkout.restSeconds ||
+                (scheduledWorkout as any).configuration?.restSeconds ||
+                (scheduledWorkout as any).exerciseConfiguration?.restSeconds || 60,
+
+            targetRpe: scheduledWorkout.targetRpe ||
+                (scheduledWorkout as any).configuration?.targetRpe ||
+                (scheduledWorkout as any).exerciseConfiguration?.targetRpe,
+
+            tempo: scheduledWorkout.tempo ||
+                (scheduledWorkout as any).configuration?.tempo ||
+                (scheduledWorkout as any).exerciseConfiguration?.tempo,
+
+            // ✅ CARDIO AND ISOMETRIC FIELDS - Try multiple locations
+            targetDurationMinutes: scheduledWorkout.targetDurationMinutes ||
+                (scheduledWorkout as any).configuration?.targetDurationMinutes ||
+                (scheduledWorkout as any).exerciseConfiguration?.targetDurationMinutes,
+
+            targetDistanceKm: scheduledWorkout.targetDistanceKm ||
+                (scheduledWorkout as any).configuration?.targetDistanceKm ||
+                (scheduledWorkout as any).exerciseConfiguration?.targetDistanceKm,
+
+            targetPace: scheduledWorkout.targetPace ||
+                (scheduledWorkout as any).configuration?.targetPace ||
+                (scheduledWorkout as any).exerciseConfiguration?.targetPace,
+
+            holdDurationSeconds: scheduledWorkout.holdDurationSeconds ||
+                (scheduledWorkout as any).configuration?.holdDurationSeconds ||
+                (scheduledWorkout as any).exerciseConfiguration?.holdDurationSeconds,
+
+            notes: scheduledWorkout.customNotes ||
+                (scheduledWorkout as any).notes ||
+                (scheduledWorkout as any).configuration?.notes,
+
+            completed: scheduledWorkout.status === 'COMPLETED',
+            status: scheduledWorkout.status,
+            createdAt: scheduledWorkout.createdAt,
+            userId: scheduledWorkout.user?.id?.toString() || '1'
+        };
+
+        // ✅ ENHANCED: Debug logging to show exactly what data was found
+        console.log('🔍 Extracted configuration data:', {
+            'Direct properties': {
+                sets: scheduledWorkout.sets,
+                reps: scheduledWorkout.reps,
+                weight: scheduledWorkout.weight,
+                restSeconds: scheduledWorkout.restSeconds,
+                targetRpe: scheduledWorkout.targetRpe,
+                tempo: scheduledWorkout.tempo
+            },
+            'Configuration object': (scheduledWorkout as any).configuration,
+            'Exercise configuration object': (scheduledWorkout as any).exerciseConfiguration,
+            'Final extracted values': {
+                sets: scheduledExercise.sets,
+                reps: scheduledExercise.reps,
+                weight: scheduledExercise.weight,
+                restSeconds: scheduledExercise.restSeconds,
+                targetRpe: scheduledExercise.targetRpe,
+                tempo: scheduledExercise.tempo
+            }
+        });
+
+        return [scheduledExercise];
     }
 
-    // Extract exercises from the workout plan and create individual scheduled exercises
-    // Note: This assumes your backend includes exercise details in WorkoutPlanInfo
-    // If not, you'll need to fetch exercise details separately
-    const workoutPlan = scheduledWorkout.workoutPlan;
+    // ✅ FALLBACK: Create a basic scheduled exercise if no workoutPlan
+    console.warn('ScheduledWorkout has no workoutPlan:', scheduledWorkout.id);
 
-    // For now, we'll create a placeholder since we need more backend API details
-    // In the real implementation, you'll need exercise details from the workout plan
-    const placeholderExercise: Exercise = {
+    const fallbackExercise: Exercise = {
         id: 0,
-        name: `${workoutPlan.name} - Exercise`,
-        exerciseName: `${workoutPlan.name} - Exercise`, // Add for backward compatibility
-        emoji: '💪',
-        description: workoutPlan.description || 'Part of workout plan',
-
-        // Use the raw enum value, not the transformed string
-        difficultyLevel: workoutPlan.difficulty, // This is already a DifficultyLevel enum
-
-        // Exercise classification fields
+        name: 'Unknown Exercise',
+        exerciseName: 'Unknown Exercise',
+        emoji: '❓',
+        description: 'Exercise details not available',
+        difficultyLevel: 'INTERMEDIATE' as DifficultyLevel,
         exerciseType: 'STRENGTH' as ExerciseType,
-        isCardio: false, // Default assumption - could be derived from workoutPlan if it has this info
-        exerciseTypeDisplay: 'Strength Training',
-
-        // Numerical fields with defaults
-        estimatedDurationMinutes: workoutPlan.estimatedDurationMinutes || 15,
-        estimatedCalories: 100, // Default estimate
-
-        // Array fields
+        isCardio: false,
+        isIsometric: false,
+        exerciseTypeDisplay: 'Exercise',
+        estimatedDurationMinutes: 15,
+        estimatedCalories: 100,
         targetMuscleGroups: [],
         equipmentRequired: [],
         benefits: [],
         tips: [],
-
-        // Optional fields
         videoUrl: null,
-
-        // Rating and popularity fields
         averageRating: 0,
         totalRatings: 0,
         usageCount: 0,
         isPopular: false,
         isHighlyRated: false,
-
-        // Feature flags
         canDoAtHome: true,
         requiresEquipment: false,
-
-        // Metadata
         createdByProfessional: false,
         createdBy: 'Platform',
         published: true
     };
 
-    // Create scheduled exercise representing this workout plan
-    const scheduledExercise: ScheduledExercise = {
+    const fallbackScheduledExercise: ScheduledExercise = {
         id: scheduledWorkout.id.toString(),
-        exerciseId: workoutPlan.id,
-        exercise: placeholderExercise,
+        exerciseId: 0,
+        exercise: fallbackExercise,
         scheduledDate: scheduledWorkout.scheduledDate,
-        sets: 3, // Default - should come from workout plan configuration
-        reps: '8-12', // Default - should come from workout plan configuration
-        weight: undefined,
-        restSeconds: 60, // Default
-        notes: scheduledWorkout.customNotes,
+
+        // ✅ FIXED: Try multiple locations for fallback case too
+        sets: scheduledWorkout.sets ||
+            (scheduledWorkout as any).configuration?.sets ||
+            (scheduledWorkout as any).exerciseConfiguration?.sets || 1,
+
+        reps: scheduledWorkout.reps ||
+            (scheduledWorkout as any).configuration?.reps ||
+            (scheduledWorkout as any).exerciseConfiguration?.reps || 'Unknown',
+
+        weight: scheduledWorkout.weight ||
+            (scheduledWorkout as any).configuration?.weight ||
+            (scheduledWorkout as any).exerciseConfiguration?.weight,
+
+        restSeconds: scheduledWorkout.restSeconds ||
+            (scheduledWorkout as any).configuration?.restSeconds ||
+            (scheduledWorkout as any).exerciseConfiguration?.restSeconds || 60,
+
+        targetRpe: scheduledWorkout.targetRpe ||
+            (scheduledWorkout as any).configuration?.targetRpe ||
+            (scheduledWorkout as any).exerciseConfiguration?.targetRpe,
+
+        tempo: scheduledWorkout.tempo ||
+            (scheduledWorkout as any).configuration?.tempo ||
+            (scheduledWorkout as any).exerciseConfiguration?.tempo,
+
+        // Cardio and isometric fields
+        targetDurationMinutes: scheduledWorkout.targetDurationMinutes ||
+            (scheduledWorkout as any).configuration?.targetDurationMinutes ||
+            (scheduledWorkout as any).exerciseConfiguration?.targetDurationMinutes,
+
+        targetDistanceKm: scheduledWorkout.targetDistanceKm ||
+            (scheduledWorkout as any).configuration?.targetDistanceKm ||
+            (scheduledWorkout as any).exerciseConfiguration?.targetDistanceKm,
+
+        targetPace: scheduledWorkout.targetPace ||
+            (scheduledWorkout as any).configuration?.targetPace ||
+            (scheduledWorkout as any).exerciseConfiguration?.targetPace,
+
+        holdDurationSeconds: scheduledWorkout.holdDurationSeconds ||
+            (scheduledWorkout as any).configuration?.holdDurationSeconds ||
+            (scheduledWorkout as any).exerciseConfiguration?.holdDurationSeconds,
+
+        notes: scheduledWorkout.customNotes ||
+            (scheduledWorkout as any).notes ||
+            (scheduledWorkout as any).configuration?.notes,
+
         completed: scheduledWorkout.status === 'COMPLETED',
         createdAt: scheduledWorkout.createdAt,
-        userId: scheduledWorkout.user.id.toString()
+        userId: scheduledWorkout.user?.id?.toString() || '1'
     };
 
-    return [scheduledExercise];
+    return [fallbackScheduledExercise];
 };
 
 /**
- * Transforms multiple scheduled workouts into the flat exercise list your calendar expects
+ * ✅ UPDATED: Transform calendar response with better error handling
  */
 export const transformScheduledWorkoutsToCalendarData = (
-    scheduledWorkouts: ScheduledWorkoutResponse[]
+    scheduledWorkouts: ScheduledWorkoutResponse[] | any
 ): ScheduledExercise[] => {
-    return scheduledWorkouts.flatMap(workout => transformScheduledWorkoutToExercises(workout));
+    // ✅ Handle different response formats from backend
+    let workoutsArray: ScheduledWorkoutResponse[] = [];
+
+    if (Array.isArray(scheduledWorkouts)) {
+        workoutsArray = scheduledWorkouts;
+    } else if (scheduledWorkouts && typeof scheduledWorkouts === 'object') {
+        // Handle CalendarViewResponse format
+        if ('workoutsByDate' in scheduledWorkouts && typeof scheduledWorkouts.workoutsByDate === 'object') {
+            // Flatten the map of date -> workout arrays into a single array
+            workoutsArray = Object.values(scheduledWorkouts.workoutsByDate).flat() as ScheduledWorkoutResponse[];
+        } else if ('scheduledWorkouts' in scheduledWorkouts && Array.isArray(scheduledWorkouts.scheduledWorkouts)) {
+            workoutsArray = scheduledWorkouts.scheduledWorkouts;
+        } else if ('content' in scheduledWorkouts && Array.isArray(scheduledWorkouts.content)) {
+            workoutsArray = scheduledWorkouts.content;
+        } else if ('data' in scheduledWorkouts && Array.isArray(scheduledWorkouts.data)) {
+            workoutsArray = scheduledWorkouts.data;
+        } else {
+            console.warn('⚠️ Unexpected calendar response format:', scheduledWorkouts);
+            return [];
+        }
+    } else {
+        console.warn('⚠️ Invalid scheduledWorkouts data:', scheduledWorkouts);
+        return [];
+    }
+
+    // Transform each scheduled workout to scheduled exercises
+    const allScheduledExercises = workoutsArray.flatMap(workout => {
+        try {
+            return transformScheduledWorkoutToExercises(workout);
+        } catch (error) {
+            console.error('❌ Failed to transform scheduled workout:', workout.id, error);
+            return [];
+        }
+    });
+
+    console.log(`✅ Transformed ${workoutsArray.length} scheduled workouts into ${allScheduledExercises.length} scheduled exercises`);
+    return allScheduledExercises;
+};
+
+/**
+ * ✅ FIXED: Transforms backend workout stats response into frontend format
+ */
+export const transformWorkoutStatsResponse = (apiStats: WorkoutStatsResponse): WorkoutStats => {
+    return {
+        totalWorkouts: apiStats.totalScheduledWorkouts || 0,
+        completedWorkouts: apiStats.totalCompletedWorkouts || 0,
+        completionRate: apiStats.overallCompletionRate || 0,
+        weeklyGoal: 5, // Default weekly goal - you can make this configurable
+        // ✅ FIXED: Your WorkoutStatsResponse doesn't have streak fields, so use defaults
+        currentStreak: 0, // Not available in your backend response
+        bestStreak: 0, // Not available in your backend response
+        totalExercisesCompleted: apiStats.totalCompletedWorkouts || 0,
+        averageWorkoutDuration: apiStats.averageDurationMinutes || 0
+    };
 };
 
 // ==================== WORKOUT SESSION TRANSFORMATIONS ====================
@@ -342,6 +539,7 @@ const createPlaceholderExercise = (exerciseId: number): Exercise => ({
     // Exercise classification - use proper enum values
     exerciseType: 'STRENGTH' as ExerciseType,
     isCardio: false, // Default to strength training
+    isIsometric: false,
     exerciseTypeDisplay: 'Strength Training',
     difficultyLevel: 'INTERMEDIATE' as DifficultyLevel,
 

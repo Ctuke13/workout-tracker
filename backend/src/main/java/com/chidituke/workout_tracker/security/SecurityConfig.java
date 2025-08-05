@@ -48,10 +48,23 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:3000"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        configuration.setAllowedOriginPatterns(List.of(
+                "http://localhost:3000",    // React default
+                "http://localhost:5173",    // Vite default
+                "http://127.0.0.1:3000",    // Alternative localhost
+                "http://127.0.0.1:5173"     // Alternative localhost
+        ));
+
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
+
         configuration.setAllowedHeaders(List.of("*"));
+
         configuration.setAllowCredentials(true);
+
+        configuration.setExposedHeaders(List.of("Authorization", "X-Total-Count", "X-Page-Count"));
+
+        configuration.setMaxAge(3600L); // 1 hour
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -70,6 +83,10 @@ public class SecurityConfig {
                     // ===================================================================
                     auth.requestMatchers("/api/auth/**").permitAll();
                     auth.requestMatchers("/api/test/**").permitAll();
+                    auth.requestMatchers("/api/health").permitAll();
+                    auth.requestMatchers("/api/health/**").permitAll();
+                    auth.requestMatchers("/api/ping").permitAll();
+                    auth.requestMatchers("/api/health").permitAll();
                     auth.requestMatchers("/error").permitAll();
                     auth.requestMatchers("/api/public/**").permitAll();
                     auth.requestMatchers("/api/subscriptions/test/**").permitAll();
@@ -93,6 +110,8 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises/workout-plan").authenticated();   // Create workout plans
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises/insights").authenticated();        // User insights
 
+                    auth.requestMatchers("/api/calendar/**").authenticated();                               // All calendar operations
+
                     // ===================================================================
                     // 💼 PROFESSIONAL ROLE - Content creation
                     // ===================================================================
@@ -115,13 +134,6 @@ public class SecurityConfig {
                     // All other requests require authentication
                     auth.anyRequest().authenticated();
                 })
-//                .exceptionHandling(ex -> ex
-//                        .authenticationEntryPoint((request, response, authException) -> {
-//                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-//                            response.getWriter().write("Unauthorized: Authentication required");
-//                            response.getWriter().flush();
-//                        })
-//                )
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

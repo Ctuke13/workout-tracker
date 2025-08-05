@@ -1,20 +1,300 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, X, Award, ChevronDown } from 'lucide-react';
-import { Exercise, Goal, ExerciseTypeOption, SortOption, FilterType } from '../types/exercise';
+import {
+    Exercise,
+    Goal,
+    ExerciseTypeOption,
+    SortOption,
+    FilterType,
+    WorkoutTrackingType,
+    ExerciseConfiguration,
+    CardioConfiguration,
+    IsometricConfiguration,
+    StrengthConfiguration,
+    UnifiedWorkoutData,
+    getWorkoutTrackingType,
+    getDefaultConfigForExercise
+} from '../types/exercise';
 import { ExerciseCard } from '../components/ExercisePage/ExerciseCard';
 import { MobileFilterDrawer } from '../components/ExercisePage/MobileFilterDrawerProps';
+import { WorkoutTrackingInterface } from '../components/WorkoutTracking/WorkoutTrackingInterface';
 import { useExerciseFilters } from '../hooks/useExerciseFilters';
 import { useNavigate } from 'react-router-dom';
-import {
-    getMockGoals,
-    getMockExerciseTypes,
-    fetchExercises
-} from '../services/mockData';
+import { exerciseApi } from '../services/exerciseApi';
 
 const defaultDifficultyOptions: string[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 const defaultEquipmentOptions: string[] = ['No Equipment', 'Dumbbells', 'Yoga Mat', 'Jump Rope', 'Foam Roller', 'Plyo Box', 'Tennis Racket'];
 
-export const ExercisesPage: React.FC = () => {
+// Helper functions for goal formatting
+const formatGoalName = (goal: string): string => {
+    const goalMap: Record<string, string> = {
+        'fat-burn': 'Fat Burn',
+        'muscle-building': 'Muscle Building',
+        'endurance': 'Endurance',
+        'strength': 'Strength',
+        'flexibility': 'Flexibility',
+        'weight-loss': 'Weight Loss',
+        'general-fitness': 'General Fitness'
+    };
+    return goalMap[goal] || goal.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+const getGoalEmoji = (goal: string): string => {
+    const emojiMap: Record<string, string> = {
+        'fat-burn': '🔥',
+        'muscle-building': '💪',
+        'endurance': '🏃‍♂️',
+        'strength': '🏋️‍♀️',
+        'flexibility': '🤸‍♀️',
+        'weight-loss': '⚖️',
+        'general-fitness': '✨'
+    };
+    return emojiMap[goal] || '🎯';
+};
+
+// Enhanced exercise type options
+const getExerciseTypeOptions = (): ExerciseTypeOption[] => [
+    { value: 'STRENGTH', display: 'Strength Training', emoji: '💪' },
+    { value: 'CARDIO', display: 'Cardiovascular', emoji: '❤️' },
+    { value: 'FLEXIBILITY', display: 'Flexibility', emoji: '🤸‍♀️' },
+    { value: 'BALANCE', display: 'Balance', emoji: '⚖️' },
+    { value: 'PLYOMETRIC', display: 'Plyometric', emoji: '⚡' },
+    { value: 'REHABILITATION', display: 'Rehabilitation', emoji: '🛡️' },
+    { value: 'SPORTS_SPECIFIC', display: 'Sports Specific', emoji: '🏆' }
+];
+
+// ✅ FIXED: Enhanced Exercise Card Component with proper props
+interface EnhancedExerciseCardProps {
+    exercise: Exercise;
+    index: number;
+    isExpanded: boolean;
+    isFavorite: boolean;
+    onToggleExpand: (index: number) => void;
+    onToggleFavorite: (exerciseId: number) => void;
+    onTrackWorkout: (exerciseId: number) => void;
+}
+
+const EnhancedExerciseCard: React.FC<EnhancedExerciseCardProps> = ({
+                                                                       exercise,
+                                                                       index,
+                                                                       isExpanded,
+                                                                       isFavorite,
+                                                                       onToggleExpand,
+                                                                       onToggleFavorite,
+                                                                       onTrackWorkout
+                                                                   }) => {
+    const trackingMode = getWorkoutTrackingType(exercise);
+
+    // Get tracking mode display info
+    const trackingModeInfo = {
+        cardio: { emoji: '❤️', label: 'Cardio Timer', color: 'text-red-600 bg-red-50' },
+        isometric: { emoji: '🛡️', label: 'Hold Duration', color: 'text-purple-600 bg-purple-50' },
+        strength: { emoji: '💪', label: 'Rep Counter', color: 'text-blue-600 bg-blue-50' }
+    };
+
+    const modeInfo = trackingModeInfo[trackingMode];
+
+    return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden">
+            {/* Card Header */}
+            <div className="p-4 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center min-w-0 flex-1">
+                        <span className="text-2xl mr-3 flex-shrink-0">
+                            {exercise.emoji || '💪'}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 truncate">
+                                {exercise.name || exercise.exerciseName}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${modeInfo.color}`}>
+                                    {modeInfo.emoji} {modeInfo.label}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                    {exercise.difficultyLevel}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFavorite(exercise.id);
+                        }}
+                        className={`p-2 rounded-full transition-colors ${
+                            isFavorite
+                                ? 'text-red-500 hover:text-red-600'
+                                : 'text-gray-400 hover:text-red-500'
+                        }`}
+                    >
+                        <span className="text-lg">
+                            {isFavorite ? '❤️' : '🤍'}
+                        </span>
+                    </button>
+                </div>
+
+                {/* Description */}
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    {exercise.description}
+                </p>
+
+                {/* Exercise Stats */}
+                <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
+                    <div className="flex items-center gap-1">
+                        <span>⏱️</span>
+                        <span>{exercise.estimatedDurationMinutes || 0} min</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <span>🔥</span>
+                        <span>{exercise.estimatedCalories || 0} cal</span>
+                    </div>
+                    {exercise.averageRating > 0 && (
+                        <div className="flex items-center gap-1">
+                            <span>⭐</span>
+                            <span>{exercise.averageRating.toFixed(1)}</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Exercise Tags */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                        {exercise.exerciseType}
+                    </span>
+                    {exercise.canDoAtHome && (
+                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                            🏠 At Home
+                        </span>
+                    )}
+                    {exercise.isCardio && (
+                        <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
+                            ❤️ Cardio
+                        </span>
+                    )}
+                    {exercise.isIsometric && (
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
+                            🛡️ Isometric
+                        </span>
+                    )}
+                </div>
+
+                {/* Expanded Content */}
+                {isExpanded && (
+                    <div className="border-t border-gray-100 pt-4 mt-4">
+                        <div className="space-y-3">
+                            {/* Show target muscle groups if available */}
+                            {exercise.targetMuscleGroups && exercise.targetMuscleGroups.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-medium text-gray-900 mb-1">Primary Muscles</h4>
+                                    <div className="flex flex-wrap gap-1">
+                                        {exercise.targetMuscleGroups.map((muscle: string, idx: number) => (
+                                            <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
+                                                {muscle}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Show required equipment if available */}
+                            {exercise.equipmentRequired && exercise.equipmentRequired.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-medium text-gray-900 mb-1">Equipment</h4>
+                                    <div className="flex flex-wrap gap-1">
+                                        {exercise.equipmentRequired.map((item: string, idx: number) => (
+                                            <span key={idx} className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded">
+                                                {item}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Show tips as instructions */}
+                            {exercise.tips && exercise.tips.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-medium text-gray-900 mb-1">Tips & Instructions</h4>
+                                    <ol className="text-xs text-gray-600 space-y-1">
+                                        {exercise.tips.slice(0, 3).map((tip: string, idx: number) => (
+                                            <li key={idx} className="flex">
+                                                <span className="mr-2 font-medium">{idx + 1}.</span>
+                                                <span>{tip}</span>
+                                            </li>
+                                        ))}
+                                        {exercise.tips.length > 3 && (
+                                            <li className="text-gray-500 italic">
+                                                +{exercise.tips.length - 3} more tips...
+                                            </li>
+                                        )}
+                                    </ol>
+                                </div>
+                            )}
+
+                            {/* Show benefits if available */}
+                            {exercise.benefits && exercise.benefits.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-medium text-gray-900 mb-1">Benefits</h4>
+                                    <div className="flex flex-wrap gap-1">
+                                        {exercise.benefits.slice(0, 3).map((benefit: string, idx: number) => (
+                                            <span key={idx} className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
+                                                {benefit}
+                                            </span>
+                                        ))}
+                                        {exercise.benefits.length > 3 && (
+                                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded italic">
+                                                +{exercise.benefits.length - 3} more
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Exercise metadata */}
+                            <div className="pt-2 border-t border-gray-100">
+                                <div className="text-xs text-gray-500 space-y-1">
+                                    <div>Type: {exercise.exerciseType}</div>
+                                    <div>Difficulty: {exercise.difficultyLevel}</div>
+                                    {exercise.averageRating > 0 && (
+                                        <div>Rating: ⭐ {exercise.averageRating.toFixed(1)} ({exercise.totalRatings} reviews)</div>
+                                    )}
+                                    {exercise.createdByProfessional && (
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-blue-600">🏆</span>
+                                            <span className="text-blue-600 font-medium">Professional Content</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 mt-4">
+                    <button
+                        onClick={() => onTrackWorkout(exercise.id)}
+                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2"
+                    >
+                        {modeInfo.emoji}
+                        <span>Start {modeInfo.label}</span>
+                    </button>
+
+                    <button
+                        onClick={() => onToggleExpand(index)}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                    >
+                        {isExpanded ? 'Less' : 'More'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ✅ FIXED: Main component export
+const ExercisesPage: React.FC = () => {
     const navigate = useNavigate();
 
     // State for exercises and filter options
@@ -32,7 +312,12 @@ export const ExercisesPage: React.FC = () => {
     const [favorites, setFavorites] = useState<Set<number>>(new Set());
     const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-    // Custom hook for filtering
+    // Enhanced: Workout tracking state
+    const [selectedExerciseForTracking, setSelectedExerciseForTracking] = useState<Exercise | null>(null);
+    const [showWorkoutInterface, setShowWorkoutInterface] = useState(false);
+    const [workoutConfiguration, setWorkoutConfiguration] = useState<ExerciseConfiguration | null>(null);
+
+    // Enhanced hook for filtering with workout tracking mode support
     const {
         filters,
         updateFilter,
@@ -41,30 +326,53 @@ export const ExercisesPage: React.FC = () => {
         filteredAndSortedExercises,
         getActiveFilters,
         generateResultsSummary,
+        getTrackingModeDistribution,
     } = useExerciseFilters(exercises, goals, exerciseTypeOptions);
 
-    // Load data on component mount
+    // Load data on component mount - Enhanced with real API integration
     useEffect(() => {
         const loadData = async (): Promise<void> => {
             try {
                 setLoading(true);
+                console.log('🔄 Loading enhanced exercise data from backend...');
 
-                // Fetch exercises
-                const exercisesData: Exercise[] = await fetchExercises();
-                setExercises(exercisesData);
+                const initialData = await exerciseApi.getInitialData();
 
-                // Generate goals with correct exercise count
-                const goalsData: Goal[] = getMockGoals(exercisesData.length);
+                console.log('✅ Enhanced exercise data loaded:', {
+                    exerciseCount: initialData.exercises.length,
+                    goalsCount: initialData.goals.length,
+                    hasCardioField: initialData.exercises.some(ex => ex.hasOwnProperty('isCardio')),
+                    hasIsometricField: initialData.exercises.some(ex => ex.hasOwnProperty('isIsometric'))
+                });
+
+                setExercises(initialData.exercises);
+
+                // Transform goals data to match Goal interface
+                const goalsData: Goal[] = initialData.goals.map(g => ({
+                    id: g.goal,
+                    name: formatGoalName(g.goal),
+                    emoji: getGoalEmoji(g.goal),
+                    count: g.count
+                }));
                 setGoals(goalsData);
 
-                // Generate exercise type options
-                const exerciseTypesData: ExerciseTypeOption[] = getMockExerciseTypes();
+                // Generate enhanced exercise type options
+                const exerciseTypesData: ExerciseTypeOption[] = getExerciseTypeOptions();
                 setExerciseTypeOptions(exerciseTypesData);
+
+                // Enhanced: Log workout tracking mode distribution
+                const trackingDistribution = {
+                    cardio: initialData.exercises.filter(ex => ex.isCardio).length,
+                    isometric: initialData.exercises.filter(ex => ex.isIsometric).length,
+                    strength: initialData.exercises.filter(ex => !ex.isCardio && !ex.isIsometric).length
+                };
+
+                console.log('📊 Enhanced workout tracking mode distribution:', trackingDistribution);
 
                 setError(null);
             } catch (err) {
-                setError('Failed to load exercises. Please try again.');
-                console.error('Error loading exercises:', err);
+                setError('Failed to load exercises. Please check your backend connection.');
+                console.error('❌ Error loading enhanced exercise data:', err);
             } finally {
                 setLoading(false);
             }
@@ -95,13 +403,44 @@ export const ExercisesPage: React.FC = () => {
         setFavorites(newFavorites);
     };
 
-    // Handle workout tracking
+    // Enhanced: Handle workout tracking with full three-mode support
     const handleTrackWorkout = (exerciseId: number): void => {
         const exercise = exercises.find(ex => ex.id === exerciseId);
         if (exercise) {
-            console.log(`Tracking workout for: ${exercise.name}`);
-            // Implement workout tracking logic here
+            const trackingMode = getWorkoutTrackingType(exercise);
+            console.log(`🏃‍♂️ Starting ${trackingMode} workout tracking for: ${exercise.name}`);
+
+            // Get default configuration for this exercise type
+            const defaultConfig = getDefaultConfigForExercise(exercise);
+
+            setSelectedExerciseForTracking(exercise);
+            setWorkoutConfiguration(defaultConfig);
+            setShowWorkoutInterface(true);
         }
+    };
+
+    // Enhanced: Handle workout completion
+    const handleWorkoutComplete = (workoutData: UnifiedWorkoutData): void => {
+        console.log('✅ Workout completed successfully:', workoutData);
+
+        // Here you would save the workout data to your backend
+        // await workoutApi.saveWorkout(workoutData);
+
+        // Show success message or navigate to workout summary
+        alert(`${workoutData.trackingMode.charAt(0).toUpperCase() + workoutData.trackingMode.slice(1)} workout completed! 🎉`);
+
+        // Close the workout interface
+        setShowWorkoutInterface(false);
+        setSelectedExerciseForTracking(null);
+        setWorkoutConfiguration(null);
+    };
+
+    // Enhanced: Handle workout cancellation
+    const handleWorkoutCancel = (): void => {
+        console.log('❌ Workout cancelled by user');
+        setShowWorkoutInterface(false);
+        setSelectedExerciseForTracking(null);
+        setWorkoutConfiguration(null);
     };
 
     // Handle goal selection
@@ -119,9 +458,8 @@ export const ExercisesPage: React.FC = () => {
         navigate('/');
     };
 
-    // Handle filter removal
+    // Enhanced: Handle filter removal with tracking type support
     const handleRemoveFilter = (filterType: string): void => {
-        // Map string to FilterType
         const filterTypeMap: Record<string, FilterType> = {
             'goal': 'goal',
             'activeGoal': 'goal',
@@ -137,6 +475,8 @@ export const ExercisesPage: React.FC = () => {
             'maxDuration': 'duration',
             'professional': 'professional',
             'showProfessionalOnly': 'professional',
+            'trackingType': 'trackingType', // Enhanced: Support tracking type removal
+            'search': 'search'
         };
 
         const mappedFilterType = filterTypeMap[filterType];
@@ -145,41 +485,48 @@ export const ExercisesPage: React.FC = () => {
         }
     };
 
-    // Loading state
+    // Enhanced loading state
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading exercises...</p>
+                    <p className="text-gray-600">Loading enhanced exercises from backend...</p>
+                    <p className="text-sm text-gray-500 mt-2">Connecting to real API with workout tracking modes...</p>
                 </div>
             </div>
         );
     }
 
-    // Error state
+    // Enhanced error state
     if (error) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
                 <div className="text-center max-w-md mx-auto">
                     <div className="text-red-500 text-xl mb-4">⚠️</div>
                     <p className="text-gray-600 mb-4">{error}</p>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                        Try Again
-                    </button>
+                    <div className="space-y-2 mb-4">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Try Again
+                        </button>
+                        <p className="text-xs text-gray-500">
+                            Make sure your backend server is running with workout tracking support
+                        </p>
+                    </div>
                 </div>
             </div>
         );
     }
 
     const activeFilters = getActiveFilters();
+    const trackingDistribution = getTrackingModeDistribution();
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Mobile-First Navigation Header */}
+            {/* Enhanced Navigation Header */}
             <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
                 <div className="px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-14 sm:h-16">
@@ -188,7 +535,7 @@ export const ExercisesPage: React.FC = () => {
                                 💪 WorkoutTracker
                             </span>
                             <span className="ml-2 px-2 py-0.5 text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full font-medium">
-                                BETA
+                                ENHANCED
                             </span>
                         </div>
 
@@ -206,17 +553,33 @@ export const ExercisesPage: React.FC = () => {
 
             {/* Main Content */}
             <div className="pt-14 sm:pt-16">
-                {/* Hero Section */}
+                {/* Enhanced Hero Section */}
                 <section className="px-4 py-6 sm:py-8 lg:py-12 bg-gradient-to-br from-blue-50 to-green-50">
                     <div className="max-w-7xl mx-auto text-center">
                         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
                             <span className="text-transparent bg-gradient-to-r from-blue-600 to-green-500 bg-clip-text">
-                                Exercise Library
+                                Enhanced Exercise Library
                             </span>
                         </h1>
                         <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto mb-6 sm:mb-8">
-                            Discover professional-grade workouts with detailed instructions, ratings, and progress tracking.
+                            Discover professional workouts with intelligent tracking: ❤️ Cardio Timer, 🛡️ Hold Duration, 💪 Rep Counter
                         </p>
+
+                        {/* Enhanced: Tracking Mode Distribution Display */}
+                        <div className="flex justify-center gap-4 sm:gap-8 mb-6">
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-red-600">{trackingDistribution.cardio}</div>
+                                <div className="text-sm text-red-700">❤️ Cardio</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-purple-600">{trackingDistribution.isometric}</div>
+                                <div className="text-sm text-purple-700">🛡️ Isometric</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-bold text-blue-600">{trackingDistribution.strength}</div>
+                                <div className="text-sm text-blue-700">💪 Strength</div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -263,21 +626,21 @@ export const ExercisesPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Search and Filter Section */}
+                    {/* Enhanced Search and Filter Section */}
                     <div className="mb-6">
-                        {/* Search Bar */}
+                        {/* Enhanced Search Bar */}
                         <div className="relative mb-4">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                             <input
                                 type="text"
-                                placeholder="Search exercises..."
+                                placeholder="Search exercises... try 'cardio timer', 'isometric holds', 'strength reps'..."
                                 value={filters.searchTerm}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
                                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                             />
                         </div>
 
-                        {/* Filter Controls */}
+                        {/* Enhanced Filter Controls */}
                         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                             {/* Mobile Filter Button */}
                             <button
@@ -285,7 +648,7 @@ export const ExercisesPage: React.FC = () => {
                                 className="sm:hidden flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 bg-white"
                             >
                                 <Filter className="w-5 h-5" />
-                                <span>Filters</span>
+                                <span>Enhanced Filters</span>
                                 {activeFilters.length > 0 && (
                                     <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-1 min-w-[20px]">
                                         {activeFilters.length}
@@ -293,8 +656,20 @@ export const ExercisesPage: React.FC = () => {
                                 )}
                             </button>
 
-                            {/* Desktop Quick Filters */}
+                            {/* Enhanced Desktop Quick Filters */}
                             <div className="hidden sm:flex flex-wrap gap-2 flex-1">
+                                {/* Enhanced: Workout Tracking Mode Filter */}
+                                <select
+                                    value={filters.trackingType || 'all'}
+                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateFilter('trackingType', e.target.value as WorkoutTrackingType | 'all')}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-blue-500 focus:outline-none text-sm min-w-[160px]"
+                                >
+                                    <option value="all">All Tracking Modes</option>
+                                    <option value="cardio">❤️ Cardio Timer</option>
+                                    <option value="isometric">🛡️ Hold Duration</option>
+                                    <option value="strength">💪 Rep Counter</option>
+                                </select>
+
                                 <select
                                     value={filters.selectedExerciseType}
                                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateFilter('selectedExerciseType', e.target.value)}
@@ -303,7 +678,7 @@ export const ExercisesPage: React.FC = () => {
                                     <option value="all">All Types</option>
                                     {exerciseTypeOptions.map((type) => (
                                         <option key={type.value} value={type.value}>
-                                            {type.display}
+                                            {type.emoji} {type.display}
                                         </option>
                                     ))}
                                 </select>
@@ -314,11 +689,9 @@ export const ExercisesPage: React.FC = () => {
                                     className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-blue-500 focus:outline-none text-sm min-w-[120px]"
                                 >
                                     <option value="all">All Levels</option>
-                                    {difficultyOptions.map((difficulty) => (
-                                        <option key={difficulty} value={difficulty}>
-                                            {difficulty}
-                                        </option>
-                                    ))}
+                                    <option value="beginner">🟢 Beginner</option>
+                                    <option value="intermediate">🟡 Intermediate</option>
+                                    <option value="advanced">🔴 Advanced</option>
                                 </select>
 
                                 <select
@@ -327,11 +700,11 @@ export const ExercisesPage: React.FC = () => {
                                     className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-blue-500 focus:outline-none text-sm min-w-[120px]"
                                 >
                                     <option value="all">All Equipment</option>
-                                    {equipmentOptions.map((equipment) => (
-                                        <option key={equipment} value={equipment}>
-                                            {equipment}
-                                        </option>
-                                    ))}
+                                    <option value="No Equipment">🏠 No Equipment</option>
+                                    <option value="Dumbbells">🏋️ Dumbbells</option>
+                                    <option value="Yoga Mat">🧘 Yoga Mat</option>
+                                    <option value="Jump Rope">🪢 Jump Rope</option>
+                                    <option value="Foam Roller">🔄 Foam Roller</option>
                                 </select>
 
                                 <button
@@ -447,10 +820,10 @@ export const ExercisesPage: React.FC = () => {
                         />
                     </div>
 
-                    {/* Exercises Grid */}
+                    {/* Enhanced Exercises Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {filteredAndSortedExercises.map((exercise, index) => (
-                            <ExerciseCard
+                            <EnhancedExerciseCard
                                 key={exercise.id}
                                 exercise={exercise}
                                 index={index}
@@ -463,7 +836,7 @@ export const ExercisesPage: React.FC = () => {
                         ))}
                     </div>
 
-                    {/* No Results State */}
+                    {/* Enhanced No Results State */}
                     {filteredAndSortedExercises.length === 0 && (
                         <div className="text-center py-12 px-4">
                             <div className="text-gray-400 text-5xl sm:text-6xl mb-4">🔍</div>
@@ -471,20 +844,42 @@ export const ExercisesPage: React.FC = () => {
                                 No exercises found
                             </h3>
                             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                                Try adjusting your filters or search terms to find what you're looking for
+                                Try adjusting your filters or search terms. Make sure to explore different tracking modes!
                             </p>
-                            <button
-                                onClick={clearFilters}
-                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                Clear all filters
-                            </button>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={clearFilters}
+                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Clear all filters
+                                </button>
+                                <div className="flex justify-center gap-2 text-sm">
+                                    <button
+                                        onClick={() => updateFilter('trackingType', 'cardio')}
+                                        className="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200"
+                                    >
+                                        ❤️ Try Cardio
+                                    </button>
+                                    <button
+                                        onClick={() => updateFilter('trackingType', 'isometric')}
+                                        className="px-3 py-1 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200"
+                                    >
+                                        🛡️ Try Isometric
+                                    </button>
+                                    <button
+                                        onClick={() => updateFilter('trackingType', 'strength')}
+                                        className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+                                    >
+                                        💪 Try Strength
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Mobile Filter Drawer */}
+            {/* Enhanced Mobile Filter Drawer */}
             <MobileFilterDrawer
                 isOpen={showMobileFilters}
                 onClose={() => setShowMobileFilters(false)}
@@ -492,6 +887,18 @@ export const ExercisesPage: React.FC = () => {
                 exerciseTypeOptions={exerciseTypeOptions}
                 onFilterChange={updateFilter}
             />
+
+            {/* Enhanced: Workout Tracking Interface */}
+            {showWorkoutInterface && selectedExerciseForTracking && workoutConfiguration && (
+                <WorkoutTrackingInterface
+                    exercise={selectedExerciseForTracking}
+                    configuration={workoutConfiguration}
+                    onComplete={handleWorkoutComplete}
+                    onCancel={handleWorkoutCancel}
+                />
+            )}
         </div>
     );
 };
+
+export default ExercisesPage;

@@ -13,6 +13,9 @@ import com.chidituke.workout_tracker.model.workout.ScheduledWorkout;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan;
 import com.chidituke.workout_tracker.model.workout.WorkoutProgram;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession;
+import com.chidituke.workout_tracker.model.workout.PlanExercise;
+import com.chidituke.workout_tracker.model.workout.Exercise;
+import com.chidituke.workout_tracker.repository.workout.PlanExerciseRepository;
 import com.chidituke.workout_tracker.repository.user.UserRepository;
 import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutPlanRepository;
@@ -39,6 +42,7 @@ public class ScheduledWorkoutService {
     private final WorkoutPlanRepository workoutPlanRepository;
     private final WorkoutProgramRepository workoutProgramRepository;
     private final WorkoutSessionRepository workoutSessionRepository;
+    private final PlanExerciseRepository planExerciseRepository;
     private final ScheduledWorkoutMapper scheduledWorkoutMapper;
 
     // =======================
@@ -104,15 +108,87 @@ public class ScheduledWorkoutService {
         return scheduledWorkoutMapper.toResponse(saved);
     }
 
+    /**
+     * Validate that a workout can be deleted - uses existing exceptions
+     */
+    private void validateWorkoutCanBeDeleted(ScheduledWorkout scheduledWorkout) {
+        ScheduledWorkout.ScheduleStatus status = scheduledWorkout.getStatus();
+
+        switch (status) {
+            case SCHEDULED:
+            case CANCELLED:
+                // ✅ Allow deletion
+                log.debug("Allowing deletion of {} workout {}", status, scheduledWorkout.getId());
+                break;
+
+            case IN_PROGRESS:
+                // ❌ Use existing WorkoutInProgressException
+                throw new WorkoutInProgressException(scheduledWorkout.getId());
+
+            case COMPLETED:
+                // ❌ Use existing InvalidWorkoutStateException with detailed context
+                throw new InvalidWorkoutStateException(
+                        "delete",
+                        "COMPLETED",
+                        "SCHEDULED or CANCELLED"
+                );
+
+            default:
+                // ❌ Use InvalidWorkoutStateException for unknown states
+                throw new InvalidWorkoutStateException(
+                        "delete",
+                        status.toString(),
+                        "SCHEDULED or CANCELLED"
+                );
+        }
+    }
+
+    /**
+     * Permanently delete a scheduled workout from the database
+     */
     @Transactional
-    public void cancelScheduledWorkout(String username, Long scheduledWorkoutId) {
+    public void permanentlyDeleteScheduledWorkout(String username, Long scheduledWorkoutId) {
+        log.debug("Attempting to permanently delete scheduled workout {} for user {}", scheduledWorkoutId, username);
+
+        // Find the scheduled workout (uses your existing method)
         ScheduledWorkout scheduledWorkout = findScheduledWorkoutById(scheduledWorkoutId);
+
+        // Verify ownership (uses your existing method)
         validateOwnership(scheduledWorkout, username);
 
-        scheduledWorkout.cancelWorkout();
-        scheduledWorkoutRepository.save(scheduledWorkout);
+        try {
+            // Handle any related records before deletion
+            handleRelatedRecordsBeforeDeletion(scheduledWorkout);
 
-        log.info("Workout cancelled: {} for user {}", scheduledWorkoutId, username);
+            // Actually delete the record from database
+            scheduledWorkoutRepository.delete(scheduledWorkout);
+
+            log.info("Successfully permanently deleted scheduled workout {} for user {}",
+                    scheduledWorkoutId, username);
+
+        } catch (Exception e) {
+            log.error("Failed to delete scheduled workout {} for user {}: {}",
+                    scheduledWorkoutId, username, e.getMessage());
+            throw new RuntimeException("Failed to delete workout: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Handle any related records that need to be cleaned up before deletion
+     */
+    private void handleRelatedRecordsBeforeDeletion(ScheduledWorkout scheduledWorkout) {
+        // Check if there's a completed workout session
+        if (scheduledWorkout.getCompletedSession() != null) {
+            log.debug("Scheduled workout {} has a completed session, handling cleanup",
+                    scheduledWorkout.getId());
+
+            // Remove the connection but keep the session record
+            scheduledWorkout.setCompletedSession(null);
+            scheduledWorkoutRepository.save(scheduledWorkout);
+        }
+
+        // Handle any other related records if they exist
+        // Example: Clean up reminders, notifications, etc.
     }
 
     // =======================
@@ -125,12 +201,12 @@ public class ScheduledWorkoutService {
         List<ScheduledWorkout> scheduledWorkouts = scheduledWorkoutRepository
                 .findByUserAndScheduledDateBetweenOrderByScheduledDateAsc(user, startDate, endDate);
 
-        // Group by date for calendar display
+        // ✅ FIXED: Use configuration-aware conversion instead of basic mapper
         Map<LocalDate, List<ScheduledWorkoutResponse>> calendarData = scheduledWorkouts.stream()
                 .collect(Collectors.groupingBy(
                         ScheduledWorkout::getScheduledDate,
                         LinkedHashMap::new,
-                        Collectors.mapping(scheduledWorkoutMapper::toResponse, Collectors.toList())
+                        Collectors.mapping(this::convertToResponseWithConfiguration, Collectors.toList())
                 ));
 
         return CalendarViewResponse.builder()
@@ -159,6 +235,120 @@ public class ScheduledWorkoutService {
         User user = findUserByUsername(username);
         List<ScheduledWorkout> overdueWorkouts = scheduledWorkoutRepository.findOverdueWorkouts(user);
         return scheduledWorkoutMapper.toResponseList(overdueWorkouts);
+    }
+
+    private ScheduledWorkoutResponse convertToResponseWithConfiguration(ScheduledWorkout scheduledWorkout) {
+        WorkoutPlan plan = scheduledWorkout.getWorkoutPlan();
+
+        // Create WorkoutPlanInfo nested object
+        ScheduledWorkoutResponse.WorkoutPlanInfo workoutPlanInfo = ScheduledWorkoutResponse.WorkoutPlanInfo.builder()
+                .id(plan.getId())
+                .name(plan.getWorkoutName())
+                .description(plan.getWorkoutDescription())
+                .difficulty(plan.getDifficultyLevel().name())
+                .estimatedDurationMinutes(plan.getEstimatedDurationMinutes())
+                .exerciseCount(getExerciseCount(plan))
+                .category(plan.getWorkoutCategory())
+                .imageUrl(plan.getWorkoutImageUrl())
+                .isPublic(plan.getIsPublic())
+                .build();
+
+        // Create UserInfo nested object
+        ScheduledWorkoutResponse.UserInfo userInfo = ScheduledWorkoutResponse.UserInfo.builder()
+                .id(scheduledWorkout.getUser().getId())
+                .username(scheduledWorkout.getUser().getUsername())
+                .email(scheduledWorkout.getUser().getEmail())
+                .firstName(scheduledWorkout.getUser().getFirstName())
+                .lastName(scheduledWorkout.getUser().getLastName())
+                .subscriptionTier(scheduledWorkout.getUser().getSubscriptionTier().name())
+                .build();
+
+        // Create WorkoutSessionInfo if completed session exists
+        ScheduledWorkoutResponse.WorkoutSessionInfo sessionInfo = null;
+        if (scheduledWorkout.getCompletedSession() != null) {
+            WorkoutSession session = scheduledWorkout.getCompletedSession();
+            sessionInfo = ScheduledWorkoutResponse.WorkoutSessionInfo.builder()
+                    .id(session.getId())
+                    .startTime(session.getCreatedAt())
+                    .endTime(session.getUpdatedAt())
+                    .actualDurationMinutes(session.getTotalDurationMinutes())
+                    .notes(null)
+                    .completed(true)
+                    .build();
+        }
+
+        // Create base response builder
+        ScheduledWorkoutResponse.ScheduledWorkoutResponseBuilder responseBuilder = ScheduledWorkoutResponse.builder()
+                .id(scheduledWorkout.getId())
+                .scheduledDate(scheduledWorkout.getScheduledDate())
+                .status(scheduledWorkout.getStatus().name())
+                .completedAt(scheduledWorkout.getCompletedAt())
+                .estimatedDurationMinutes(scheduledWorkout.getEstimatedDurationMinutes())
+                .customNotes(scheduledWorkout.getCustomNotes())
+                .createdAt(scheduledWorkout.getCreatedAt())
+                .updatedAt(scheduledWorkout.getUpdatedAt())
+                .workoutPlan(workoutPlanInfo)
+                .user(userInfo)
+                .completedSession(sessionInfo)
+                .weekNumber(scheduledWorkout.getWeekNumber())
+                .dayOfWeek(scheduledWorkout.getDayOfWeek())
+                .reminderTime(scheduledWorkout.getReminderTime())
+                .createdByUserId(scheduledWorkout.getCreatedByUserId());
+
+        // ✅ CRITICAL: Extract configuration from the first PlanExercise (for individual exercises)
+        List<PlanExercise> planExercises = planExerciseRepository.findByWorkoutPlanOrderByOrderInWorkout(plan);
+        if (!planExercises.isEmpty()) {
+            PlanExercise planExercise = planExercises.get(0); // Single exercise for individual scheduling
+            Exercise exercise = planExercise.getExercise();
+
+            log.debug("🔍 Extracting configuration for exercise: {} (isCardio: {}, isIsometric: {})",
+                    exercise.getExerciseName(), exercise.getIsCardio(), exercise.getIsIsometric());
+
+            // Extract configuration based on exercise type
+            if (exercise.getIsCardio()) {
+                // Extract cardio configuration
+                responseBuilder
+                        .targetDurationMinutes(planExercise.getPrescribedSets()) // Duration stored in sets field
+                        .targetDistanceKm(planExercise.getPrescribedWeightPercent()) // Distance stored in weight field
+                        .targetPace(planExercise.getPrescribedRpe() != null ? planExercise.getPrescribedRpe().doubleValue() : null); // Pace stored in RPE field
+
+                log.debug("✅ Extracted cardio config: duration={}min, distance={}km, pace={}",
+                        planExercise.getPrescribedSets(), planExercise.getPrescribedWeightPercent(), planExercise.getPrescribedRpe());
+
+            } else if (exercise.getIsIsometric()) {
+                // Extract isometric configuration
+                responseBuilder
+                        .sets(planExercise.getPrescribedSets()) // Number of holds
+                        .holdDurationSeconds(planExercise.getPrescribedRestSeconds()) // Hold duration stored in rest seconds
+                        .restSeconds(60); // Default rest between holds
+
+                log.debug("✅ Extracted isometric config: sets={}, holdDuration={}s",
+                        planExercise.getPrescribedSets(), planExercise.getPrescribedRestSeconds());
+
+            } else {
+                // Extract strength configuration
+                responseBuilder
+                        .sets(planExercise.getPrescribedSets())
+                        .reps(planExercise.getPrescribedReps())
+                        .weight(planExercise.getPrescribedWeightPercent()) // Weight stored as percentage
+                        .restSeconds(planExercise.getPrescribedRestSeconds())
+                        .tempo(planExercise.getPrescribedTempo())
+                        .targetRpe(planExercise.getPrescribedRpe());
+
+                log.debug("✅ Extracted strength config: sets={}, reps={}, weight={}kg, rest={}s, rpe={}",
+                        planExercise.getPrescribedSets(), planExercise.getPrescribedReps(),
+                        planExercise.getPrescribedWeightPercent(), planExercise.getPrescribedRestSeconds(),
+                        planExercise.getPrescribedRpe());
+            }
+        } else {
+            log.warn("⚠️ No PlanExercise found for WorkoutPlan {}, using defaults", plan.getId());
+        }
+
+        return responseBuilder.build();
+    }
+
+    private Integer getExerciseCount(WorkoutPlan plan) {
+        return (int) planExerciseRepository.countByWorkoutPlan(plan);
     }
 
     // =======================

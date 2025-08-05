@@ -15,7 +15,7 @@ import ProgressPage from './pages/ProgressPage';
 import CalendarPage from './pages/CalendarPage';
 import CommunityPage from './pages/CommunityPage';
 import MessagesPage from './pages/MessagesPage';
-import { ExercisesPage } from './pages/ExercisesPage';
+import ExercisesPage  from './pages/ExercisesPage';
 
 // Workout Mode (full-screen, no layout)
 import WorkoutModePage from './pages/WorkoutModePage';
@@ -55,8 +55,8 @@ const App: React.FC = () => {
                         <Route path="/billing" element={<MobileLayout><BillingPage /></MobileLayout>} />
                     </Routes>
 
-                    {/* API Test Panel - Shows on all pages in development */}
-                    {process.env.NODE_ENV === 'development' && <ApiTestPanel />}
+                    {/*/!* API Test Panel - Shows on all pages in development *!/*/}
+                    {/*{process.env.NODE_ENV === 'development' && <ApiTestPanel />}*/}
                 </WorkoutProvider>
             </AuthProvider>
         </BrowserRouter>

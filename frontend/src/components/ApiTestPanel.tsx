@@ -1,4 +1,4 @@
-// src/components/ApiTestPanel.tsx
+// src/components/ApiTestPanel.tsx - Enhanced with isIsometric testing
 
 import React, { useState } from 'react';
 
@@ -69,7 +69,7 @@ export const ApiTestPanel: React.FC = () => {
         }
     };
 
-    // Test 2: Public Exercises Endpoint
+    // Test 2: Public Exercises Endpoint - ENHANCED with isIsometric testing
     const testExercisesEndpoint = async () => {
         addTestResult({ test: 'Exercises Endpoint', status: 'pending', message: 'Testing...' });
 
@@ -89,18 +89,36 @@ export const ApiTestPanel: React.FC = () => {
 
                 // Check if it's an array and has exercises
                 const exercises = Array.isArray(data) ? data : (data.data || []);
+
+                // ENHANCED: Test all three workout tracking modes
                 const cardioCount = exercises.filter((ex: any) => ex.isCardio).length;
-                const strengthCount = exercises.filter((ex: any) => !ex.isCardio).length;
+                const isometricCount = exercises.filter((ex: any) => ex.isIsometric).length;
+                const strengthCount = exercises.filter((ex: any) => !ex.isCardio && !ex.isIsometric).length;
+
+                // Check for required fields
+                const hasIsCardio = exercises.length > 0 && 'isCardio' in exercises[0];
+                const hasIsIsometric = exercises.length > 0 && 'isIsometric' in exercises[0];
+
+                let message = `Found ${exercises.length} exercises`;
+                if (hasIsCardio && hasIsIsometric) {
+                    message += ` (❤️${cardioCount} cardio, 🛡️${isometricCount} isometric, 💪${strengthCount} strength)`;
+                } else {
+                    message += ` - Missing workout tracking fields!`;
+                }
 
                 addTestResult({
                     test: 'Exercises Endpoint',
-                    status: 'success',
-                    message: `Found ${exercises.length} exercises (${cardioCount} cardio, ${strengthCount} strength)`,
+                    status: hasIsCardio && hasIsIsometric ? 'success' : 'error',
+                    message: message,
                     data: {
                         total: exercises.length,
                         cardio: cardioCount,
+                        isometric: isometricCount,
                         strength: strengthCount,
-                        sample: exercises[0]
+                        hasIsCardio: hasIsCardio,
+                        hasIsIsometric: hasIsIsometric,
+                        sample: exercises[0],
+                        workoutTrackingSupport: hasIsCardio && hasIsIsometric ? 'Full Support' : 'Missing Fields'
                     }
                 });
             } else {
@@ -147,7 +165,7 @@ export const ApiTestPanel: React.FC = () => {
         }
     };
 
-    // Test 4: Test Exercise API Service
+    // Test 4: Test Exercise API Service - ENHANCED with workout tracking modes
     const testExerciseApiService = async () => {
         addTestResult({ test: 'Exercise API Service', status: 'pending', message: 'Testing...' });
 
@@ -159,19 +177,45 @@ export const ApiTestPanel: React.FC = () => {
             const exercises = await exerciseApi.getPublicExercises();
 
             if (Array.isArray(exercises)) {
+                // ENHANCED: Test all workout tracking modes
                 const cardioExercises = exercises.filter(ex => ex.isCardio);
-                const strengthExercises = exercises.filter(ex => !ex.isCardio);
+                const isometricExercises = exercises.filter(ex => ex.isIsometric);
+                const strengthExercises = exercises.filter(ex => !ex.isCardio && !ex.isIsometric);
+
+                // Verify the fields exist and data makes sense
+                const hasAllFields = exercises.length > 0 &&
+                    'isCardio' in exercises[0] &&
+                    'isIsometric' in exercises[0];
+
+                // Check for data consistency
+                const totalCategorized = cardioExercises.length + isometricExercises.length + strengthExercises.length;
+                const isDataConsistent = totalCategorized === exercises.length;
+
+                let message = `Service working! ${exercises.length} exercises loaded`;
+                if (hasAllFields && isDataConsistent) {
+                    message += ` with complete workout tracking support`;
+                } else {
+                    message += ` - workout tracking data issues detected`;
+                }
 
                 addTestResult({
                     test: 'Exercise API Service',
-                    status: 'success',
-                    message: `Service working! ${exercises.length} exercises loaded`,
+                    status: hasAllFields && isDataConsistent ? 'success' : 'error',
+                    message: message,
                     data: {
                         total: exercises.length,
                         cardio: cardioExercises.length,
+                        isometric: isometricExercises.length,
                         strength: strengthExercises.length,
                         hasIsCardioField: exercises.length > 0 && 'isCardio' in exercises[0],
-                        sample: exercises[0]
+                        hasIsIsometricField: exercises.length > 0 && 'isIsometric' in exercises[0],
+                        dataConsistency: isDataConsistent ? 'Valid' : 'Invalid',
+                        sample: exercises[0],
+                        workoutTrackingModes: {
+                            cardio: cardioExercises.slice(0, 2).map(ex => ex.name),
+                            isometric: isometricExercises.slice(0, 2).map(ex => ex.name),
+                            strength: strengthExercises.slice(0, 2).map(ex => ex.name)
+                        }
                     }
                 });
             } else {
@@ -183,6 +227,66 @@ export const ApiTestPanel: React.FC = () => {
                 test: 'Exercise API Service',
                 status: 'error',
                 message: error.message || 'Exercise API service failed'
+            });
+        }
+    };
+
+    // NEW Test 5: Workout Tracking Mode Validation
+    const testWorkoutTrackingModes = async () => {
+        addTestResult({ test: 'Workout Tracking Modes', status: 'pending', message: 'Testing...' });
+
+        try {
+            console.log('🧪 Testing workout tracking mode validation...');
+
+            const { exerciseApi } = await import('../services/exerciseApi');
+            const exercises = await exerciseApi.getPublicExercises();
+
+            if (Array.isArray(exercises) && exercises.length > 0) {
+                // Test specific workout tracking scenarios
+                const testScenarios = {
+                    cardioExercises: exercises.filter(ex => ex.isCardio && !ex.isIsometric),
+                    isometricExercises: exercises.filter(ex => ex.isIsometric && !ex.isCardio),
+                    strengthExercises: exercises.filter(ex => !ex.isCardio && !ex.isIsometric),
+                    invalidExercises: exercises.filter(ex => ex.isCardio && ex.isIsometric) // Should be empty
+                };
+
+                const issues = [];
+                if (testScenarios.invalidExercises.length > 0) {
+                    issues.push(`${testScenarios.invalidExercises.length} exercises are both cardio AND isometric`);
+                }
+
+                if (testScenarios.cardioExercises.length === 0) {
+                    issues.push('No cardio exercises found');
+                }
+
+                if (testScenarios.strengthExercises.length === 0) {
+                    issues.push('No strength exercises found');
+                }
+
+                const isValid = issues.length === 0;
+
+                addTestResult({
+                    test: 'Workout Tracking Modes',
+                    status: isValid ? 'success' : 'error',
+                    message: isValid
+                        ? `✅ All workout tracking modes are properly configured!`
+                        : `⚠️ Issues found: ${issues.join(', ')}`,
+                    data: {
+                        ...testScenarios,
+                        totalExercises: exercises.length,
+                        issues: issues,
+                        validation: isValid ? 'PASSED' : 'FAILED'
+                    }
+                });
+            } else {
+                throw new Error('No exercises available for testing');
+            }
+        } catch (error: any) {
+            console.error('❌ Workout tracking mode test failed:', error);
+            addTestResult({
+                test: 'Workout Tracking Modes',
+                status: 'error',
+                message: error.message || 'Workout tracking mode validation failed'
             });
         }
     };
@@ -202,6 +306,10 @@ export const ApiTestPanel: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
 
         await testExerciseApiService();
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // NEW: Test workout tracking modes
+        await testWorkoutTrackingModes();
 
         setIsRunning(false);
         console.log('✅ All API tests completed');
@@ -240,7 +348,7 @@ export const ApiTestPanel: React.FC = () => {
                     🧪 API Connectivity Test Panel
                 </h2>
                 <p style={{ margin: '0', color: '#6c757d', fontSize: '14px' }}>
-                    Test your Spring Boot backend integration
+                    Test your Spring Boot backend integration with workout tracking modes
                 </p>
             </div>
 
@@ -280,6 +388,22 @@ export const ApiTestPanel: React.FC = () => {
                 </button>
 
                 <button
+                    onClick={testWorkoutTrackingModes}
+                    disabled={isRunning}
+                    style={{
+                        padding: '12px 20px',
+                        marginRight: '10px',
+                        backgroundColor: isRunning ? '#6c757d' : '#17a2b8',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: isRunning ? 'not-allowed' : 'pointer'
+                    }}
+                >
+                    🎯 Test Tracking
+                </button>
+
+                <button
                     onClick={clearTests}
                     disabled={isRunning}
                     style={{
@@ -308,7 +432,7 @@ export const ApiTestPanel: React.FC = () => {
                         <p style={{ fontSize: '18px', margin: '0 0 10px 0' }}>🎯</p>
                         <p style={{ margin: '0' }}>No tests run yet.</p>
                         <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>
-                            Click "Run All Tests" to start testing your API connectivity.
+                            Click "Run All Tests" to start testing your API connectivity and workout tracking modes.
                         </p>
                     </div>
                 ) : (
@@ -383,12 +507,13 @@ export const ApiTestPanel: React.FC = () => {
                     </p>
                     <ul style={{ margin: '0', paddingLeft: '20px', lineHeight: '1.5' }}>
                         <li><strong>🔗 Basic Connection:</strong> Can we reach your Spring Boot server?</li>
-                        <li><strong>💪 Exercises Endpoint:</strong> Does /api/exercises/public work?</li>
+                        <li><strong>💪 Exercises Endpoint:</strong> Does /api/exercises/public work with isIsometric field?</li>
                         <li><strong>🛠️ API Client:</strong> Is your apiClient.ts working?</li>
-                        <li><strong>🎯 Exercise Service:</strong> Is the isCardio field working correctly?</li>
+                        <li><strong>🎯 Exercise Service:</strong> Are isCardio and isIsometric fields working?</li>
+                        <li><strong>🏃‍♂️ Workout Tracking:</strong> Are all three modes (cardio/isometric/strength) properly configured?</li>
                     </ul>
                     <p style={{ margin: '10px 0 0 0', fontSize: '13px', fontStyle: 'italic' }}>
-                        💡 Make sure your Spring Boot server is running on <code>http://localhost:8080</code>
+                        💡 Make sure your Spring Boot server is running on <code>http://localhost:8080</code> with the V003 migration applied
                     </p>
                 </div>
             </div>

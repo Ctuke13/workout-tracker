@@ -1,49 +1,44 @@
-// src/components/CalendarPage/ExerciseConfigModal.tsx - With Day Navigation
-import React from 'react';
-import { Exercise } from '../../types/exercise';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, Target, Zap, Weight, Repeat, Timer, MapPin, Gauge, Sparkles, Heart, Flame, AlertTriangle } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Badge } from '../ui/badge';
+
+// Import your types (these should match your actual imports)
 import {
-    XMarkIcon,
-    BookmarkIcon,
-    ClockIcon,
-    BoltIcon,
-    HeartIcon,
-    InformationCircleIcon,
-    LightBulbIcon,
-    PlayIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon
-} from '@heroicons/react/24/outline';
+    Exercise,
+    ExerciseConfiguration,
+    StrengthConfiguration,
+    CardioConfiguration,
+    IsometricConfiguration,
+    getDefaultConfigForExercise
+} from '../../types/exercise';
 
-// Import calendar day type for navigation
-import { CalendarDay } from '../../services/calendarMockData';
-
-
-interface ExerciseConfiguration {
-    sets: number;
-    reps: string;
-    weight?: number;
-    restSeconds?: number;
-    tempo?: string;
-    targetRpe?: number;
-    notes?: string;
-}
+// Import WorkoutPlanInfo from api types
+import { WorkoutPlanInfo } from '../../types/api';
 
 interface ExerciseConfigModalProps {
-    open: boolean;
+    isOpen: boolean;
     onClose: () => void;
-    exercise: Exercise | null;
-    config: ExerciseConfiguration;
+    exercise?: Exercise;
+    config: ExerciseConfiguration | null;
     onConfigChange: (config: ExerciseConfiguration) => void;
-    onSave: () => void;
-    selectedDate?: string | null;
+    onSave: () => Promise<void>;
+    selectedDate: Date;
     loading?: boolean;
-    isEditing?: boolean;
-    calendarDays?: CalendarDay[];
-    onDateChange?: (date: string) => void;
+    mode: 'exercise' | 'workout-plan';
+    onModeChange: (mode: 'exercise' | 'workout-plan') => void;
+    onWorkoutPlanSelect: (plan: WorkoutPlanInfo | null) => void;
+    selectedWorkoutPlan: WorkoutPlanInfo | null;
+    // New props for edit mode
+    isEditMode?: boolean;
+    editingExercise?: any; // ScheduledExercise type
 }
 
 const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
-                                                                     open,
+                                                                     isOpen,
                                                                      onClose,
                                                                      exercise,
                                                                      config,
@@ -51,537 +46,691 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                                                                      onSave,
                                                                      selectedDate,
                                                                      loading = false,
-                                                                     isEditing = false,
-                                                                     calendarDays = [],
-                                                                     onDateChange
+                                                                     mode,
+                                                                     onModeChange,
+                                                                     onWorkoutPlanSelect,
+                                                                     selectedWorkoutPlan,
+                                                                     isEditMode = false,
+                                                                     editingExercise
                                                                  }) => {
-    if (!exercise || !open) return null;
+    // ==================== STATE ====================
+    const [localConfig, setLocalConfig] = useState<ExerciseConfiguration | null>(null);
+    const [currentMode, setCurrentMode] = useState<'exercise' | 'workout-plan'>(mode);
 
-    const exerciseName = exercise.exerciseName || exercise.name || 'Unknown Exercise';
+    // ==================== DEBUG STATE ====================
+    const [debugInfo, setDebugInfo] = useState({
+        exerciseReceived: false,
+        configCreated: false,
+        trackingMode: 'unknown',
+        renderAttempted: false
+    });
 
-    // Day navigation functions
-    const getCurrentDateIndex = () => {
-        if (!selectedDate || calendarDays.length === 0) return -1;
-        return calendarDays.findIndex(day => day.dateString === selectedDate);
-    };
+    // ==================== EFFECTS ====================
 
-    const canNavigatePrevious = () => {
-        const currentIndex = getCurrentDateIndex();
-        if (currentIndex <= 0) return false;
-        return true; // Allow navigation to any previous day in the week
-    };
+    // Sync mode changes from parent
+    useEffect(() => {
+        console.log('🔄 Mode changed from parent:', mode);
+        setCurrentMode(mode);
+    }, [mode]);
 
-    const canNavigateNext = () => {
-        const currentIndex = getCurrentDateIndex();
-        if (currentIndex < 0 || currentIndex >= calendarDays.length - 1) return false;
-        return true; // Allow navigation to any next day in the week
-    };
+    // Create default config when exercise changes
+    useEffect(() => {
+        if (exercise && currentMode === 'exercise') {
+            console.log('🔧 Creating default config for exercise:', exercise.name, {
+                isCardio: exercise.isCardio,
+                isIsometric: exercise.isIsometric,
+                exerciseType: exercise.exerciseType
+            });
 
-    const navigateToPreviousDay = () => {
-        if (!canNavigatePrevious() || !onDateChange) return;
+            try {
+                const defaultConfig = getDefaultConfigForExercise(exercise);
+                console.log('🔧 Default config created:', defaultConfig);
 
-        const currentIndex = getCurrentDateIndex();
-        const previousDay = calendarDays[currentIndex - 1];
-        if (previousDay) {
-            onDateChange(previousDay.dateString);
-        }
-    };
+                setLocalConfig(defaultConfig);
+                onConfigChange(defaultConfig);
 
-    const navigateToNextDay = () => {
-        if (!canNavigateNext() || !onDateChange) return;
+                setDebugInfo(prev => ({
+                    ...prev,
+                    exerciseReceived: true,
+                    configCreated: true,
+                    trackingMode: defaultConfig.trackingMode
+                }));
+            } catch (error) {
+                console.error('❌ Error creating default config:', error);
 
-        const currentIndex = getCurrentDateIndex();
-        const nextDay = calendarDays[currentIndex + 1];
-        if (nextDay) {
-            onDateChange(nextDay.dateString);
-        }
-    };
-
-    const getSelectedDateInfo = () => {
-        if (!selectedDate) return null;
-
-        const selectedDay = calendarDays.find(day => day.dateString === selectedDate);
-        if (!selectedDay) return null;
-
-        return {
-            dayName: selectedDay.date.toLocaleDateString('en-US', { weekday: 'long' }),
-            date: selectedDay.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            isToday: selectedDay.isToday,
-            exerciseCount: selectedDay.exercises.length
-        };
-    };
-
-    // Preset configurations based on exercise type and difficulty
-    const getPresetConfigs = () => {
-        const presets = [];
-
-        // Strength training presets
-        if (exercise.exerciseType?.toLowerCase() === 'strength') {
-            if (exercise.difficultyLevel?.toLowerCase() === 'beginner') {
-                presets.push({
-                    name: 'Beginner Strength',
-                    sets: 2,
-                    reps: '8-10',
-                    restSeconds: 60,
-                    targetRpe: 6
-                });
-            } else if (exercise.difficultyLevel?.toLowerCase() === 'intermediate') {
-                presets.push({
-                    name: 'Intermediate Strength',
-                    sets: 3,
-                    reps: '8-12',
-                    restSeconds: 90,
-                    targetRpe: 7
-                });
-            } else {
-                presets.push({
-                    name: 'Advanced Strength',
-                    sets: 4,
-                    reps: '6-8',
-                    restSeconds: 120,
-                    targetRpe: 8
-                });
+                // Fallback config creation
+                const fallbackConfig = createFallbackConfig(exercise);
+                setLocalConfig(fallbackConfig);
+                onConfigChange(fallbackConfig);
             }
+        } else if (currentMode === 'workout-plan') {
+            setLocalConfig(null);
         }
+    }, [exercise, currentMode]); // Remove onConfigChange from dependencies
 
-        // Cardio presets
-        if (exercise.exerciseType?.toLowerCase() === 'cardio') {
-            presets.push({
-                name: 'Cardio Session',
-                sets: 1,
-                reps: '20 minutes',
-                restSeconds: 0,
-                targetRpe: 6
-            });
+    // Sync external config changes - only when external config prop changes
+    useEffect(() => {
+        if (config) {
+            console.log('🔄 Syncing external config change:', config);
+            setLocalConfig(config);
         }
+    }, [config]);
 
-        // Flexibility presets
-        if (exercise.exerciseType?.toLowerCase() === 'flexibility') {
-            presets.push({
-                name: 'Flexibility Session',
+    // ==================== HELPER FUNCTIONS ====================
+
+    const createFallbackConfig = (exercise: Exercise): ExerciseConfiguration => {
+        console.log('🚨 Creating fallback config for exercise:', exercise.name);
+
+        // Determine tracking mode based on exercise properties
+        if (exercise.isCardio) {
+            console.log('🎯 Determined tracking mode: cardio');
+            const config: CardioConfiguration = {
+                trackingMode: 'cardio',
+                targetDurationMinutes: exercise.estimatedDurationMinutes || 20,
+                targetDistanceKm: undefined,
+                targetPace: undefined,
+                notes: ''
+            };
+            return config;
+        } else if (exercise.isIsometric) {
+            console.log('🎯 Determined tracking mode: isometric');
+            const config: IsometricConfiguration = {
+                trackingMode: 'isometric',
                 sets: 3,
-                reps: '30 seconds',
-                restSeconds: 15,
-                targetRpe: 4
-            });
+                holdDurationSeconds: 30,
+                restSeconds: 60,
+                notes: ''
+            };
+            return config;
+        } else {
+            console.log('🎯 Determined tracking mode: strength');
+            const config: StrengthConfiguration = {
+                trackingMode: 'strength',
+                sets: 3,
+                reps: '8-12',
+                weight: undefined,
+                restSeconds: 90,
+                targetRpe: 7,
+                tempo: undefined,
+                notes: ''
+            };
+            return config;
+        }
+    };
+
+    // ==================== HANDLERS ====================
+
+    const handleConfigUpdate = (updates: Partial<ExerciseConfiguration>) => {
+        if (!localConfig) {
+            console.warn('⚠️ Trying to update config but localConfig is null');
+            return;
         }
 
-        return presets;
+        let updatedConfig: ExerciseConfiguration;
+
+        // Type-safe updates based on current tracking mode
+        if (localConfig.trackingMode === 'strength') {
+            updatedConfig = {
+                ...localConfig as StrengthConfiguration,
+                ...updates
+            } as StrengthConfiguration;
+        } else if (localConfig.trackingMode === 'cardio') {
+            updatedConfig = {
+                ...localConfig as CardioConfiguration,
+                ...updates
+            } as CardioConfiguration;
+        } else if (localConfig.trackingMode === 'isometric') {
+            updatedConfig = {
+                ...localConfig as IsometricConfiguration,
+                ...updates
+            } as IsometricConfiguration;
+        } else {
+            console.error('❌ Unknown tracking mode:', (localConfig as any).trackingMode);
+            return;
+        }
+
+        console.log('🔄 Updating config:', { current: localConfig, updates, result: updatedConfig });
+
+        setLocalConfig(updatedConfig);
+        onConfigChange(updatedConfig);
     };
 
-    const handlePresetSelect = (preset: any) => {
-        onConfigChange({
-            ...config,
-            sets: preset.sets,
-            reps: preset.reps,
-            restSeconds: preset.restSeconds,
-            targetRpe: preset.targetRpe
+    const handleSave = async () => {
+        console.log('💾 Save clicked - Current state:', {
+            mode: currentMode,
+            exercise: exercise?.name,
+            config: localConfig,
+            workoutPlan: selectedWorkoutPlan?.name
         });
+
+        try {
+            await onSave();
+            console.log('✅ Save completed successfully');
+        } catch (error) {
+            console.error('❌ Save failed:', error);
+        }
     };
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric'
-        });
+    const handleClose = () => {
+        console.log('🚪 Modal closing');
+        onClose();
     };
 
-    const getRpeDescription = (rpe: number) => {
-        const descriptions: Record<number, string> = {
-            1: 'Very easy - warm up pace',
-            2: 'Easy - could do this all day',
-            3: 'Moderate - comfortable effort',
-            4: 'Somewhat hard - breathing harder',
-            5: 'Hard - challenging but sustainable',
-            6: 'Hard - difficult to maintain',
-            7: 'Very hard - can speak a few words',
-            8: 'Very hard - can barely speak',
-            9: 'Extremely hard - maximal effort',
-            10: 'Maximum - cannot continue'
+    // ==================== VALIDATION ====================
+
+    const validateConfiguration = (): boolean => {
+        console.log('🔍 Validating configuration:', { currentMode, localConfig });
+
+        if (currentMode === 'workout-plan') {
+            return selectedWorkoutPlan !== null;
+        }
+
+        if (!exercise || !localConfig) {
+            console.log('❌ Validation failed: missing exercise or config');
+            return false;
+        }
+
+        // Type guard functions
+        const isStrengthConfig = (config: ExerciseConfiguration): config is StrengthConfiguration => {
+            return config.trackingMode === 'strength';
         };
-        return descriptions[rpe] || 'Unknown intensity';
-    };
 
-    const formatTime = (seconds: number) => {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    };
+        const isCardioConfig = (config: ExerciseConfiguration): config is CardioConfiguration => {
+            return config.trackingMode === 'cardio';
+        };
 
-    const getDifficultyColor = (difficulty: string) => {
-        switch (difficulty.toLowerCase()) {
-            case 'beginner': return 'bg-green-100 text-green-800';
-            case 'intermediate': return 'bg-yellow-100 text-yellow-800';
-            case 'advanced': return 'bg-red-100 text-red-800';
-            default: return 'bg-gray-100 text-gray-800';
+        const isIsometricConfig = (config: ExerciseConfiguration): config is IsometricConfiguration => {
+            return config.trackingMode === 'isometric';
+        };
+
+        if (isStrengthConfig(localConfig)) {
+            const isValid = localConfig.sets > 0 && localConfig.reps.length > 0;
+            console.log('🏋️ Strength validation:', { sets: localConfig.sets, reps: localConfig.reps, valid: isValid });
+            return isValid;
+        } else if (isCardioConfig(localConfig)) {
+            const cardioValid = localConfig.targetDurationMinutes > 0;
+            console.log('❤️ Cardio validation:', { duration: localConfig.targetDurationMinutes, valid: cardioValid });
+            return cardioValid;
+        } else if (isIsometricConfig(localConfig)) {
+            const isometricValid = localConfig.sets > 0 && localConfig.holdDurationSeconds > 0;
+            console.log('✨ Isometric validation:', { sets: localConfig.sets, hold: localConfig.holdDurationSeconds, valid: isometricValid });
+            return isometricValid;
+        } else {
+            console.log('❌ Unknown tracking mode:', (localConfig as any).trackingMode);
+            return false;
         }
     };
 
-    const getExerciseTypeColor = (type: string) => {
-        switch (type.toLowerCase()) {
-            case 'strength': return 'bg-blue-100 text-blue-800';
-            case 'cardio': return 'bg-red-100 text-red-800';
-            case 'flexibility': return 'bg-green-100 text-green-800';
-            default: return 'bg-gray-100 text-gray-800';
+    // ==================== RENDER CONFIGURATION FORMS ====================
+
+    const renderConfigurationForm = () => {
+        console.log('🎯 renderConfigurationForm called', {
+            currentMode,
+            exercise: exercise?.name,
+            localConfig: localConfig ? (localConfig as any).trackingMode : 'null',
+            configExists: !!localConfig
+        });
+
+        if (currentMode === 'workout-plan') {
+            return renderWorkoutPlanSelector();
+        }
+
+        if (!exercise || !localConfig) {
+            console.log('❌ Cannot render config form: missing exercise or localConfig');
+            return (
+                <div className="p-6 text-center">
+                    <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                    <p className="text-gray-600">Configuration not available</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                        Exercise: {exercise ? '✅' : '❌'} | Config: {localConfig ? '✅' : '❌'}
+                    </p>
+                </div>
+            );
+        }
+
+        // Don't update state during render - this causes infinite loops
+        // setDebugInfo(prev => ({ ...prev, renderAttempted: true }));
+
+        // Type guard functions
+        const isStrengthConfig = (config: ExerciseConfiguration): config is StrengthConfiguration => {
+            return config.trackingMode === 'strength';
+        };
+
+        const isCardioConfig = (config: ExerciseConfiguration): config is CardioConfiguration => {
+            return config.trackingMode === 'cardio';
+        };
+
+        const isIsometricConfig = (config: ExerciseConfiguration): config is IsometricConfiguration => {
+            return config.trackingMode === 'isometric';
+        };
+
+        if (isStrengthConfig(localConfig)) {
+            console.log('🏋️ Rendering strength config:', localConfig);
+            return renderStrengthConfiguration(localConfig);
+        } else if (isCardioConfig(localConfig)) {
+            console.log('❤️ Rendering cardio config:', localConfig);
+            return renderCardioConfiguration(localConfig);
+        } else if (isIsometricConfig(localConfig)) {
+            console.log('✨ Rendering isometric config:', localConfig);
+            return renderIsometricConfiguration(localConfig);
+        } else {
+            console.log('❌ Unknown tracking mode:', (localConfig as any).trackingMode);
+            return (
+                <div className="p-6 text-center">
+                    <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                    <p className="text-gray-600">Unknown configuration type: {(localConfig as any).trackingMode}</p>
+                </div>
+            );
         }
     };
 
-    const dateInfo = getSelectedDateInfo();
+    const renderStrengthConfiguration = (config: StrengthConfiguration) => (
+        <div className="space-y-6 p-6">
+            <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Weight className="w-8 h-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Strength Configuration</h3>
+                <p className="text-sm text-gray-600 mt-1">Configure sets, reps, and weight</p>
+            </div>
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col">
-                {/* Header with Day Navigation */}
-                <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 border-b border-gray-200">
-                    <div className="flex-1 min-w-0">
-                        <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-                            {isEditing ? 'Edit Exercise' : 'Configure Exercise'}
-                        </h2>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {exercise.emoji} {exerciseName}
-                        </p>
-
-                        {/* Date Navigation with Arrows */}
-                        {selectedDate && dateInfo && onDateChange && (
-                            <div className="mt-2 flex items-center justify-center space-x-3">
-                                <button
-                                    onClick={navigateToPreviousDay}
-                                    disabled={!canNavigatePrevious()}
-                                    className={`p-2 rounded-full transition-all ${
-                                        canNavigatePrevious()
-                                            ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 active:scale-95 border border-gray-200 hover:border-gray-300'
-                                            : 'text-gray-300 cursor-not-allowed border border-gray-100'
-                                    }`}
-                                    title={canNavigatePrevious() ? "Previous day" : "First day of week"}
-                                >
-                                    <ChevronLeftIcon className="w-5 h-5" />
-                                </button>
-
-                                <div className="flex items-center space-x-2 min-w-0 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-                                    <span className="text-sm font-semibold text-green-900 truncate">
-                                        <span className="sm:hidden">{dateInfo.date}</span>
-                                        <span className="hidden sm:inline">{dateInfo.dayName}, {dateInfo.date}</span>
-                                    </span>
-                                    {dateInfo.isToday && (
-                                        <span className="px-2 py-0.5 bg-green-600 text-white text-xs font-medium rounded-full">
-                                            Today
-                                        </span>
-                                    )}
-                                    {dateInfo.exerciseCount > 0 && (
-                                        <span className="px-2 py-0.5 bg-white text-green-700 text-xs font-medium rounded-full border border-green-200">
-                                            {dateInfo.exerciseCount} exercises
-                                        </span>
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={navigateToNextDay}
-                                    disabled={!canNavigateNext()}
-                                    className={`p-2 rounded-full transition-all ${
-                                        canNavigateNext()
-                                            ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 active:scale-95 border border-gray-200 hover:border-gray-300'
-                                            : 'text-gray-300 cursor-not-allowed border border-gray-100'
-                                    }`}
-                                    title={canNavigateNext() ? "Next day" : "Last day of week"}
-                                >
-                                    <ChevronRightIcon className="w-5 h-5" />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors active:scale-95 ml-2"
-                    >
-                        <XMarkIcon className="w-5 h-5" />
-                    </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Sets */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-blue-600 flex items-center gap-2">
+                        <Repeat className="w-4 h-4" />
+                        Sets
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.sets}
+                        onChange={(e) => handleConfigUpdate({ sets: parseInt(e.target.value) || 1 })}
+                        min="1"
+                        max="10"
+                        className="border-blue-200 focus:border-blue-500"
+                        placeholder="3"
+                    />
                 </div>
 
+                {/* Reps */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-blue-600 flex items-center gap-2">
+                        <Target className="w-4 h-4" />
+                        Reps
+                    </Label>
+                    <Input
+                        type="text"
+                        value={config.reps}
+                        onChange={(e) => handleConfigUpdate({ reps: e.target.value })}
+                        className="border-blue-200 focus:border-blue-500"
+                        placeholder="8-12"
+                    />
+                </div>
+
+                {/* Weight */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-green-600 flex items-center gap-2">
+                        <Weight className="w-4 h-4" />
+                        Weight (kg)
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.weight || ''}
+                        onChange={(e) => handleConfigUpdate({ weight: parseFloat(e.target.value) || undefined })}
+                        step="0.5"
+                        min="0"
+                        className="border-green-200 focus:border-green-500"
+                        placeholder="Optional"
+                    />
+                </div>
+
+                {/* Rest */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-green-600 flex items-center gap-2">
+                        <Timer className="w-4 h-4" />
+                        Rest (seconds)
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.restSeconds}
+                        onChange={(e) => handleConfigUpdate({ restSeconds: parseInt(e.target.value) || 60 })}
+                        min="15"
+                        max="300"
+                        className="border-green-200 focus:border-green-500"
+                        placeholder="90"
+                    />
+                </div>
+
+                {/* RPE */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-purple-600 flex items-center gap-2">
+                        <Gauge className="w-4 h-4" />
+                        Target RPE (1-10)
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.targetRpe || ''}
+                        onChange={(e) => handleConfigUpdate({ targetRpe: parseInt(e.target.value) || undefined })}
+                        min="1"
+                        max="10"
+                        className="border-purple-200 focus:border-purple-500"
+                        placeholder="7"
+                    />
+                </div>
+
+                {/* Tempo */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-purple-600 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Tempo
+                    </Label>
+                    <Input
+                        type="text"
+                        value={config.tempo || ''}
+                        onChange={(e) => handleConfigUpdate({ tempo: e.target.value || undefined })}
+                        className="border-purple-200 focus:border-purple-500"
+                        placeholder="3-1-2-1"
+                    />
+                </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                <Textarea
+                    value={config.notes || ''}
+                    onChange={(e) => handleConfigUpdate({ notes: e.target.value })}
+                    className="min-h-[80px]"
+                    placeholder="Any additional notes or modifications..."
+                />
+            </div>
+        </div>
+    );
+
+    const renderCardioConfiguration = (config: CardioConfiguration) => (
+        <div className="space-y-6 p-6">
+            <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Heart className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Cardio Configuration</h3>
+                <p className="text-sm text-gray-600 mt-1">Configure duration, distance, and pace</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Duration */}
+                <div className="space-y-2 sm:col-span-2">
+                    <Label className="text-sm font-medium text-red-600 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Target Duration (minutes)
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.targetDurationMinutes}
+                        onChange={(e) => handleConfigUpdate({ targetDurationMinutes: parseInt(e.target.value) || 1 })}
+                        min="1"
+                        max="180"
+                        className="border-red-200 focus:border-red-500"
+                        placeholder="20"
+                    />
+                </div>
+
+                {/* Distance */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-orange-600 flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        Distance (km)
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.targetDistanceKm || ''}
+                        onChange={(e) => handleConfigUpdate({ targetDistanceKm: parseFloat(e.target.value) || undefined })}
+                        step="0.1"
+                        min="0"
+                        className="border-orange-200 focus:border-orange-500"
+                        placeholder="Optional"
+                    />
+                </div>
+
+                {/* Pace */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-orange-600 flex items-center gap-2">
+                        <Zap className="w-4 h-4" />
+                        Target Pace (min/km)
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.targetPace || ''}
+                        onChange={(e) => handleConfigUpdate({ targetPace: parseFloat(e.target.value) || undefined })}
+                        step="0.1"
+                        min="0"
+                        className="border-orange-200 focus:border-orange-500"
+                        placeholder="Optional"
+                    />
+                </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                <Textarea
+                    value={config.notes || ''}
+                    onChange={(e) => handleConfigUpdate({ notes: e.target.value })}
+                    className="min-h-[80px]"
+                    placeholder="Intensity level, terrain, or other notes..."
+                />
+            </div>
+        </div>
+    );
+
+    const renderIsometricConfiguration = (config: IsometricConfiguration) => (
+        <div className="space-y-6 p-6">
+            <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Sparkles className="w-8 h-8 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Isometric Configuration</h3>
+                <p className="text-sm text-gray-600 mt-1">Configure holds, sets, and rest</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Sets */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-purple-600 flex items-center gap-2">
+                        <Repeat className="w-4 h-4" />
+                        Sets
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.sets}
+                        onChange={(e) => handleConfigUpdate({ sets: parseInt(e.target.value) || 1 })}
+                        min="1"
+                        max="10"
+                        className="border-purple-200 focus:border-purple-500"
+                        placeholder="3"
+                    />
+                </div>
+
+                {/* Hold Duration */}
+                <div className="space-y-2">
+                    <Label className="text-sm font-medium text-purple-600 flex items-center gap-2">
+                        <Timer className="w-4 h-4" />
+                        Hold Duration (seconds)
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.holdDurationSeconds}
+                        onChange={(e) => handleConfigUpdate({ holdDurationSeconds: parseInt(e.target.value) || 1 })}
+                        min="1"
+                        max="300"
+                        className="border-purple-200 focus:border-purple-500"
+                        placeholder="30"
+                    />
+                </div>
+
+                {/* Rest */}
+                <div className="space-y-2 sm:col-span-2">
+                    <Label className="text-sm font-medium text-indigo-600 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Rest Between Sets (seconds)
+                    </Label>
+                    <Input
+                        type="number"
+                        value={config.restSeconds}
+                        onChange={(e) => handleConfigUpdate({ restSeconds: parseInt(e.target.value) || 60 })}
+                        min="15"
+                        max="300"
+                        className="border-indigo-200 focus:border-indigo-500"
+                        placeholder="60"
+                    />
+                </div>
+            </div>
+
+            {/* Total Duration Calculator */}
+            <div className="bg-purple-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-purple-700 mb-2">Estimated Total Duration</p>
+                <p className="text-2xl font-bold text-purple-600">
+                    {Math.round(((config.holdDurationSeconds * config.sets) + (config.restSeconds * Math.max(0, config.sets - 1))) / 60 * 10) / 10} minutes
+                </p>
+                <p className="text-xs text-purple-600 mt-1">
+                    {config.sets} × {config.holdDurationSeconds}s holds + {Math.max(0, config.sets - 1)} × {config.restSeconds}s rest
+                </p>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                <Textarea
+                    value={config.notes || ''}
+                    onChange={(e) => handleConfigUpdate({ notes: e.target.value })}
+                    className="min-h-[80px]"
+                    placeholder="Form cues, modifications, or intensity notes..."
+                />
+            </div>
+        </div>
+    );
+
+    const renderWorkoutPlanSelector = () => (
+        <div className="p-6 text-center">
+            <Calendar className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Workout Plan Mode</h3>
+            <p className="text-gray-600">Workout plan selection would go here</p>
+            <p className="text-sm text-gray-500 mt-2">
+                Selected: {selectedWorkoutPlan?.name || 'None'}
+            </p>
+        </div>
+    );
+
+    // ==================== RENDER MODAL ====================
+
+    if (!isOpen) return null;
+
+    const isConfigValid = validateConfiguration();
+    const dateDisplay = selectedDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-t-xl">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold">
+                                {isEditMode ? 'Edit Exercise Configuration' :
+                                    currentMode === 'exercise' ? 'Configure Exercise' : 'Select Workout Plan'}
+                            </h2>
+                            <p className="text-blue-100 text-sm mt-1">
+                                {currentMode === 'exercise' && exercise ?
+                                    `${exercise.name} • ${dateDisplay}` :
+                                    `Scheduling for • ${dateDisplay}`}
+                                {isEditMode && editingExercise && (
+                                    <span className="ml-2 bg-blue-600 px-2 py-1 rounded text-xs">
+                                        Editing
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleClose}
+                            className="text-white hover:text-blue-200 text-2xl font-bold"
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+
+                {/* Debug Panel (Development only) */}
+                {process.env.NODE_ENV === 'development' && (
+                    <div className="bg-yellow-50 border-b border-yellow-200 p-3">
+                        <p className="text-xs font-medium text-yellow-800 mb-1">Debug Info:</p>
+                        <div className="text-xs text-yellow-700 space-y-1">
+                            <p>Exercise: {exercise?.name || 'None'} | isCardio: {exercise?.isCardio ? 'Yes' : 'No'} | isIsometric: {exercise?.isIsometric ? 'Yes' : 'No'}</p>
+                            <p>Local Config: {localConfig ? (localConfig as any).trackingMode : 'None'} | Valid: {isConfigValid ? 'Yes' : 'No'}</p>
+                            <p>Mode: {currentMode} | Render Attempted: {debugInfo.renderAttempted ? 'Yes' : 'No'}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Mode Selector - Only show when not in edit mode */}
+                {!isEditMode && (
+                    <div className="border-b border-gray-200 p-4">
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    setCurrentMode('exercise');
+                                    onModeChange('exercise');
+                                }}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    currentMode === 'exercise'
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                            >
+                                Single Exercise
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setCurrentMode('workout-plan');
+                                    onModeChange('workout-plan');
+                                }}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    currentMode === 'workout-plan'
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                            >
+                                Workout Plan
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
-                    {/* Exercise Info Card */}
-                    <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
-                        <div className="flex items-center mb-3">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-full flex items-center justify-center text-white mr-3">
-                                <span className="text-sm sm:text-base">{exercise.emoji || '🏋️‍♂️'}</span>
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{exerciseName}</h3>
-                                <div className="flex gap-2 mt-1">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getDifficultyColor(exercise.difficultyLevel)}`}>
-                                        {exercise.difficultyLevel}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        {exercise.description && (
-                            <p className="text-xs sm:text-sm text-gray-600 mb-3">{exercise.description}</p>
-                        )}
-                        {exercise.targetMuscleGroups && exercise.targetMuscleGroups.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                                {exercise.targetMuscleGroups.map((muscle, index) => (
-                                    <span
-                                        key={index}
-                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800"
-                                    >
-                                        {muscle}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Quick Presets */}
-                    {getPresetConfigs().length > 0 && (
-                        <div className="mb-4 sm:mb-6">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                                <BoltIcon className="w-4 h-4 mr-1" />
-                                Quick Presets
-                            </h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                {getPresetConfigs().map((preset, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => handlePresetSelect(preset)}
-                                        className="p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors text-left active:scale-[0.98]"
-                                    >
-                                        <div className="text-sm font-medium text-gray-900">{preset.name}</div>
-                                        <div className="text-xs text-gray-600 mt-1">
-                                            {preset.sets} sets × {preset.reps}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        {/* Basic Configuration */}
-                        <div className="space-y-3 sm:space-y-4">
-                            <h4 className="text-sm font-medium text-gray-700 flex items-center">
-                                <BookmarkIcon className="w-4 h-4 mr-1" />
-                                Basic Configuration
-                            </h4>
-
-                            {/* Sets */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Sets
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="10"
-                                    value={config.sets}
-                                    onChange={(e) => onConfigChange({
-                                        ...config,
-                                        sets: parseInt(e.target.value) || 1
-                                    })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                                />
-                            </div>
-
-                            {/* Reps */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Reps/Duration
-                                </label>
-                                <input
-                                    type="text"
-                                    value={config.reps}
-                                    onChange={(e) => onConfigChange({
-                                        ...config,
-                                        reps: e.target.value
-                                    })}
-                                    placeholder="e.g., 8-12, 30 seconds, 1 mile"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                                />
-                            </div>
-
-                            {/* Weight */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Weight (lbs) - Optional
-                                </label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.5"
-                                    value={config.weight || ''}
-                                    onChange={(e) => onConfigChange({
-                                        ...config,
-                                        weight: e.target.value ? parseFloat(e.target.value) : undefined
-                                    })}
-                                    placeholder="Body weight, 135, etc."
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Advanced Configuration */}
-                        <div className="space-y-3 sm:space-y-4">
-                            <h4 className="text-sm font-medium text-gray-700 flex items-center">
-                                <LightBulbIcon className="w-4 h-4 mr-1" />
-                                Advanced Options
-                            </h4>
-
-                            {/* Rest Time */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Rest Time: {config.restSeconds ? formatTime(config.restSeconds) : '0:00'}
-                                </label>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="300"
-                                    step="15"
-                                    value={config.restSeconds || 60}
-                                    onChange={(e) => onConfigChange({
-                                        ...config,
-                                        restSeconds: parseInt(e.target.value)
-                                    })}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                                />
-                                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                    <span>0s</span>
-                                    <span>5min</span>
-                                </div>
-                            </div>
-
-                            {/* RPE */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Target RPE: {config.targetRpe || 7}
-                                </label>
-                                <input
-                                    type="range"
-                                    min="1"
-                                    max="10"
-                                    value={config.targetRpe || 7}
-                                    onChange={(e) => onConfigChange({
-                                        ...config,
-                                        targetRpe: parseInt(e.target.value)
-                                    })}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                                />
-                                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                    <span>Easy</span>
-                                    <span>Max</span>
-                                </div>
-                                <p className="text-xs text-gray-600 mt-1">
-                                    {getRpeDescription(config.targetRpe || 7)}
-                                </p>
-                            </div>
-
-                            {/* Tempo */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Tempo - Optional
-                                </label>
-                                <input
-                                    type="text"
-                                    value={config.tempo || ''}
-                                    onChange={(e) => onConfigChange({
-                                        ...config,
-                                        tempo: e.target.value
-                                    })}
-                                    placeholder="e.g., 3-1-2-1"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Format: eccentric-pause-concentric-pause
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Notes */}
-                    <div className="mt-4 sm:mt-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Notes - Optional
-                        </label>
-                        <textarea
-                            value={config.notes || ''}
-                            onChange={(e) => onConfigChange({
-                                ...config,
-                                notes: e.target.value
-                            })}
-                            rows={3}
-                            placeholder="Form cues, modifications, or personal reminders..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm sm:text-base"
-                        />
-                    </div>
-
-                    {/* Exercise Tips */}
-                    {exercise.tips && exercise.tips.length > 0 && (
-                        <div className="mt-4 sm:mt-6">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                                <InformationCircleIcon className="w-4 h-4 mr-1" />
-                                Exercise Tips
-                            </h4>
-                            <div className="bg-blue-50 rounded-lg p-3 sm:p-4">
-                                <ul className="space-y-2">
-                                    {exercise.tips.slice(0, 3).map((tip, index) => (
-                                        <li key={index} className="text-xs sm:text-sm text-blue-800 flex items-start">
-                                            <span className="text-blue-600 mr-2">•</span>
-                                            {tip}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Estimated Workout Time */}
-                    <div className="mt-4 sm:mt-6 bg-green-50 rounded-lg p-3 sm:p-4">
-                        <h4 className="text-sm font-medium text-green-800 mb-2 flex items-center">
-                            <ClockIcon className="w-4 h-4 mr-1" />
-                            Estimated Workout Time
-                        </h4>
-                        <div className="text-base sm:text-lg font-semibold text-green-900">
-                            {(() => {
-                                const exerciseTime = exercise.estimatedDurationMinutes || 2;
-                                const restTime = ((config.restSeconds || 60) * (config.sets - 1)) / 60;
-                                const totalTime = Math.ceil((exerciseTime * config.sets) + restTime);
-                                return `${totalTime} minutes`;
-                            })()}
-                        </div>
-                        <p className="text-xs text-green-700 mt-1">
-                            Including rest periods between sets
-                        </p>
-                    </div>
+                <div className="flex-1 overflow-y-auto">
+                    {renderConfigurationForm()}
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 border-t border-gray-200 bg-gray-50">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors active:scale-95"
+                <div className="border-t border-gray-200 p-4 flex gap-3 justify-end">
+                    <Button
+                        variant="outline"
+                        onClick={handleClose}
                         disabled={loading}
                     >
                         Cancel
-                    </button>
-                    <button
-                        onClick={onSave}
-                        disabled={loading}
-                        className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center active:scale-95"
+                    </Button>
+                    <Button
+                        onClick={handleSave}
+                        disabled={!isConfigValid || loading}
+                        className="bg-blue-600 hover:bg-blue-700"
                     >
-                        {loading ? (
-                            <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                <span className="text-sm sm:text-base">Adding...</span>
-                            </>
-                        ) : (
-                            <>
-                                <PlayIcon className="w-4 h-4 mr-2" />
-                                <span className="text-sm sm:text-base">
-                                    {isEditing ? 'Update Exercise' : 'Add Exercise'}
-                                </span>
-                            </>
-                        )}
-                    </button>
+                        {loading ? 'Saving...' : isEditMode ? 'Update Exercise' : 'Schedule Exercise'}
+                    </Button>
                 </div>
             </div>
         </div>

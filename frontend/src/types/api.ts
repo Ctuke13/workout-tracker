@@ -1,4 +1,4 @@
-import { Exercise, ExerciseType } from './exercise';
+import {Exercise, ExerciseType, ScheduledExercise} from './exercise';
 
 // ==================== AUTHENTICATION TYPES ====================
 
@@ -48,6 +48,7 @@ export interface BackendExercise {
     exerciseType: 'STRENGTH' | 'CARDIO' | 'FLEXIBILITY' | 'REHABILITATION' | 'SPORTS_SPECIFIC' | 'PLYOMETRIC' | 'BALANCE';
     exerciseTypeDisplay: string;  // "Strength Training", "Cardiovascular", etc.
     isCardio: boolean;
+    isIsometric: boolean;
     difficultyLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
     difficultyDescription: string;  // "Beginner - No experience needed"
     estimatedDurationMinutes: number | null;
@@ -126,86 +127,109 @@ export interface ExerciseFilters {
 // ==================== SCHEDULED WORKOUT TYPES ====================
 
 export interface ScheduledWorkoutResponse {
+    // =============================================================================
+    // BASIC IDENTIFICATION & SCHEDULING
+    // =============================================================================
     id: number;
     scheduledDate: string; // ISO date string "2025-01-20"
     status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'SKIPPED' | 'RESCHEDULED';
-    weekNumber?: number;
+
+    // =============================================================================
+    // EXERCISE CONFIGURATION FIELDS
+    // =============================================================================
+    // Strength exercise fields
+    sets?: number;
+    reps?: string;
+    weight?: number;
+    restSeconds?: number;
+    tempo?: string;
+    targetRpe?: number;
+
+    // Cardio exercise fields
+    targetDurationMinutes?: number;
+    targetDistanceKm?: number;
+    targetPace?: number;
+
+    // Isometric exercise fields
+    holdDurationSeconds?: number;
+
+    // =============================================================================
+    // PROGRAM CONTEXT & SCHEDULING
+    // =============================================================================
+    weekNumber?: number; // Which week of the program
     dayOfWeek?: number; // 1=Monday, 7=Sunday
+    estimatedDurationMinutes?: number;
+
+    // =============================================================================
+    // USER CUSTOMIZATIONS & NOTES
+    // =============================================================================
     customNotes?: string;
     reminderTime?: string; // ISO datetime string
-    estimatedDurationMinutes?: number;
-    completedAt?: string; // ISO datetime string
-    createdAt: string;
-    updatedAt: string;
-    createdByUserId?: number;
 
-    // Nested DTOs - exactly matching your backend
-    workoutPlan: WorkoutPlanInfo;
-    user: UserInfo;
-    program?: WorkoutProgramInfo;
-    completedSession?: WorkoutSessionInfo;
+    // =============================================================================
+    // COMPLETION & TRACKING
+    // =============================================================================
+    completedAt?: string; // ISO datetime string
+
+    // =============================================================================
+    // METADATA & AUDIT FIELDS
+    // =============================================================================
+    createdAt: string; // ISO datetime string
+    updatedAt: string; // ISO datetime string
+    createdByUserId?: number; // For coach-assigned workouts
+
+    // =============================================================================
+    // RELATED ENTITY INFORMATION
+    // =============================================================================
+    workoutPlan?: WorkoutPlanInfo;
+    user?: UserInfo;
+    program?: WorkoutProgramInfo; // Optional - only if part of program
+    completedSession?: WorkoutSessionInfo; // Only if completed
 }
+
+// =============================================================================
+// SUPPORTING INTERFACES FOR SCHEDULED WORKOUTS
+// =============================================================================
 
 export interface WorkoutPlanInfo {
     id: number;
     name: string;
     description?: string;
-    difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+    difficulty: string; // BEGINNER, INTERMEDIATE, ADVANCED
     estimatedDurationMinutes?: number;
     exerciseCount: number;
     category?: string;
     imageUrl?: string;
-    isPublic: boolean;
+    isPublic?: boolean;
 }
 
 export interface UserInfo {
     id: number;
     username: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    subscriptionTier: 'FREE' | 'PLUS' | 'PRO';
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    subscriptionTier?: string; // FREE, PLUS, PRO
 }
 
 export interface WorkoutProgramInfo {
     id: number;
     name: string;
     description?: string;
-    totalWeeks: number;
-    difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+    totalWeeks?: number;
+    difficulty?: string;
     category?: string;
     imageUrl?: string;
-    isActive: boolean;
+    isActive?: boolean;
 }
 
 export interface WorkoutSessionInfo {
     id: number;
-    startTime: string;
-    endTime?: string;
+    startTime?: string; // ISO datetime string
+    endTime?: string; // ISO datetime string
     actualDurationMinutes?: number;
     notes?: string;
-    completed: boolean;
-}
-
-// ==================== FRONTEND SCHEDULED EXERCISE (Your Current Structure) ====================
-
-// This interface represents how scheduled workouts appear to your current frontend
-// We'll transform ScheduledWorkoutResponse into this structure for backward compatibility
-export interface ScheduledExercise {
-    id: string;                    // from ScheduledWorkoutResponse.id
-    exerciseId: number;           // from workout plan exercises
-    exercise: Exercise;           // transformed from workoutPlan.exercises
-    scheduledDate: string;        // ISO date string from ScheduledWorkoutResponse
-    sets: number;                 // from exercise configuration
-    reps: string;                 // from exercise configuration
-    weight?: number;              // from exercise configuration
-    restSeconds?: number;         // from exercise configuration
-    tempo?: string;               // from exercise configuration
-    targetRpe?: number;           // from exercise configuration
-    notes?: string;               // from ScheduledWorkoutResponse.customNotes
-    completed: boolean;           // derived from status === 'COMPLETED'
-    createdAt: string;           // from ScheduledWorkoutResponse.createdAt
-    userId: string;              // from ScheduledWorkoutResponse.user.id
+    completed?: boolean;
 }
 
 // ==================== WORKOUT SESSION TYPES ====================
@@ -246,6 +270,47 @@ export interface WorkoutSessionResponse {
     isShared: boolean;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface WorkoutStatsResponse {
+    // ===== CORE TOTALS =====
+    totalScheduledWorkouts: number;
+    totalCompletedWorkouts: number;
+    overallCompletionRate: number;  // 0-100 percentage
+    currentStreekDays: number;
+    longestStreakDays: number;
+    averageDurationMinutes: number;
+
+    // ===== WEEKLY STATS =====
+    thisWeekScheduled: number;
+    thisWeekCompleted: number;
+    weeklyCompletionRate: number;
+    completionRateThisWeek?: number;  // Alternative naming - your backend might use this
+
+    // ===== MONTHLY STATS =====
+    thisMonthScheduled: number;
+    thisMonthCompleted: number;
+    monthlyCompletionRate: number;
+    completionRateThisMonth?: number;  // Alternative naming - your backend might use this
+
+    // ===== BEHAVIORAL INSIGHTS =====
+    favoriteExerciseType?: string;
+    averageWorkoutsPerWeek?: number;
+    mostActiveDay?: string;  // e.g., "Monday", "Tuesday", etc.
+
+    // ===== PERFORMANCE METRICS =====
+    totalCaloriesBurned?: number;
+    totalDistanceKm?: number;  // For cardio tracking
+
+    // ===== ADDITIONAL INSIGHTS =====
+    averageCaloriesPerWorkout?: number;
+    averageDistancePerCardioSession?: number;
+    totalWorkoutTimeHours?: number;
+    preferredWorkoutTimeOfDay?: string;  // e.g., "Morning", "Evening"
+
+    // ===== GOAL TRACKING =====
+    weeklyGoalAchievementRate?: number;  // Percentage of weeks where weekly goal was met
+    consistencyScore?: number;  // Algorithm-based consistency rating (0-100)
 }
 
 // ==================== PERFORMANCE RECORD TYPES ====================
@@ -544,13 +609,19 @@ export const API_ENDPOINTS = {
     // Calendar & Scheduling
     CALENDAR: {
         BASE: '/api/calendar',
+        EXERCISES: '/api/calendar/exercises',
+        EXERCISE_BY_ID: (id: string) => `/api/calendar/exercises/${id}`,
+        EXERCISE_COMPLETE: (id: string) => `/api/calendar/exercises/${id}/complete`,
+        EXERCISE_BY_DATE: (date: string) => `/api/calendar/exercises/date/${date}`,
         TODAY: '/api/calendar/today',
         UPCOMING: '/api/calendar/upcoming',
         OVERDUE: '/api/calendar/overdue',
         SCHEDULE: '/api/calendar/schedule',
         RESCHEDULE: (id: number) => `/api/calendar/${id}/reschedule`,
         START: (id: number) => `/api/calendar/${id}/start`,
-        DELETE: (id: number) => `/api/calendar/${id}`
+        DELETE: (id: number) => `/api/calendar/${id}`,
+        STATS: '/api/calendar/stats',
+        WORKOUT_PLANS: '/api/calendar/workout-plans'
     },
 
     // Workout Sessions

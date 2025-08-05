@@ -1,8 +1,8 @@
-// src/components/CalendarPage/InWorkoutExerciseSelector.tsx
+// src/components/CalendarPage/InWorkoutExerciseSelector.tsx - Fixed
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWorkout } from '../../contexts/WorkoutContext';
-import { Exercise } from '../../types/exercise';
-import { calendarMockApi } from '../../services/calendarMockData';
+import { Exercise, ExerciseFilters } from '../../types/exercise';
+import { exerciseApi } from '../../services/exerciseApi'; //
 import {
     XMarkIcon,
     MagnifyingGlassIcon,
@@ -45,10 +45,10 @@ const DEFAULT_CONFIG: ExerciseConfiguration = {
 // Quick categories for filtering
 const QUICK_CATEGORIES = [
     { id: 'all', name: 'All', emoji: '🎯' },
-    { id: 'strength', name: 'Strength', emoji: '💪' },
-    { id: 'cardio', name: 'Cardio', emoji: '❤️' },
-    { id: 'flexibility', name: 'Flexibility', emoji: '🧘‍♀️' },
-    { id: 'core', name: 'Core', emoji: '🔥' }
+    { id: 'STRENGTH', name: 'Strength', emoji: '💪' },
+    { id: 'CARDIO', name: 'Cardio', emoji: '❤️' },
+    { id: 'FLEXIBILITY', name: 'Flexibility', emoji: '🧘‍♀️' },
+    { id: 'CORE', name: 'Core', emoji: '🔥' }
 ];
 
 const InWorkoutExerciseSelector: React.FC<InWorkoutExerciseSelectorProps> = ({
@@ -74,7 +74,6 @@ const InWorkoutExerciseSelector: React.FC<InWorkoutExerciseSelectorProps> = ({
     // Recent exercises (from workout history or context)
     const [recentExercises, setRecentExercises] = useState<Exercise[]>([]);
 
-    // Fetch exercises using your real API
     const fetchExercises = useCallback(async (query: string = '') => {
         setLoading(true);
         setError(null);
@@ -82,10 +81,29 @@ const InWorkoutExerciseSelector: React.FC<InWorkoutExerciseSelectorProps> = ({
         try {
             console.log('🔍 Fetching exercises for workout mode:', query);
 
-            // Use your existing calendar mock API
-            const results = await calendarMockApi.searchExercises(query, {
-                exerciseType: selectedCategory !== 'all' ? selectedCategory : undefined
-            });
+            // Create proper ExerciseFilters object
+            const filters: ExerciseFilters = {
+                activeGoal: 'all',
+                searchTerm: query,
+                selectedEquipment: 'all',
+                selectedDifficulty: 'all',
+                selectedExerciseType: selectedCategory !== 'all' ? selectedCategory : 'all',
+                minRating: 0,
+                maxDuration: 480,
+                sortBy: 'relevance',
+                showProfessionalOnly: false,
+                onlyFavorites: false,
+                includeCompleted: true,
+                muscleGroups: [],
+                availableEquipment: [],
+                fitnessLevel: 'all',
+                trackingType: 'all'
+            };
+
+            // Use the correct exerciseApi method
+            const results = query.trim()
+                ? await exerciseApi.searchExercises(query, filters)
+                : await exerciseApi.getPublicExercises(filters);
 
             setExercises(results);
             console.log('✅ Exercises loaded for workout mode:', results.length);
@@ -151,9 +169,9 @@ const InWorkoutExerciseSelector: React.FC<InWorkoutExerciseSelectorProps> = ({
                 const muscleGroups = exercise.targetMuscleGroups?.map(m => m.toLowerCase()) || [];
 
                 return (
-                    exerciseType === selectedCategory ||
-                    exerciseType.includes(selectedCategory) ||
-                    muscleGroups.some(muscle => muscle.includes(selectedCategory))
+                    exerciseType === selectedCategory.toLowerCase() ||
+                    exerciseType.includes(selectedCategory.toLowerCase()) ||
+                    muscleGroups.some(muscle => muscle.includes(selectedCategory.toLowerCase()))
                 );
             });
         }
@@ -238,7 +256,6 @@ const InWorkoutExerciseSelector: React.FC<InWorkoutExerciseSelectorProps> = ({
 
         const presets = [];
         const exerciseType = selectedExercise.exerciseType.toLowerCase();
-        const difficulty = selectedExercise.difficultyLevel.toLowerCase();
 
         if (exerciseType === 'strength') {
             presets.push(

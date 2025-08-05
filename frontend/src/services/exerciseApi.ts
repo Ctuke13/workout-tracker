@@ -26,7 +26,7 @@ class ExerciseApiService {
     private async fetchWithErrorHandling<T>(endpoint: string, params?: any): Promise<T> {
         if (this.useAuthenticatedClient) {
             // Use your sophisticated API client with JWT auth and error handling
-            return apiClient.get<T>(endpoint, params);
+            return apiClient.get<T>(endpoint, { params });
         } else {
             // Fallback to the original fetch-based approach
             const url = this.buildUrl(endpoint, params);
@@ -42,7 +42,7 @@ class ExerciseApiService {
 
     // Keep your existing URL building logic (it's good!)
     private buildUrl(endpoint: string, params?: any): string {
-        const baseUrl = 'http://localhost:8080/api/exercises';
+        const baseUrl = 'http://localhost:8080';
         const url = new URL(`${baseUrl}${endpoint}`);
 
         if (params) {
@@ -77,7 +77,8 @@ class ExerciseApiService {
             console.log(
                 `✅ Successfully fetched ${transformedExercises.length} exercises. ` +
                 `Cardio: ${transformedExercises.filter(ex => ex.isCardio).length}, ` +
-                `Strength: ${transformedExercises.filter(ex => !ex.isCardio).length}`
+                `Isometric: ${transformedExercises.filter(ex => ex.isIsometric).length}, ` +
+                `Strength: ${transformedExercises.filter(ex => !ex.isCardio && !ex.isIsometric).length}`
             );
 
             return transformedExercises;

@@ -336,22 +336,22 @@ public class ExerciseDataLoader implements CommandLineRunner {
                                 List<String> benefits, List<String> tips, List<String> muscleGroups) {
         Exercise exercise = new Exercise();
 
-        // ✅ FIXED: Using correct setter names and types
-        exercise.setExerciseName(name);  // Correct field name
-        exercise.setExerciseType(exerciseType);  // Enum type
-        exercise.setEstimatedDurationMinutes(durationMinutes);  // Integer type
-        exercise.setEquipmentRequired(equipment);  // List<String> type
-        exercise.setDifficultyLevel(difficulty);  // Enum type
-        exercise.setEstimatedCalories(calories);  // Integer type
-        exercise.setEmoji(emoji);
-        exercise.setDescription(description);
-        exercise.setBenefits(benefits);
-        exercise.setTips(tips);
-        exercise.setTargetMuscleGroups(muscleGroups);  // Correct field name
-        exercise.setPublished(true);
-        exercise.setUsageCount(0);  // Initialize usage count
-        exercise.setAverageRating(0.0);  // Initialize rating
-        exercise.setTotalRatings(0);  // Initialize rating count
+        // ✅ FIXED: Using correct setter names based on Exercise entity field names
+        exercise.setExerciseName(name);              // ✅ Field: exerciseName
+        exercise.setExerciseType(exerciseType);      // ✅ Field: exerciseType
+        exercise.setEstimatedDurationMinutes(durationMinutes);  // ✅ Field: estimatedDurationMinutes
+        exercise.setEquipmentRequired(equipment);    // ✅ Field: equipmentRequired
+        exercise.setDifficultyLevel(difficulty);     // ✅ Field: difficultyLevel
+        exercise.setEstimatedCalories(calories);     // ✅ Field: estimatedCalories
+        exercise.setEmoji(emoji);                    // ✅ Field: emoji
+        exercise.setDescription(description);        // ✅ Field: description
+        exercise.setBenefits(benefits);              // ✅ Field: benefits
+        exercise.setTips(tips);                      // ✅ Field: tips
+        exercise.setTargetMuscleGroups(muscleGroups);// ✅ Field: targetMuscleGroups
+        exercise.setPublished(true);                 // ✅ Field: published
+        exercise.setUsageCount(0);                   // ✅ Field: usageCount
+        exercise.setAverageRating(0.0);              // ✅ Field: averageRating
+        exercise.setTotalRatings(0);                 // ✅ Field: totalRatings
 
         exerciseRepository.save(exercise);
         log.debug("Created exercise: {} (Type: {}, Difficulty: {})", name, exerciseType, difficulty);

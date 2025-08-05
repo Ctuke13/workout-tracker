@@ -79,6 +79,22 @@ public class ExerciseGoalMapping {
         };
     }
 
+    // ✅ ADDED MISSING METHODS THAT Exercise.java EXPECTS:
+
+    /**
+     * Get the fitness goal (accessor method for Exercise.java)
+     */
+    public FitnessGoal getFitnessGoal() {
+        return this.fitnessGoal;
+    }
+
+    /**
+     * Get the relevance score (accessor method for Exercise.java)
+     */
+    public Integer getRelevanceScore() {
+        return this.relevanceScore;
+    }
+
     // 📱 CONVENIENCE CONSTRUCTORS
     public ExerciseGoalMapping(Long exerciseId, Integer goalId, Integer relevanceScore, Boolean isPrimary) {
         this.exerciseId = exerciseId;

@@ -214,7 +214,7 @@ export const WorkoutTrackingInterface: React.FC<WorkoutTrackingInterfaceProps> =
                 {/* Current Set Display */}
                 <div className="text-center">
                     <div className="text-2xl font-bold text-purple-600 mb-2">
-                        Set {currentSet} of {config.sets}
+                        Set {currentSet} of {config.targetSets || 3} {/* ✅ FIXED: Use targetSets */}
                     </div>
 
                     {/* Hold Timer */}
@@ -270,7 +270,7 @@ export const WorkoutTrackingInterface: React.FC<WorkoutTrackingInterfaceProps> =
                         </div>
                         <div>
                             <div className="text-purple-800 font-medium">Rest Time</div>
-                            <div className="text-purple-900 font-bold">{config.restSeconds}s</div>
+                            <div className="text-purple-900 font-bold">{config.restSeconds || 60}s</div>
                         </div>
                     </div>
                 </div>
@@ -301,18 +301,20 @@ export const WorkoutTrackingInterface: React.FC<WorkoutTrackingInterfaceProps> =
                 {/* Current Set Display */}
                 <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600 mb-4">
-                        Set {currentSet} of {config.sets}
+                        Set {currentSet} of {config.targetSets || 3} {/* ✅ FIXED: Use targetSets */}
                     </div>
 
                     {/* Rep Counter */}
                     <div className="bg-blue-50 p-6 rounded-lg">
                         <div className="text-lg text-blue-800 mb-2">Target Reps</div>
-                        <div className="text-4xl font-bold text-blue-900">{config.reps}</div>
+                        <div className="text-4xl font-bold text-blue-900">{config.targetReps || 10}</div> {/* ✅ FIXED: Use targetReps */}
 
-                        {config.weight && (
+                        {config.targetWeight && ( /* ✅ FIXED: Use targetWeight */
                             <div className="mt-4">
                                 <div className="text-lg text-blue-800">Weight</div>
-                                <div className="text-2xl font-bold text-blue-900">{config.weight} lbs</div>
+                                <div className="text-2xl font-bold text-blue-900">
+                                    {config.targetWeight} {config.targetWeightUnit || 'lbs'} {/* ✅ FIXED: Use targetWeight and targetWeightUnit */}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -323,7 +325,9 @@ export const WorkoutTrackingInterface: React.FC<WorkoutTrackingInterfaceProps> =
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <div className="text-blue-800 font-medium">Rest Time</div>
-                            <div className="text-blue-900 font-bold">{Math.floor(config.restSeconds / 60)}:{(config.restSeconds % 60).toString().padStart(2, '0')}</div>
+                            <div className="text-blue-900 font-bold">
+                                {Math.floor((config.restSeconds || 60) / 60)}:{((config.restSeconds || 60) % 60).toString().padStart(2, '0')}
+                            </div>
                         </div>
                         <div>
                             <div className="text-blue-800 font-medium">Target RPE</div>
@@ -338,7 +342,7 @@ export const WorkoutTrackingInterface: React.FC<WorkoutTrackingInterfaceProps> =
                         <div className="text-center">
                             <div className="text-orange-800 font-medium mb-2">Rest Timer</div>
                             <div className="text-3xl font-mono font-bold text-orange-600">
-                                {formatTime(Math.max(0, config.restSeconds - currentTime))}
+                                {formatTime(Math.max(0, (config.restSeconds || 60) - currentTime))}
                             </div>
                         </div>
                     </div>

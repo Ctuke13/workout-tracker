@@ -130,9 +130,10 @@ CREATE TABLE scheduled_workouts (
     -- ✅ NEW: EXERCISE CONFIGURATION FIELDS (Step 6 of Solution)
     -- =============================================================================
     -- Strength exercise fields
-                                    sets INTEGER,                                          -- @Column(name = "sets")
-                                    reps VARCHAR(50),                                      -- @Column(name = "reps")
-                                    weight DOUBLE PRECISION,                               -- @Column(name = "weight")
+                                    target_sets INTEGER,                                          -- @Column(name = "targetSets")
+                                    target_reps VARCHAR(50),                                      -- @Column(name = "targetReps")
+                                    target_weight DOUBLE PRECISION,                          -- @Column(name = "targetWeight")
+                                    target_weight_unit VARCHAR(3) DEFAULT 'lbs',
                                     rest_seconds INTEGER,                                  -- @Column(name = "rest_seconds")
                                     tempo VARCHAR(20),                                     -- @Column(name = "tempo")
                                     target_rpe INTEGER,                                    -- @Column(name = "target_rpe")
@@ -165,8 +166,10 @@ CREATE TABLE scheduled_workouts (
                                     CHECK (estimated_duration_minutes IS NULL OR estimated_duration_minutes > 0),
 
     -- ✅ NEW: Check constraints for exercise configuration fields
-                                    CHECK (sets IS NULL OR sets > 0),
-                                    CHECK (weight IS NULL OR weight >= 0),
+                                    CHECK (target_sets IS NULL OR target_sets > 0),
+                                    CHECK (target_reps IS NULL OR target_reps > 0),
+                                    CHECK (target_weight IS NULL OR target_weight >= 0),
+                                    CHECK (target_weight_unit IN ('kg', 'lbs')),
                                     CHECK (rest_seconds IS NULL OR rest_seconds >= 0),
                                     CHECK (target_rpe IS NULL OR (target_rpe >= 1 AND target_rpe <= 10)),
                                     CHECK (target_duration_minutes IS NULL OR target_duration_minutes > 0),
@@ -225,8 +228,10 @@ CREATE INDEX idx_scheduled_workouts_week_day ON scheduled_workouts(week_number, 
 CREATE INDEX idx_scheduled_workouts_reminder_time ON scheduled_workouts(reminder_time);
 
 -- ✅ NEW: Indexes for exercise configuration fields
-CREATE INDEX idx_scheduled_workouts_sets ON scheduled_workouts(sets) WHERE sets IS NOT NULL;
-CREATE INDEX idx_scheduled_workouts_weight ON scheduled_workouts(weight) WHERE weight IS NOT NULL;
+CREATE INDEX idx_scheduled_workouts_target_sets ON scheduled_workouts(target_sets) WHERE sets IS NOT NULL;
+CREATE INDEX idx_scheduled_workouts_target_reps ON scheduled_workouts(target_reps) WHERE target_reps IS NOT NULL;
+CREATE INDEX idx_scheduled_workouts_target_weight ON scheduled_workouts(target_weight) WHERE target_weight IS NOT NULL;
+CREATE INDEX idx_scheduled_workouts_target_weight_unit ON scheduled_workouts(target_weight_unit);
 CREATE INDEX idx_scheduled_workouts_target_duration ON scheduled_workouts(target_duration_minutes) WHERE target_duration_minutes IS NOT NULL;
 
 -- =====================================================
@@ -280,9 +285,10 @@ COMMENT ON COLUMN scheduled_workouts.reminder_time IS 'When to send reminder for
 COMMENT ON COLUMN scheduled_workouts.estimated_duration_minutes IS 'Estimated duration for this specific workout instance';
 
 -- ✅ NEW: Comments for exercise configuration fields
-COMMENT ON COLUMN scheduled_workouts.sets IS 'Number of sets for strength exercises';
-COMMENT ON COLUMN scheduled_workouts.reps IS 'Number of reps per set (e.g., "8-12", "15", "AMRAP")';
-COMMENT ON COLUMN scheduled_workouts.weight IS 'Weight to use for exercise (in kg or lbs)';
+COMMENT ON COLUMN scheduled_workouts.target_sets IS 'Number of sets for strength exercises';
+COMMENT ON COLUMN scheduled_workouts.target_reps IS 'Target number of reps per set (single number only)';
+COMMENT ON COLUMN scheduled_workouts.target_weight IS 'Target weight to use for exercise';
+COMMENT ON COLUMN scheduled_workouts.target_weight_unit IS 'Weight unit: kg or lbs (default lbs for US users)';
 COMMENT ON COLUMN scheduled_workouts.rest_seconds IS 'Rest time between sets in seconds';
 COMMENT ON COLUMN scheduled_workouts.tempo IS 'Exercise tempo (e.g., "3-1-2-1")';
 COMMENT ON COLUMN scheduled_workouts.target_rpe IS 'Target Rate of Perceived Exertion (1-10)';

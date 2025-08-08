@@ -23,14 +23,17 @@ public class ScheduledWorkout {
     @NotNull(message = "User is required")
     private User user;
 
-    @Column(name = "sets")
-    private Integer sets;
+    @Column(name = "target_sets")
+    private Integer targetSets;
 
-    @Column(name = "reps")
-    private String reps;
+    @Column(name = "target_reps")
+    private String targetReps;
 
-    @Column(name = "weight")
-    private Double weight;
+    @Column(name = "target_weight")
+    private Double targetWeight;
+
+    @Column(name = "target_weight_unit")
+    private String targetWeightUnit = "lbs";
 
     @Column(name = "rest_seconds")
     private Integer restSeconds;
@@ -167,6 +170,32 @@ public class ScheduledWorkout {
     public boolean canBeRescheduled() {
         return status == ScheduleStatus.SCHEDULED &&
                 scheduledDate.isAfter(LocalDate.now());
+    }
+
+    public Double getTargetWeightInKg() {
+        if (targetWeight == null) return null;
+        if ("lbs".equals(targetWeightUnit)) {
+            return targetWeight * 0.453592; // Convert lbs to kg
+        }
+        return targetWeight;
+    }
+
+    public Double getTargetWeightInLbs() {
+        if (targetWeight == null) return null;
+        if ("kg".equals(targetWeightUnit)) {
+            return targetWeight * 2.20462; // Convert kg to lbs
+        }
+        return targetWeight;
+    }
+
+    public void setTargetWeightInKg(Double weightKg) {
+        this.targetWeight = weightKg;
+        this.targetWeightUnit = "kg";
+    }
+
+    public void setTargetWeightInLbs(Double weightLbs) {
+        this.targetWeight = weightLbs;
+        this.targetWeightUnit = "lbs";
     }
 
     /**

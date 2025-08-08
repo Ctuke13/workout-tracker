@@ -22,11 +22,14 @@ import {
     StrengthConfiguration,
     CardioConfiguration,
     IsometricConfiguration,
+    convertDistance,
+    formatDistance
 } from '../types/exercise';
 import { calendarApi } from '../services/calendarApi';
 import { transformScheduledWorkoutsToCalendarData } from '../services/transformers';
 
-// Workout stats response interface
+// ==================== INTERFACES ====================
+
 interface WorkoutStatsResponse {
     exercisesScheduledToday: number;
     exercisesCompletedToday: number;
@@ -48,10 +51,11 @@ interface WorkoutStatsResponse {
     favoriteExerciseType: string;
 }
 
+// ==================== MAIN COMPONENT ====================
+
 const CalendarPage: React.FC = () => {
     // ==================== CORE STATE ====================
 
-    // Focus on current viewing date (starts with today)
     const [viewingDate, setViewingDate] = useState(new Date());
     const [scheduledWorkouts, setScheduledWorkouts] = useState<ScheduledExercise[]>([]);
     const [stats, setStats] = useState<WorkoutStats | null>(null);
@@ -73,14 +77,23 @@ const CalendarPage: React.FC = () => {
     const [schedulingMode, setSchedulingMode] = useState<'exercise' | 'workout-plan'>('exercise');
 
     // ==================== EDITING STATE ====================
+
     const [editingExercise, setEditingExercise] = useState<ScheduledExercise | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
 
-    // ==================== DATA LOADING EFFECTS ====================
+    // ==================== COMPUTED VALUES ====================
 
     const viewingDateString = useMemo(() => {
         return viewingDate.toISOString().split('T')[0];
     }, [viewingDate]);
+
+    // Get exercises for the viewing date
+    const viewingDateExercises = useMemo(() => {
+        const dateString = viewingDate.toISOString().split('T')[0];
+        return scheduledWorkouts.filter(workout => workout.scheduledDate === dateString);
+    }, [viewingDate, scheduledWorkouts]);
+
+    // ==================== DATA LOADING EFFECTS ====================
 
     // Load data when viewing date changes
     useEffect(() => {
@@ -222,12 +235,12 @@ const CalendarPage: React.FC = () => {
                 notes: exerciseConfig.notes || `${selectedExercise.name || selectedExercise.exerciseName}`
             };
 
-            // Add configuration based on tracking mode
+            // ✅ FIXED: Add configuration based on tracking mode with correct field names
             if (exerciseConfig.trackingMode === 'strength') {
                 const strengthConfig = exerciseConfig as StrengthConfiguration;
-                scheduleData.sets = strengthConfig.sets;
-                scheduleData.reps = strengthConfig.reps;
-                scheduleData.weight = strengthConfig.weight;
+                scheduleData.sets = strengthConfig.targetSets;                    // ✅ FIXED: targetSets -> sets
+                scheduleData.reps = strengthConfig.targetReps?.toString();        // ✅ FIXED: targetReps -> reps (as string for backend)
+                scheduleData.weight = strengthConfig.targetWeight;                // ✅ FIXED: targetWeight -> weight
                 scheduleData.restSeconds = strengthConfig.restSeconds;
                 scheduleData.targetRpe = strengthConfig.targetRpe;
                 scheduleData.tempo = strengthConfig.tempo;
@@ -238,14 +251,13 @@ const CalendarPage: React.FC = () => {
                 scheduleData.targetPace = cardioConfig.targetPace;
             } else if (exerciseConfig.trackingMode === 'isometric') {
                 const isometricConfig = exerciseConfig as IsometricConfiguration;
-                scheduleData.sets = isometricConfig.sets;
+                scheduleData.sets = isometricConfig.targetSets;                   // ✅ FIXED: targetSets -> sets
                 scheduleData.holdDurationSeconds = isometricConfig.holdDurationSeconds;
                 scheduleData.restSeconds = isometricConfig.restSeconds;
             }
 
             console.log('📡 Sending individual exercise schedule request:', scheduleData);
 
-            // ✅ FIXED: Use the individual exercise scheduling method (to be added to calendarApi)
             const response = await calendarApi.scheduleIndividualExercise(scheduleData);
 
             toast.success('Exercise scheduled successfully!');
@@ -288,7 +300,6 @@ const CalendarPage: React.FC = () => {
 
             console.log('📡 Sending workout plan schedule request:', scheduleData);
 
-            // Use the existing workout plan scheduling method
             const response = await calendarApi.scheduleWorkout(scheduleData);
 
             toast.success('Workout plan scheduled successfully!');
@@ -305,6 +316,7 @@ const CalendarPage: React.FC = () => {
     };
 
     // ==================== EDITING HANDLERS ====================
+
     const handleEditExercise = (scheduledExercise: ScheduledExercise) => {
         console.log('🔧 Editing exercise:', scheduledExercise);
 
@@ -334,31 +346,32 @@ const CalendarPage: React.FC = () => {
                 config: exerciseConfig
             });
 
-            // ✅ BETTER: Use Partial<ScheduledExercise> type
-            const updateData: Partial<ScheduledExercise> = {
+            // ✅ FIXED: Use correct field names for the update request
+            const updateData: any = {
                 exerciseId: selectedExercise.id,
                 scheduledDate: viewingDate.toISOString().split('T')[0],
                 notes: exerciseConfig.notes || `${selectedExercise.name || selectedExercise.exerciseName}`
             };
 
-            // Add configuration based on tracking mode
+            // ✅ FIXED: Add configuration based on tracking mode with correct field names
             if (exerciseConfig.trackingMode === 'strength') {
                 const strengthConfig = exerciseConfig as StrengthConfiguration;
-                updateData.sets = strengthConfig.sets;
-                updateData.reps = strengthConfig.reps;
-                updateData.weight = strengthConfig.weight;
+                updateData.sets = strengthConfig.targetSets;                      // ✅ FIXED: targetSets -> sets
+                updateData.reps = strengthConfig.targetReps?.toString();          // ✅ FIXED: targetReps -> reps (as string for backend)
+                updateData.weight = strengthConfig.targetWeight;                  // ✅ FIXED: targetWeight -> weight
                 updateData.restSeconds = strengthConfig.restSeconds;
                 updateData.targetRpe = strengthConfig.targetRpe;
                 updateData.tempo = strengthConfig.tempo;
             } else if (exerciseConfig.trackingMode === 'cardio') {
                 const cardioConfig = exerciseConfig as CardioConfiguration;
-                // Note: ScheduledExercise doesn't have cardio fields, so you might need to extend it
-                // or use a different approach for cardio exercises
+                updateData.targetDurationMinutes = cardioConfig.targetDurationMinutes;
+                updateData.targetDistanceKm = cardioConfig.targetDistanceKm;
+                updateData.targetPace = cardioConfig.targetPace;
             } else if (exerciseConfig.trackingMode === 'isometric') {
                 const isometricConfig = exerciseConfig as IsometricConfiguration;
-                updateData.sets = isometricConfig.sets;
+                updateData.sets = isometricConfig.targetSets;                     // ✅ FIXED: targetSets -> sets
+                updateData.holdDurationSeconds = isometricConfig.holdDurationSeconds;
                 updateData.restSeconds = isometricConfig.restSeconds;
-                // Note: ScheduledExercise doesn't have holdDurationSeconds
             }
 
             console.log('📡 Sending exercise update request:', updateData);
@@ -376,31 +389,33 @@ const CalendarPage: React.FC = () => {
         }
     };
 
+    // ✅ FIXED: Updated conversion function to use new field names
     const convertScheduledExerciseToConfig = (scheduledExercise: ScheduledExercise): ExerciseConfiguration => {
         const exercise = scheduledExercise.exercise;
 
         if (exercise.isCardio) {
             return {
                 trackingMode: 'cardio',
-                targetDurationMinutes: exercise.estimatedDurationMinutes || 20,
-                targetDistanceKm: undefined,
-                targetPace: undefined,
+                targetDurationMinutes: scheduledExercise.targetDurationMinutes || exercise.estimatedDurationMinutes || 20,
+                targetDistanceKm: scheduledExercise.targetDistanceKm,
+                targetPace: scheduledExercise.targetPace,
                 notes: scheduledExercise.notes || ''
             } as CardioConfiguration;
         } else if (exercise.isIsometric) {
             return {
                 trackingMode: 'isometric',
-                sets: scheduledExercise.sets || 3,
-                holdDurationSeconds: 30, // Default, you might want to store this
+                targetSets: scheduledExercise.targetSets || 3,                    // ✅ FIXED: targetSets
+                holdDurationSeconds: scheduledExercise.holdDurationSeconds || 30,
                 restSeconds: scheduledExercise.restSeconds || 60,
                 notes: scheduledExercise.notes || ''
             } as IsometricConfiguration;
         } else {
             return {
                 trackingMode: 'strength',
-                sets: scheduledExercise.sets || 3,
-                reps: scheduledExercise.reps || '8-12',
-                weight: scheduledExercise.weight,
+                targetSets: scheduledExercise.targetSets || 3,                    // ✅ FIXED: targetSets
+                targetReps: scheduledExercise.targetReps || 10,                   // ✅ FIXED: targetReps as number
+                targetWeight: scheduledExercise.targetWeight,                     // ✅ FIXED: targetWeight
+                targetWeightUnit: scheduledExercise.targetWeightUnit || 'lbs',    // ✅ NEW: targetWeightUnit
                 restSeconds: scheduledExercise.restSeconds || 90,
                 targetRpe: scheduledExercise.targetRpe,
                 tempo: scheduledExercise.tempo,
@@ -468,7 +483,7 @@ const CalendarPage: React.FC = () => {
                 status: (workout as any).status
             });
 
-            // ✅ CHANGED: Only block deletion for COMPLETED workouts, not CANCELLED ones
+            // Only block deletion for COMPLETED workouts
             if (workout.completed) {
                 console.log('❌ Workout is completed, cannot delete');
                 toast('Cannot delete completed workout', {
@@ -481,9 +496,6 @@ const CalendarPage: React.FC = () => {
                 });
                 return;
             }
-
-            // ✅ REMOVED: The cancelled status check - we want to delete cancelled workouts!
-            // This was preventing the delete API call from happening
         }
 
         console.log('✅ Proceeding with delete confirmation');
@@ -546,20 +558,12 @@ const CalendarPage: React.FC = () => {
     };
 
     const startWorkoutMode = () => {
-        // Navigate to workout mode or trigger workout overlay
         toast.success('Starting workout mode!');
         // You can integrate with your WorkoutModeOverlay here
     };
 
-    // ==================== COMPUTED VALUES ====================
+    // ==================== DATE INFORMATION HELPERS ====================
 
-    // Get exercises for the viewing date
-    const viewingDateExercises = useMemo(() => {
-        const dateString = viewingDate.toISOString().split('T')[0];
-        return scheduledWorkouts.filter(workout => workout.scheduledDate === dateString);
-    }, [viewingDate, scheduledWorkouts]);
-
-    // Date information helpers
     const isToday = () => {
         const today = new Date();
         return viewingDate.toDateString() === today.toDateString();
@@ -649,29 +653,61 @@ const CalendarPage: React.FC = () => {
     const getConfigurationDisplay = (exercise: ScheduledExercise) => {
         const exerciseType = exercise.exercise;
 
-        // Debug logging to see what data we have
         console.log('🔍 Configuration display for exercise:', {
             exerciseName: exercise.exercise.name,
-            sets: exercise.sets,
-            reps: exercise.reps,
-            weight: exercise.weight,
+            isCardio: exerciseType.isCardio,
+            isIsometric: exerciseType.isIsometric,
+            targetSets: exercise.targetSets,
+            targetReps: exercise.targetReps,
+            targetWeight: exercise.targetWeight,
+            targetWeightUnit: exercise.targetWeightUnit,
+            targetDurationMinutes: exercise.targetDurationMinutes,
+            targetDistance: exercise.targetDistance,           // ✅ NEW
+            targetDistanceKm: exercise.targetDistanceKm,       // ✅ LEGACY
+            targetDistanceUnit: exercise.targetDistanceUnit,   // ✅ NEW
+            targetPace: exercise.targetPace,
             restSeconds: exercise.restSeconds,
             targetRpe: exercise.targetRpe,
             tempo: exercise.tempo,
-            notes: exercise.notes,
-            isCardio: exerciseType.isCardio,
-            isIsometric: exerciseType.isIsometric
+            notes: exercise.notes
         });
 
         if (exerciseType.isCardio) {
             const details = [];
-            // Use actual scheduled data or fall back to exercise estimates
-            const duration = exercise.exercise.estimatedDurationMinutes;
+
+            // 🎯 PRIORITY 1: Duration (most important for cardio)
+            const duration = exercise.targetDurationMinutes || exercise.exercise.estimatedDurationMinutes;
             if (duration) {
-                details.push(`🕒 ${duration} min`);
+                details.push(`⏱️ ${duration} min`);
             }
-            // Add other cardio details if available from scheduled exercise
-            // Note: You may need to add targetDistanceKm and targetPace to ScheduledExercise type
+
+            // 🎯 PRIORITY 2: Distance (if available) - handle both new and legacy fields
+            if (exercise.targetDistance) {
+                const unit = exercise.targetDistanceUnit === 'km' ? 'km' : 'mi';
+                details.push(`📍 ${exercise.targetDistance}${unit}`);
+            } else if (exercise.targetDistanceKm) {
+                // Legacy field support
+                details.push(`📍 ${exercise.targetDistanceKm}km`);
+            }
+
+            // 🎯 PRIORITY 3: Pace (if available)
+            if (exercise.targetPace) {
+                const paceUnit = exercise.targetDistanceUnit === 'km' ? '/km' : '/mi';
+                const minutes = Math.floor(exercise.targetPace);
+                const seconds = Math.round((exercise.targetPace - minutes) * 60);
+                const paceDisplay = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                details.push(`⚡ ${paceDisplay}${paceUnit}`);
+            }
+
+            // 🎯 PRIORITY 4: Sets/Rounds (only if interval cardio with multiple sets)
+            if (exercise.targetSets && exercise.targetSets > 1) {
+                details.push(`🔄 ${exercise.targetSets} rounds`);
+
+                // Add rest time for interval cardio
+                if (exercise.restSeconds && exercise.restSeconds > 0) {
+                    details.push(`💤 ${exercise.restSeconds}s rest`);
+                }
+            }
 
             return {
                 text: details.length > 0 ? details.join(' • ') : '❤️ Cardio workout',
@@ -682,10 +718,9 @@ const CalendarPage: React.FC = () => {
             };
         } else if (exerciseType.isIsometric) {
             const details = [];
-            // Use actual scheduled exercise data
-            if (exercise.sets) details.push(`🔄 ${exercise.sets} sets`);
-            if (exercise.restSeconds) details.push(`⏱️ ${exercise.restSeconds}s rest`);
-            // Note: You may need to add holdDurationSeconds to ScheduledExercise type
+            if (exercise.targetSets) details.push(`🔄 ${exercise.targetSets} sets`);
+            if (exercise.holdDurationSeconds) details.push(`⏱️ ${exercise.holdDurationSeconds}s hold`);
+            if (exercise.restSeconds) details.push(`💤 ${exercise.restSeconds}s rest`);
 
             return {
                 text: details.length > 0 ? details.join(' • ') : '🛡️ Isometric holds',
@@ -695,11 +730,16 @@ const CalendarPage: React.FC = () => {
                 iconColor: 'text-purple-600'
             };
         } else {
+            // Strength exercises
             const details = [];
-            // Use actual scheduled exercise configuration data
-            if (exercise.sets) details.push(`🔄 ${exercise.sets} sets`);
-            if (exercise.reps) details.push(`🎯 ${exercise.reps} reps`);
-            if (exercise.weight) details.push(`⚖️ ${exercise.weight}kg`);
+            if (exercise.targetSets) details.push(`🔄 ${exercise.targetSets} sets`);
+            if (exercise.targetReps) details.push(`🎯 ${exercise.targetReps} reps`);
+
+            if (exercise.targetWeight) {
+                const unit = exercise.targetWeightUnit || 'lbs';
+                details.push(`⚖️ ${exercise.targetWeight}${unit}`);
+            }
+
             if (exercise.restSeconds) details.push(`⏱️ ${exercise.restSeconds}s rest`);
             if (exercise.targetRpe) details.push(`💪 RPE ${exercise.targetRpe}`);
             if (exercise.tempo) details.push(`🎵 ${exercise.tempo}`);
@@ -1087,13 +1127,13 @@ const CalendarPage: React.FC = () => {
             )}
 
             {/* Enhanced Exercise Configuration Modal with Edit Support */}
-            {showConfigModal && (selectedExercise || schedulingMode === 'workout-plan') && (
+            {showConfigModal && selectedExercise && (
                 <ExerciseConfigModal
                     isOpen={showConfigModal}
                     onClose={() => {
                         resetEditingState();
                     }}
-                    exercise={selectedExercise || undefined}
+                    exercise={selectedExercise}
                     config={exerciseConfig}
                     onConfigChange={handleConfigChange}
                     onSave={handleSaveExercise}

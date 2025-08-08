@@ -6,10 +6,11 @@ import { ScheduledExercise } from '../types/exercise';
 export interface WorkoutSet {
     id: string;
     setNumber: number;
-    targetReps: string;
+    targetReps: number;
     actualReps?: number;
     targetWeight?: number;
     actualWeight?: number;
+    targetWeightUnit?: 'kg' | 'lbs';
     targetRpe?: number;
     actualRpe?: number;
     restSeconds?: number;
@@ -91,9 +92,8 @@ export interface WorkoutContextType {
 const getExerciseSetsCount = (scheduledExercise: ScheduledExercise): number => {
     const exercise = scheduledExercise.exercise;
 
-    // If sets are explicitly defined in scheduled exercise, use that
-    if (scheduledExercise.sets && scheduledExercise.sets > 0) {
-        return scheduledExercise.sets;
+    if (scheduledExercise.targetSets && scheduledExercise.targetSets > 0) {
+        return scheduledExercise.targetSets;
     }
 
     // Otherwise, determine based on exercise type
@@ -109,21 +109,21 @@ const getExerciseSetsCount = (scheduledExercise: ScheduledExercise): number => {
 /**
  * ✅ NEW: Gets appropriate target reps based on exercise type
  */
-const getExerciseTargetReps = (scheduledExercise: ScheduledExercise): string => {
+const getExerciseTargetReps = (scheduledExercise: ScheduledExercise): number => {
     const exercise = scheduledExercise.exercise;
 
-    // If reps are explicitly defined, use them
-    if (scheduledExercise.reps) {
-        return scheduledExercise.reps;
+    // ✅ FIXED: Use targetReps instead of reps, and convert to number
+    if (scheduledExercise.targetReps && scheduledExercise.targetReps > 0) {
+        return scheduledExercise.targetReps;
     }
 
     // Otherwise, provide sensible defaults based on exercise type
     if (exercise.isCardio) {
-        return `${exercise.estimatedDurationMinutes || 20} min`; // Show duration for cardio
+        return exercise.estimatedDurationMinutes || 20; // Show duration for cardio
     } else if (exercise.isIsometric) {
-        return `${scheduledExercise.holdDurationSeconds || 30}s hold`; // Show hold duration
+        return scheduledExercise.holdDurationSeconds || 30; // Show hold duration
     } else {
-        return '8-12'; // Standard rep range for strength exercises
+        return 10; // Standard reps for strength exercises
     }
 };
 
@@ -148,6 +148,10 @@ const getExerciseRestSeconds = (scheduledExercise: ScheduledExercise): number =>
     }
 };
 
+const getExerciseWeightUnit = (scheduledExercise: ScheduledExercise): 'kg' | 'lbs' => {
+    return scheduledExercise.targetWeightUnit || 'lbs'; // Default to lbs for American users
+};
+
 /**
  * ✅ NEW: Validates exercise configuration and logs warnings for missing data
  */
@@ -164,7 +168,7 @@ const validateScheduledExercise = (scheduledExercise: ScheduledExercise): void =
         console.warn(`⚠️ Isometric exercise "${exerciseName}" missing hold duration`);
     }
 
-    if (!exercise.isCardio && !exercise.isIsometric && !scheduledExercise.sets) {
+    if (!exercise.isCardio && !exercise.isIsometric && !scheduledExercise.targetSets) {
         console.warn(`⚠️ Strength exercise "${exerciseName}" missing sets configuration`);
     }
 
@@ -174,7 +178,8 @@ const validateScheduledExercise = (scheduledExercise: ScheduledExercise): void =
         sets: getExerciseSetsCount(scheduledExercise),
         reps: getExerciseTargetReps(scheduledExercise),
         rest: getExerciseRestSeconds(scheduledExercise),
-        weight: scheduledExercise.weight,
+        weight: scheduledExercise.targetWeight,
+        weightUnit: getExerciseWeightUnit(scheduledExercise),
         notes: scheduledExercise.notes
     });
 };
@@ -222,13 +227,15 @@ function workoutReducer(
                 const setsCount = getExerciseSetsCount(scheduledExercise);
                 const targetReps = getExerciseTargetReps(scheduledExercise);
                 const restSeconds = getExerciseRestSeconds(scheduledExercise);
+                const weightUnit = getExerciseWeightUnit(scheduledExercise);
 
                 // Create workout sets based on exercise type and configuration
                 const sets: WorkoutSet[] = Array.from({ length: setsCount }, (_, setIndex) => ({
                     id: `${scheduledExercise.id}-set-${setIndex + 1}`,
                     setNumber: setIndex + 1,
-                    targetReps,
-                    targetWeight: scheduledExercise.weight,
+                    targetReps,                                        // ✅ FIXED: Now a number
+                    targetWeight: scheduledExercise.targetWeight,
+                    targetWeightUnit: weightUnit,                      // ✅ NEW: Weight unit
                     targetRpe: scheduledExercise.targetRpe,
                     restSeconds,
                     completed: false,
@@ -455,12 +462,13 @@ function workoutReducer(
             const newSetNumber = exercise.sets.length + 1;
             const lastSet = exercise.sets[exercise.sets.length - 1];
 
-            // ✅ FIXED: Create new set with proper defaults
+            // ✅ FIXED: Create new set with proper defaults and weight unit
             const newSet: WorkoutSet = {
                 id: `${exerciseId}-set-${newSetNumber}`,
                 setNumber: newSetNumber,
                 targetReps: lastSet?.targetReps || getExerciseTargetReps(exercise.scheduledExercise),
-                targetWeight: lastSet?.targetWeight || exercise.scheduledExercise.weight,
+                targetWeight: lastSet?.targetWeight || exercise.scheduledExercise.targetWeight,
+                targetWeightUnit: lastSet?.targetWeightUnit || getExerciseWeightUnit(exercise.scheduledExercise),
                 targetRpe: lastSet?.targetRpe || exercise.scheduledExercise.targetRpe,
                 restSeconds: lastSet?.restSeconds || getExerciseRestSeconds(exercise.scheduledExercise),
                 completed: false,
@@ -581,18 +589,20 @@ function workoutReducer(
 
             console.log('🏋️‍♂️ Adding exercise to current workout:', exercise.name || exercise.exerciseName, config);
 
-            // ✅ FIXED: Robust configuration handling with defaults
-            const setsCount = config.sets || (exercise.isCardio ? 1 : exercise.isIsometric ? 3 : 3);
-            const targetReps = config.reps || (exercise.isCardio ? `${config.targetDurationMinutes || 20} min` :
-                exercise.isIsometric ? `${config.holdDurationSeconds || 30}s hold` : '8-12');
+            // ✅ FIXED: Robust configuration handling with defaults and weight units
+            const setsCount = config.targetSets || (exercise.isCardio ? 1 : exercise.isIsometric ? 3 : 3);
+            const targetReps = config.targetReps || (exercise.isCardio ? config.targetDurationMinutes || 20 :
+                exercise.isIsometric ? config.holdDurationSeconds || 30 : 10);
             const restSeconds = config.restSeconds || (exercise.isCardio ? 0 : exercise.isIsometric ? 60 : 90);
+            const weightUnit = config.targetWeightUnit || 'lbs';
 
             // Create sets based on configuration
             const sets: WorkoutSet[] = Array.from({ length: setsCount }, (_, setIndex) => ({
                 id: `added-exercise-${Date.now()}-set-${setIndex + 1}`,
                 setNumber: setIndex + 1,
-                targetReps,
-                targetWeight: config.weight ? parseFloat(config.weight) : undefined,
+                targetReps,                                               // ✅ FIXED: Now a number
+                targetWeight: config.targetWeight ? parseFloat(config.targetWeight) : undefined,
+                targetWeightUnit: weightUnit,                             // ✅ NEW: Weight unit
                 targetRpe: config.targetRpe,
                 restSeconds,
                 completed: false,
@@ -604,9 +614,10 @@ function workoutReducer(
                 exerciseId: exercise.id,
                 exercise: exercise,
                 scheduledDate: state.currentWorkout.date,
-                sets: setsCount,
-                reps: targetReps,
-                weight: config.weight ? parseFloat(config.weight) : undefined,
+                targetSets: setsCount,                                    // ✅ FIXED: targetSets
+                targetReps: targetReps,                                   // ✅ FIXED: targetReps as number
+                targetWeight: config.targetWeight ? parseFloat(config.targetWeight) : undefined,
+                targetWeightUnit: weightUnit,                             // ✅ NEW: Weight unit
                 restSeconds,
                 targetRpe: config.targetRpe,
                 notes: config.notes,

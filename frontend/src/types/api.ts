@@ -1,4 +1,11 @@
-import {Exercise, ExerciseType, ScheduledExercise} from './exercise';
+import {
+    Exercise,
+    ExerciseType,
+    ScheduledExercise,
+    DifficultyLevel,
+    ExerciseFilters as DomainExerciseFilters,
+    Goal as DomainGoal
+} from './exercise';
 
 // ==================== AUTHENTICATION TYPES ====================
 
@@ -45,11 +52,11 @@ export interface BackendExercise {
     name: string;  // Backend field name - matches ExerciseResponseDTO.name
     emoji: string | null;
     description: string;
-    exerciseType: 'STRENGTH' | 'CARDIO' | 'FLEXIBILITY' | 'REHABILITATION' | 'SPORTS_SPECIFIC' | 'PLYOMETRIC' | 'BALANCE';
+    exerciseType: ExerciseType; // ✅ Use imported type from exercise.ts
     exerciseTypeDisplay: string;  // "Strength Training", "Cardiovascular", etc.
     isCardio: boolean;
     isIsometric: boolean;
-    difficultyLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+    difficultyLevel: DifficultyLevel; // ✅ Use imported type from exercise.ts
     difficultyDescription: string;  // "Beginner - No experience needed"
     estimatedDurationMinutes: number | null;
     estimatedCalories: number | null;
@@ -74,7 +81,7 @@ export interface BackendExercise {
     // Frontend-specific fields (only populated by public endpoints)
     // These are calculated by ExerciseResponseDTO.fromEntityForFrontend()
     duration?: string | null;      // "20 mins" format
-    calories?: string | null;      // "400-600/hr" format  
+    calories?: string | null;      // "400-600/hr" format
     equipment?: string | null;     // "Dumbbells" format
     difficulty?: string | null;    // "Beginner" format
     goal?: string | null;          // "fat-burn" format
@@ -83,22 +90,10 @@ export interface BackendExercise {
     rating?: string | null;        // "4.5 stars (120 reviews)"
 }
 
-// ==================== FRONTEND EXERCISE TYPES (UI-Optimized) ====================
-
-// This represents how exercises appear in your React components after transformation
-export type { Exercise } from './exercise';
-
-// ==================== GOAL AND FILTER TYPES ====================
+// ==================== GOAL AND FILTER TYPES (Renamed to avoid conflicts) ====================
 
 export interface GoalData {
     goal: string;  // "fat-burn", "muscle-building", "endurance", etc.
-    count: number;
-}
-
-export interface Goal {
-    id: string;    // goal code: "fat-burn", "muscle-building"
-    name: string;  // display name: "Fat Burn", "Muscle Building"
-    emoji: string; // "🔥", "💪"
     count: number;
 }
 
@@ -111,9 +106,10 @@ export interface FiltersData {
 
 // ==================== API FILTER PARAMETERS ====================
 
-export interface ExerciseFilters {
+// ✅ RENAMED: This is the API-specific filter interface (different from domain ExerciseFilters)
+export interface ApiExerciseFilters {
     goal?: string;           // "fat-burn", "muscle-building", etc.
-    difficulty?: string;     // "BEGINNER", "INTERMEDIATE", "ADVANCED" 
+    difficulty?: string;     // "BEGINNER", "INTERMEDIATE", "ADVANCED"
     equipment?: string;      // "dumbbells", "barbell", "None"
     exercise_type?: string;  // "STRENGTH", "CARDIO", etc.
     muscle_group?: string;   // "CHEST", "LEGS", etc.
@@ -407,7 +403,7 @@ export interface PerformanceResponse {
 export interface WorkoutSet {
     id: string;
     setNumber: number;
-    targetReps: string;
+    targetReps: number;
     actualReps?: number;
     targetWeight?: number;
     actualWeight?: number;
@@ -430,19 +426,7 @@ export interface WorkoutExercise {
     notes?: string;
 }
 
-export interface WorkoutSession {
-    id: string;
-    date: string;
-    exercises: WorkoutExercise[];
-    status: 'not_started' | 'in_progress' | 'paused' | 'completed' | 'cancelled';
-    startedAt?: Date;
-    completedAt?: Date;
-    pausedAt?: Date;
-    totalDurationMinutes?: number;
-    currentExerciseIndex: number;
-    currentSetIndex: number;
-    notes?: string;
-}
+// Note: WorkoutSession is already defined in exercise.ts, so we don't duplicate it here
 
 // ==================== REQUEST TYPES ====================
 
@@ -465,7 +449,7 @@ export interface RescheduleWorkoutRequest {
 
 export interface ExercisePageState {
     exercises: Exercise[];
-    goals: Goal[];
+    goals: DomainGoal[];
     equipmentOptions: string[];
     difficultyOptions: string[];
     exerciseTypeOptions: string[];
@@ -507,8 +491,8 @@ export interface PageResponse<T> {
 // Updated to match your current structure while supporting backend integration
 export interface ExerciseApiClient {
     // Public exercise endpoints
-    getPublicExercises: (filters?: ExerciseFilters) => Promise<BackendExercise[]>;
-    searchExercises: (query: string, filters?: ExerciseFilters) => Promise<BackendExercise[]>;
+    getPublicExercises: (filters?: DomainExerciseFilters) => Promise<BackendExercise[]>;
+    searchExercises: (query: string, filters?: DomainExerciseFilters) => Promise<BackendExercise[]>;
     getExerciseById: (id: number) => Promise<BackendExercise>;
 
     // Goal and filter endpoints

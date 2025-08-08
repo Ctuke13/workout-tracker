@@ -2,24 +2,36 @@
 // CALENDAR AND SCHEDULING INTERFACES
 // =============================================================================
 
+import {WorkoutExercise} from "@/types/api";
+
 export interface ScheduledExercise {
     id: string;
     exerciseId: number;
     exercise: Exercise;
     scheduledDate: string;
 
+    // NEW: Add tracking mode and configuration for modal compatibility
+    trackingMode?: 'strength' | 'cardio' | 'isometric';
+    configuration?: ExerciseConfiguration;
+
     // Strength fields
-    sets?: number;
-    reps?: string;
-    weight?: number;
+    targetSets?: number;
+    targetReps?: number;
+    targetWeight?: number;
+    targetWeightUnit?: 'kg' | 'lbs';
     restSeconds?: number;
     tempo?: string;
     targetRpe?: number;
 
     //  Cardio fields
+    // ✅ UPDATED: Cardio fields with distance unit support
     targetDurationMinutes?: number;
-    targetDistanceKm?: number;
+    targetDistance?: number;
+    targetDistanceUnit?: 'km' | 'miles';
     targetPace?: number;
+
+    // Legacy support (deprecated)
+    targetDistanceKm?: number;
 
     // Isometric fields
     holdDurationSeconds?: number;
@@ -81,6 +93,9 @@ export type FilterType =
 export type WorkoutTrackingType = 'cardio' | 'isometric' | 'strength';
 export type WorkoutSessionStatus = 'not_started' | 'in_progress' | 'paused' | 'completed' | 'cancelled';
 
+export type WeightUnit = 'kg' | 'lbs';
+export type DistanceUnit = 'km' | 'miles';
+
 // =============================================================================
 // EXERCISE CONFIGURATION INTERFACES - FIXED WITH DISCRIMINATED UNION
 // =============================================================================
@@ -93,29 +108,47 @@ interface BaseExerciseConfiguration {
 
 export interface CardioConfiguration extends BaseExerciseConfiguration {
     trackingMode: 'cardio';
+
+    // Primary cardio fields (always shown)
     targetDurationMinutes: number;
+    targetDistance?: number;
+    targetDistanceUnit: 'km' | 'miles';
+    targetPace?: number;
+
+    // Session type configuration
+    sessionType?: 'single_session' | 'interval_sets';
+    targetSets?: number; // Only used for interval cardio
+    restSeconds?: number; // Only used for interval cardio
+
+    // Legacy support
     targetDistanceKm?: number;
-    targetPace?: number; // minutes per km
 }
 
 export interface IsometricConfiguration extends BaseExerciseConfiguration {
     trackingMode: 'isometric';
-    sets: number;
-    holdDurationSeconds: number;
+    targetSets: number;
+    holdDurationSeconds: number; // ✅ FIXED: Changed from targetHoldSeconds to holdDurationSeconds
     restSeconds: number;
 }
 
 export interface StrengthConfiguration extends BaseExerciseConfiguration {
     trackingMode: 'strength';
-    sets: number;
-    reps: string;
-    weight?: number;
+    targetSets: number;
+    targetReps: number;
+    targetWeight?: number;
+    targetWeightUnit: 'kg' | 'lbs';
     restSeconds: number;
     targetRpe?: number;
     tempo?: string;
 }
 
-// ✅ FIXED: Proper discriminated union type
+export interface CardioSessionType {
+    type: 'single_session' | 'interval_sets';
+    defaultSets: number;
+    showSetsInConfig: boolean;
+    description: string;
+}
+
 export type ExerciseConfiguration = CardioConfiguration | IsometricConfiguration | StrengthConfiguration;
 
 // =============================================================================
@@ -151,6 +184,10 @@ export interface Exercise {
     requiresEquipment: boolean;
     createdBy: string;
     isFavorite?: boolean;
+
+    // ✅ ADDED: Missing properties for modal compatibility
+    type?: ExerciseType; // Alias for exerciseType
+    primaryMuscleGroup?: string; // Primary muscle group
 }
 
 // =============================================================================
@@ -244,11 +281,11 @@ export interface UnifiedWorkoutData {
 
 export interface WorkoutSession {
     id: string;
-    date: string; // ISO date string
-    exercises: UnifiedWorkoutData[];
-    status: WorkoutSessionStatus;
-    startTime?: Date;
-    endTime?: Date;
+    date: string;
+    exercises: WorkoutExercise[];
+    status: 'not_started' | 'in_progress' | 'paused' | 'completed' | 'cancelled';
+    startedAt?: Date;
+    completedAt?: Date;
     totalDurationMinutes?: number;
     notes?: string;
 
@@ -367,6 +404,44 @@ export const getWorkoutTrackingType = (exercise: Exercise): WorkoutTrackingType 
     return 'strength';
 };
 
+export const getCardioSessionType = (exercise: Exercise): CardioSessionType => {
+    const exerciseName = exercise.name.toLowerCase();
+    const description = exercise.description?.toLowerCase() || '';
+
+    // Keywords that indicate interval/set-based cardio
+    const intervalKeywords = [
+        'hiit', 'high intensity interval',
+        'interval', 'intervals',
+        'circuit', 'circuits',
+        'tabata',
+        'emom', 'every minute on the minute',
+        'amrap', 'as many reps as possible',
+        'rounds',
+        'burpees', // Usually done in sets
+        'mountain climbers', // Often done in timed sets
+    ];
+
+    const isIntervalCardio = intervalKeywords.some(keyword =>
+        exerciseName.includes(keyword) || description.includes(keyword)
+    );
+
+    if (isIntervalCardio) {
+        return {
+            type: 'interval_sets',
+            defaultSets: 4,
+            showSetsInConfig: true,
+            description: 'This exercise is typically done in multiple sets/rounds with rest periods'
+        };
+    }
+
+    return {
+        type: 'single_session',
+        defaultSets: 1,
+        showSetsInConfig: false,
+        description: 'This exercise is typically done as one continuous session'
+    };
+};
+
 export const isCardioExercise = (exercise: Exercise): boolean => {
     return exercise.isCardio === true;
 };
@@ -448,6 +523,67 @@ export const createExercise = (exerciseData: Omit<Exercise, 'isCardio' | 'isIsom
 };
 
 // =============================================================================
+// ✅ ADDED: MISSING UTILITY FUNCTIONS
+// =============================================================================
+
+// Time formatting utility
+export const formatTime = (seconds: number): string => {
+    if (seconds < 60) {
+        return `${seconds}s`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (remainingSeconds === 0) {
+        return `${minutes}m`;
+    }
+    return `${minutes}m ${remainingSeconds}s`;
+};
+
+// Weight conversion utilities
+export const convertWeight = (weight: number, fromUnit: WeightUnit, toUnit: WeightUnit): number => {
+    if (fromUnit === toUnit) return weight;
+    if (fromUnit === 'lbs' && toUnit === 'kg') {
+        return Math.round(weight * 0.453592 * 100) / 100;
+    }
+    if (fromUnit === 'kg' && toUnit === 'lbs') {
+        return Math.round(weight * 2.20462 * 100) / 100;
+    }
+    return weight;
+};
+
+export const formatWeight = (weight: number, unit: WeightUnit): string => {
+    if (weight % 1 === 0) {
+        return `${weight} ${unit}`;
+    }
+    return `${weight.toFixed(1)} ${unit}`;
+};
+
+// Distance conversion utilities (already exist, keeping for completeness)
+export const convertDistance = (distance: number, fromUnit: DistanceUnit, toUnit: DistanceUnit): number => {
+    if (fromUnit === toUnit) return distance;
+    if (fromUnit === 'miles' && toUnit === 'km') {
+        return Math.round(distance * 1.60934 * 100) / 100;
+    }
+    if (fromUnit === 'km' && toUnit === 'miles') {
+        return Math.round(distance * 0.621371 * 100) / 100;
+    }
+    return distance;
+};
+
+export const formatDistance = (distance: number, unit: DistanceUnit): string => {
+    if (unit === 'miles') {
+        return `${distance % 1 === 0 ? distance : distance.toFixed(1)} mi`;
+    } else {
+        return `${distance % 1 === 0 ? distance : distance.toFixed(1)} km`;
+    }
+};
+
+// Distance presets function
+export const getDistancePresets = (unit: DistanceUnit): number[] => {
+    return DISTANCE_PRESETS[unit];
+};
+
+// =============================================================================
 // CONSTANTS AND PREDEFINED DATA
 // =============================================================================
 
@@ -504,45 +640,68 @@ export const enhancedExerciseTypeOptions: EnhancedExerciseTypeOption[] = [
     }
 ];
 
-// ✅ FIXED: Default configurations with proper tracking mode
+// ✅ UPDATED: Default configurations with proper field names
 export const DEFAULT_CARDIO_CONFIG: CardioConfiguration = {
     trackingMode: 'cardio',
     targetDurationMinutes: 20,
-    targetDistanceKm: undefined,
+    targetDistance: undefined,
+    targetDistanceUnit: 'miles',
     targetPace: undefined,
     notes: ''
 };
 
 export const DEFAULT_ISOMETRIC_CONFIG: IsometricConfiguration = {
     trackingMode: 'isometric',
-    sets: 3,
-    holdDurationSeconds: 30,
+    targetSets: 3,
+    holdDurationSeconds: 30, // ✅ FIXED: Using correct field name
     restSeconds: 60,
     notes: ''
 };
 
 export const DEFAULT_STRENGTH_CONFIG: StrengthConfiguration = {
     trackingMode: 'strength',
-    sets: 3,
-    reps: '8-12',
-    weight: undefined,
+    targetSets: 3,
+    targetReps: 10,
+    targetWeight: undefined,
+    targetWeightUnit: 'lbs',
     restSeconds: 90,
     targetRpe: 7,
     tempo: undefined,
     notes: ''
 };
 
-// ✅ FIXED: Helper to get default config based on exercise
 export const getDefaultConfigForExercise = (exercise: Exercise): ExerciseConfiguration => {
     const trackingMode = getWorkoutTrackingType(exercise);
+
     switch (trackingMode) {
-        case 'cardio':
-            return { ...DEFAULT_CARDIO_CONFIG };
+        case 'cardio': {
+            const sessionType = getCardioSessionType(exercise);
+            return {
+                trackingMode: 'cardio',
+                sessionType: sessionType.type,
+                targetDurationMinutes: exercise.estimatedDurationMinutes || 20,
+                targetDistance: undefined,
+                targetDistanceUnit: 'miles', // American default
+                targetPace: undefined,
+                targetSets: sessionType.defaultSets,
+                restSeconds: sessionType.type === 'interval_sets' ? 60 : undefined,
+                notes: ''
+            } as CardioConfiguration;
+        }
         case 'isometric':
             return { ...DEFAULT_ISOMETRIC_CONFIG };
         case 'strength':
-            return { ...DEFAULT_STRENGTH_CONFIG };
         default:
             return { ...DEFAULT_STRENGTH_CONFIG };
     }
+};
+
+export const DISTANCE_PRESETS = {
+    miles: [0.5, 1, 1.5, 2, 3, 3.1, 6.2, 13.1, 26.2], // Including 5K, 10K, Half, Full marathon in miles
+    km: [1, 2, 3, 5, 8, 10, 21.1, 42.2]             // Standard metric distances
+};
+
+export const PACE_PRESETS = {
+    miles: [6, 7, 8, 9, 10, 11, 12], // minutes per mile
+    km: [4, 5, 6, 7, 8]             // minutes per km
 };

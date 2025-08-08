@@ -1,4 +1,4 @@
-// src/services/transformers.ts - Fixed by removing ScheduledExerciseResponse function
+// src/services/transformers.ts - Fixed with correct imports and updated field names
 
 import {
     // Backend types (what Spring Boot sends) - keep these from api.ts
@@ -8,7 +8,7 @@ import {
     PerformanceResponse,
     WorkoutPlanInfo,
     WorkoutStatsResponse,
-    WorkoutSession,
+    WorkoutSessionInfo,
     WorkoutSet,
     WorkoutExercise,
 
@@ -23,7 +23,8 @@ import {
     DifficultyLevel,
     ExerciseType,
     WorkoutStats,
-    ScheduledExercise
+    ScheduledExercise,
+    WorkoutSession
 } from '../types/exercise';
 
 // ==================== EXERCISE TRANSFORMATIONS ====================
@@ -94,74 +95,28 @@ const transformDifficultyLevel = (difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADV
     }
 };
 
-/**
- * Formats duration from minutes to user-friendly string
- */
-const formatDuration = (minutes: number | null | undefined): string => {
-    if (minutes === null || minutes === undefined) return 'Variable';
-    if (minutes < 60) return `${minutes} mins`;
-    const hours = Math.floor(minutes / 60);
-    const remainingMins = minutes % 60;
-    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
-};
-
-/**
- * Formats calories from backend number to user-friendly range string
- */
-const formatCalories = (calories: number | null | undefined): string => {
-    if (calories === null || calories === undefined) return 'Varies';
-    const lower = Math.round(calories * 0.8);
-    const upper = Math.round(calories * 1.2);
-    return `${lower}-${upper}/hr`;
-};
-
-/**
- * Formats equipment from backend arrays to user-friendly string
- */
-const formatEquipment = (equipmentArray: string[], equipmentSummary: string): string => {
-    // Use the backend's summary if available, otherwise format the array
-    if (equipmentSummary && equipmentSummary !== '') return equipmentSummary;
-    if (!equipmentArray || equipmentArray.length === 0) return 'No Equipment';
-    return equipmentArray.map(eq => formatEquipmentName(eq)).join(', ');
-};
-
-/**
- * Converts backend equipment codes to user-friendly names
- */
-const formatEquipmentName = (equipment: string): string => {
-    const equipmentMap: Record<string, string> = {
-        'dumbbells': 'Dumbbells',
-        'barbell': 'Barbell',
-        'kettlebell': 'Kettlebell',
-        'resistance_bands': 'Resistance Bands',
-        'yoga_mat': 'Yoga Mat',
-        'jump_rope': 'Jump Rope',
-        'pull_up_bar': 'Pull-up Bar',
-        'bench': 'Bench',
-        'cable_machine': 'Cable Machine',
-        'treadmill': 'Treadmill',
-        'stationary_bike': 'Stationary Bike',
-        'foam_roller': 'Foam Roller'
-    };
-    return equipmentMap[equipment] || equipment.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-};
-
 // ==================== SCHEDULED WORKOUT TRANSFORMATIONS ====================
 
 /**
- * ✅ FIXED: Handle both individual exercises and workout plan responses
- * Based on actual ScheduledWorkoutResponse structure from BOTH GET and POST calls
+ * ✅ FIXED: Handle both individual exercises and workout plan responses with updated field names
  */
 export const transformScheduledWorkoutToExercises = (
     scheduledWorkout: ScheduledWorkoutResponse
 ): ScheduledExercise[] => {
 
-    console.log('🔍 Transforming workout:', scheduledWorkout); // ← DEBUG LOG
+    console.log('🔍 Transforming workout:', scheduledWorkout);
+
+    // ✅ SMART DETECTION: Determine exercise type from scheduled workout data
+    const isCardio = !!(
+        scheduledWorkout.targetDurationMinutes ||
+        scheduledWorkout.targetDistanceKm ||
+        scheduledWorkout.targetPace
+    );
+    const isIsometric = !!scheduledWorkout.holdDurationSeconds;
 
     if (scheduledWorkout.workoutPlan) {
         const workoutPlan = scheduledWorkout.workoutPlan;
 
-        // Create exercise representation
         const exercise: Exercise = {
             id: workoutPlan.id,
             name: workoutPlan.name,
@@ -169,9 +124,12 @@ export const transformScheduledWorkoutToExercises = (
             emoji: workoutPlan.exerciseCount === 1 ? '💪' : '📋',
             description: workoutPlan.description || 'Scheduled workout',
             difficultyLevel: (workoutPlan.difficulty || 'INTERMEDIATE') as DifficultyLevel,
-            exerciseType: 'STRENGTH' as ExerciseType,
-            isCardio: false,
-            isIsometric: false,
+            exerciseType: isCardio ? 'CARDIO' as ExerciseType : 'STRENGTH' as ExerciseType,
+
+            // ✅ FIXED: Auto-determine from scheduled workout data
+            isCardio: isCardio,
+            isIsometric: isIsometric,
+
             exerciseTypeDisplay: workoutPlan.exerciseCount === 1 ? 'Exercise' : 'Workout Plan',
             estimatedDurationMinutes: workoutPlan.estimatedDurationMinutes || 15,
             estimatedCalories: Math.round((workoutPlan.estimatedDurationMinutes || 15) * 8),
@@ -198,101 +156,87 @@ export const transformScheduledWorkoutToExercises = (
             exercise: exercise,
             scheduledDate: scheduledWorkout.scheduledDate,
 
-            // ✅ FIXED: Try multiple possible locations for configuration data
-            // First try direct properties, then try nested locations
-            sets: scheduledWorkout.sets ||
-                (scheduledWorkout as any).configuration?.sets ||
-                (scheduledWorkout as any).exerciseConfiguration?.sets ||
-                workoutPlan.exerciseCount || 1,
+            // ✅ ENHANCED: Smart defaults based on exercise type
+            targetSets: (() => {
+                if (isCardio) {
+                    return scheduledWorkout.sets || 1; // Default to 1 for single-session cardio
+                }
+                return scheduledWorkout.sets || 3; // Default for strength/isometric
+            })(),
 
-            reps: scheduledWorkout.reps ||
-                (scheduledWorkout as any).configuration?.reps ||
-                (scheduledWorkout as any).exerciseConfiguration?.reps ||
-                (workoutPlan.exerciseCount === 1 ? '8-12' : `${workoutPlan.exerciseCount} exercises`),
+            targetReps: (() => {
+                if (isCardio) {
+                    return scheduledWorkout.targetDurationMinutes || 20; // Show duration for cardio
+                }
+                return parseInt(scheduledWorkout.reps || '10'); // Convert string to number
+            })(),
 
-            weight: scheduledWorkout.weight ||
-                (scheduledWorkout as any).configuration?.weight ||
-                (scheduledWorkout as any).exerciseConfiguration?.weight,
+            targetWeight: scheduledWorkout.weight,
+            targetWeightUnit: 'lbs', // Default to lbs for American users
+            restSeconds: scheduledWorkout.restSeconds || (isCardio ? 0 : 60),
+            targetRpe: scheduledWorkout.targetRpe,
+            tempo: scheduledWorkout.tempo,
 
-            restSeconds: scheduledWorkout.restSeconds ||
-                (scheduledWorkout as any).configuration?.restSeconds ||
-                (scheduledWorkout as any).exerciseConfiguration?.restSeconds || 60,
+            // ✅ CARDIO FIELDS - Fixed field names
+            targetDurationMinutes: scheduledWorkout.targetDurationMinutes,
 
-            targetRpe: scheduledWorkout.targetRpe ||
-                (scheduledWorkout as any).configuration?.targetRpe ||
-                (scheduledWorkout as any).exerciseConfiguration?.targetRpe,
+            // ✅ FIXED: Convert from targetDistanceKm to targetDistance in miles
+            targetDistance: (() => {
+                if (scheduledWorkout.targetDistanceKm) {
+                    // Backend sends km, convert to miles for American users
+                    return Math.round(scheduledWorkout.targetDistanceKm * 0.621371 * 100) / 100;
+                }
+                return undefined; // No distance set
+            })(),
 
-            tempo: scheduledWorkout.tempo ||
-                (scheduledWorkout as any).configuration?.tempo ||
-                (scheduledWorkout as any).exerciseConfiguration?.tempo,
+            targetDistanceUnit: 'miles', // Default to miles for American users
+            targetDistanceKm: scheduledWorkout.targetDistanceKm, // Keep for legacy support
+            targetPace: scheduledWorkout.targetPace,
 
-            // ✅ CARDIO AND ISOMETRIC FIELDS - Try multiple locations
-            targetDurationMinutes: scheduledWorkout.targetDurationMinutes ||
-                (scheduledWorkout as any).configuration?.targetDurationMinutes ||
-                (scheduledWorkout as any).exerciseConfiguration?.targetDurationMinutes,
+            // ✅ ISOMETRIC FIELDS
+            holdDurationSeconds: scheduledWorkout.holdDurationSeconds,
 
-            targetDistanceKm: scheduledWorkout.targetDistanceKm ||
-                (scheduledWorkout as any).configuration?.targetDistanceKm ||
-                (scheduledWorkout as any).exerciseConfiguration?.targetDistanceKm,
-
-            targetPace: scheduledWorkout.targetPace ||
-                (scheduledWorkout as any).configuration?.targetPace ||
-                (scheduledWorkout as any).exerciseConfiguration?.targetPace,
-
-            holdDurationSeconds: scheduledWorkout.holdDurationSeconds ||
-                (scheduledWorkout as any).configuration?.holdDurationSeconds ||
-                (scheduledWorkout as any).exerciseConfiguration?.holdDurationSeconds,
-
-            notes: scheduledWorkout.customNotes ||
-                (scheduledWorkout as any).notes ||
-                (scheduledWorkout as any).configuration?.notes,
-
+            // ✅ FIXED: Use customNotes, not notes
+            notes: scheduledWorkout.customNotes,
             completed: scheduledWorkout.status === 'COMPLETED',
             status: scheduledWorkout.status,
             createdAt: scheduledWorkout.createdAt,
             userId: scheduledWorkout.user?.id?.toString() || '1'
         };
 
-        // ✅ ENHANCED: Debug logging to show exactly what data was found
-        console.log('🔍 Extracted configuration data:', {
-            'Direct properties': {
-                sets: scheduledWorkout.sets,
-                reps: scheduledWorkout.reps,
-                weight: scheduledWorkout.weight,
-                restSeconds: scheduledWorkout.restSeconds,
-                targetRpe: scheduledWorkout.targetRpe,
-                tempo: scheduledWorkout.tempo
-            },
-            'Configuration object': (scheduledWorkout as any).configuration,
-            'Exercise configuration object': (scheduledWorkout as any).exerciseConfiguration,
-            'Final extracted values': {
-                sets: scheduledExercise.sets,
-                reps: scheduledExercise.reps,
-                weight: scheduledExercise.weight,
-                restSeconds: scheduledExercise.restSeconds,
-                targetRpe: scheduledExercise.targetRpe,
-                tempo: scheduledExercise.tempo
-            }
+        console.log('✅ FIXED: Transformed exercise with proper flags:', {
+            exerciseName: exercise.name,
+            isCardio: exercise.isCardio,
+            isIsometric: exercise.isIsometric,
+            targetSets: scheduledExercise.targetSets,
+            targetReps: scheduledExercise.targetReps,
+            targetDurationMinutes: scheduledExercise.targetDurationMinutes,
+            targetDistance: scheduledExercise.targetDistance,
+            targetDistanceUnit: scheduledExercise.targetDistanceUnit,
+            notes: scheduledExercise.notes
         });
 
         return [scheduledExercise];
     }
 
-    // ✅ FALLBACK: Create a basic scheduled exercise if no workoutPlan
-    console.warn('ScheduledWorkout has no workoutPlan:', scheduledWorkout.id);
+    // ✅ FALLBACK: Handle individual exercises (this might be your case)
+    console.warn('⚠️ ScheduledWorkout has no workoutPlan, using fallback:', scheduledWorkout.id);
 
-    const fallbackExercise: Exercise = {
+    const exercise: Exercise = {
         id: 0,
-        name: 'Unknown Exercise',
-        exerciseName: 'Unknown Exercise',
-        emoji: '❓',
-        description: 'Exercise details not available',
+        name: 'Individual Exercise', // Will be overridden by backend
+        exerciseName: 'Individual Exercise',
+        emoji: '💪',
+        description: 'Individual scheduled exercise',
         difficultyLevel: 'INTERMEDIATE' as DifficultyLevel,
-        exerciseType: 'STRENGTH' as ExerciseType,
-        isCardio: false,
-        isIsometric: false,
-        exerciseTypeDisplay: 'Exercise',
-        estimatedDurationMinutes: 15,
+        exerciseType: isCardio ? 'CARDIO' as ExerciseType : 'STRENGTH' as ExerciseType,
+
+        // ✅ FIXED: Smart detection from scheduled workout data
+        isCardio: isCardio,
+        isIsometric: isIsometric,
+
+        exerciseTypeDisplay: 'Individual Exercise',
+        estimatedDurationMinutes: scheduledWorkout.targetDurationMinutes || 15,
         estimatedCalories: 100,
         targetMuscleGroups: [],
         equipmentRequired: [],
@@ -311,64 +255,68 @@ export const transformScheduledWorkoutToExercises = (
         published: true
     };
 
-    const fallbackScheduledExercise: ScheduledExercise = {
+    const scheduledExercise: ScheduledExercise = {
         id: scheduledWorkout.id.toString(),
         exerciseId: 0,
-        exercise: fallbackExercise,
+        exercise: exercise,
         scheduledDate: scheduledWorkout.scheduledDate,
 
-        // ✅ FIXED: Try multiple locations for fallback case too
-        sets: scheduledWorkout.sets ||
-            (scheduledWorkout as any).configuration?.sets ||
-            (scheduledWorkout as any).exerciseConfiguration?.sets || 1,
+        // ✅ SMART DEFAULTS based on detected exercise type
+        targetSets: (() => {
+            if (isCardio) {
+                return scheduledWorkout.sets || 1; // Cardio usually 1 set unless interval
+            }
+            return scheduledWorkout.sets || 3; // Strength/isometric default to 3
+        })(),
 
-        reps: scheduledWorkout.reps ||
-            (scheduledWorkout as any).configuration?.reps ||
-            (scheduledWorkout as any).exerciseConfiguration?.reps || 'Unknown',
+        targetReps: (() => {
+            if (isCardio) {
+                return scheduledWorkout.targetDurationMinutes || 20; // Show duration for cardio
+            }
+            return parseInt(scheduledWorkout.reps || '10');
+        })(),
 
-        weight: scheduledWorkout.weight ||
-            (scheduledWorkout as any).configuration?.weight ||
-            (scheduledWorkout as any).exerciseConfiguration?.weight,
+        targetWeight: scheduledWorkout.weight,
+        targetWeightUnit: 'lbs',
+        restSeconds: scheduledWorkout.restSeconds || (isCardio ? 0 : 60),
+        targetRpe: scheduledWorkout.targetRpe,
+        tempo: scheduledWorkout.tempo,
 
-        restSeconds: scheduledWorkout.restSeconds ||
-            (scheduledWorkout as any).configuration?.restSeconds ||
-            (scheduledWorkout as any).exerciseConfiguration?.restSeconds || 60,
+        // ✅ CARDIO FIELDS - Fixed field names
+        targetDurationMinutes: scheduledWorkout.targetDurationMinutes,
 
-        targetRpe: scheduledWorkout.targetRpe ||
-            (scheduledWorkout as any).configuration?.targetRpe ||
-            (scheduledWorkout as any).exerciseConfiguration?.targetRpe,
+        // ✅ FIXED: Convert from targetDistanceKm to targetDistance in miles
+        targetDistance: scheduledWorkout.targetDistanceKm ?
+            Math.round(scheduledWorkout.targetDistanceKm * 0.621371 * 100) / 100 :
+            undefined,
 
-        tempo: scheduledWorkout.tempo ||
-            (scheduledWorkout as any).configuration?.tempo ||
-            (scheduledWorkout as any).exerciseConfiguration?.tempo,
+        targetDistanceUnit: 'miles',
+        targetDistanceKm: scheduledWorkout.targetDistanceKm,
+        targetPace: scheduledWorkout.targetPace,
 
-        // Cardio and isometric fields
-        targetDurationMinutes: scheduledWorkout.targetDurationMinutes ||
-            (scheduledWorkout as any).configuration?.targetDurationMinutes ||
-            (scheduledWorkout as any).exerciseConfiguration?.targetDurationMinutes,
+        // ✅ ISOMETRIC FIELDS
+        holdDurationSeconds: scheduledWorkout.holdDurationSeconds,
 
-        targetDistanceKm: scheduledWorkout.targetDistanceKm ||
-            (scheduledWorkout as any).configuration?.targetDistanceKm ||
-            (scheduledWorkout as any).exerciseConfiguration?.targetDistanceKm,
-
-        targetPace: scheduledWorkout.targetPace ||
-            (scheduledWorkout as any).configuration?.targetPace ||
-            (scheduledWorkout as any).exerciseConfiguration?.targetPace,
-
-        holdDurationSeconds: scheduledWorkout.holdDurationSeconds ||
-            (scheduledWorkout as any).configuration?.holdDurationSeconds ||
-            (scheduledWorkout as any).exerciseConfiguration?.holdDurationSeconds,
-
-        notes: scheduledWorkout.customNotes ||
-            (scheduledWorkout as any).notes ||
-            (scheduledWorkout as any).configuration?.notes,
-
+        // ✅ FIXED: Use customNotes, not notes
+        notes: scheduledWorkout.customNotes,
         completed: scheduledWorkout.status === 'COMPLETED',
         createdAt: scheduledWorkout.createdAt,
         userId: scheduledWorkout.user?.id?.toString() || '1'
     };
 
-    return [fallbackScheduledExercise];
+    console.log('✅ FIXED: Fallback exercise with smart detection:', {
+        exerciseName: exercise.name,
+        isCardio: exercise.isCardio,
+        isIsometric: exercise.isIsometric,
+        detectedFrom: {
+            hasDuration: !!scheduledWorkout.targetDurationMinutes,
+            hasDistance: !!scheduledWorkout.targetDistanceKm,
+            hasPace: !!scheduledWorkout.targetPace,
+            hasHold: !!scheduledWorkout.holdDurationSeconds
+        }
+    });
+
+    return [scheduledExercise];
 };
 
 /**
@@ -381,12 +329,18 @@ export const transformScheduledWorkoutsToCalendarData = (
     let workoutsArray: ScheduledWorkoutResponse[] = [];
 
     if (Array.isArray(scheduledWorkouts)) {
+        // Direct array response
         workoutsArray = scheduledWorkouts;
     } else if (scheduledWorkouts && typeof scheduledWorkouts === 'object') {
         // Handle CalendarViewResponse format
         if ('workoutsByDate' in scheduledWorkouts && typeof scheduledWorkouts.workoutsByDate === 'object') {
+            console.log('🔍 DEBUG: Found workoutsByDate:', scheduledWorkouts.workoutsByDate);
+
             // Flatten the map of date -> workout arrays into a single array
-            workoutsArray = Object.values(scheduledWorkouts.workoutsByDate).flat() as ScheduledWorkoutResponse[];
+            workoutsArray = Object.values(scheduledWorkouts.workoutsByDate)
+                .flat() as ScheduledWorkoutResponse[];
+
+            console.log('🔍 DEBUG: Flattened workouts:', workoutsArray);
         } else if ('scheduledWorkouts' in scheduledWorkouts && Array.isArray(scheduledWorkouts.scheduledWorkouts)) {
             workoutsArray = scheduledWorkouts.scheduledWorkouts;
         } else if ('content' in scheduledWorkouts && Array.isArray(scheduledWorkouts.content)) {
@@ -394,12 +348,13 @@ export const transformScheduledWorkoutsToCalendarData = (
         } else if ('data' in scheduledWorkouts && Array.isArray(scheduledWorkouts.data)) {
             workoutsArray = scheduledWorkouts.data;
         } else {
-            console.warn('⚠️ Unexpected calendar response format:', scheduledWorkouts);
-            return [];
+            console.warn('⚠️ Unexpected response format:', scheduledWorkouts);
+            console.warn('⚠️ Available properties:', Object.keys(scheduledWorkouts));
+            workoutsArray = [];
         }
     } else {
-        console.warn('⚠️ Invalid scheduledWorkouts data:', scheduledWorkouts);
-        return [];
+        console.warn('⚠️ Response is not an object or array:', scheduledWorkouts);
+        workoutsArray = [];
     }
 
     // Transform each scheduled workout to scheduled exercises
@@ -453,14 +408,15 @@ export const transformWorkoutSessionResponse = (
         const exercisePerformance = exercisePerformanceMap[exerciseId];
         const sets = transformPerformanceRecordsToSets(exercisePerformance);
 
-        // Create placeholder scheduled exercise
+        // Create placeholder scheduled exercise with updated field names
         const placeholderScheduledExercise: ScheduledExercise = {
             id: `session-${backendSession.id}-exercise-${exerciseId}`,
             exerciseId: parseInt(exerciseId),
             exercise: createPlaceholderExercise(parseInt(exerciseId)),
             scheduledDate: backendSession.date,
-            sets: sets.length,
-            reps: '8-12',
+            targetSets: sets.length,                           // ✅ FIXED: targetSets
+            targetReps: 10,                                    // ✅ FIXED: targetReps as number
+            targetWeightUnit: 'lbs',                           // ✅ NEW: Weight unit
             completed: sets.every(set => set.completed),
             createdAt: backendSession.createdAt,
             userId: '1' // Would come from auth context
@@ -503,7 +459,7 @@ const groupPerformanceByExercise = (records: PerformanceResponse[]): Record<stri
 };
 
 /**
- * Transforms performance records into workout sets
+ * ✅ UPDATED: Transforms performance records into workout sets with updated field names
  */
 const transformPerformanceRecordsToSets = (records: PerformanceResponse[]): WorkoutSet[] => {
     return records
@@ -511,10 +467,11 @@ const transformPerformanceRecordsToSets = (records: PerformanceResponse[]): Work
         .map(record => ({
             id: record.id.toString(),
             setNumber: record.setNumber,
-            targetReps: record.reps?.toString() || '8-12',
+            targetReps: record.reps || 10,                     // ✅ FIXED: targetReps as number
             actualReps: record.reps,
             targetWeight: record.weight,
             actualWeight: record.weight,
+            targetWeightUnit: 'lbs',                           // ✅ NEW: Weight unit default
             targetRpe: record.perceivedExertion,
             actualRpe: record.perceivedExertion,
             restSeconds: record.restSeconds,
@@ -613,8 +570,7 @@ const findCurrentSetIndex = (exercises: WorkoutExercise[]): number => {
 // ==================== REVERSE TRANSFORMATIONS (Frontend to Backend) ====================
 
 /**
- * Transforms frontend workout set data into backend performance request
- * This is used when users complete sets and we need to save to backend
+ * ✅ UPDATED: Transforms frontend workout set data into backend performance request with updated field names
  */
 export const transformWorkoutSetToPerformanceRequest = (
     workoutSet: WorkoutSet,
@@ -636,12 +592,12 @@ export const transformWorkoutSetToPerformanceRequest = (
 };
 
 /**
- * Determines achievement status based on target vs actual performance
+ * ✅ UPDATED: Determines achievement status based on target vs actual performance
  */
 const determineAchievementStatus = (workoutSet: WorkoutSet): 'NOT_SET' | 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL' => {
     if (!workoutSet.targetReps || !workoutSet.actualReps) return 'NOT_SET';
 
-    const targetReps = parseInt(workoutSet.targetReps.split('-')[0]); // Take lower bound of range
+    const targetReps = workoutSet.targetReps; // Now already a number
     const actualReps = workoutSet.actualReps;
 
     if (actualReps > targetReps) return 'EXCEEDED';
@@ -671,6 +627,31 @@ export const formatDateForBackend = (date: Date): DateString => {
  */
 export const formatDateTimeForBackend = (date: Date): DateTimeString => {
     return date.toISOString(); // Returns full ISO datetime format
+};
+
+/**
+ * ✅ NEW: Weight conversion utilities for American users
+ */
+export const convertWeight = (weight: number, fromUnit: 'kg' | 'lbs', toUnit: 'kg' | 'lbs'): number => {
+    if (fromUnit === toUnit) return weight;
+    if (fromUnit === 'lbs' && toUnit === 'kg') {
+        return Math.round(weight * 0.453592 * 100) / 100;
+    }
+    if (fromUnit === 'kg' && toUnit === 'lbs') {
+        return Math.round(weight * 2.20462 * 100) / 100;
+    }
+    return weight;
+};
+
+/**
+ * ✅ NEW: Format weight with appropriate precision for display
+ */
+export const formatWeight = (weight: number, unit: 'kg' | 'lbs'): string => {
+    if (unit === 'lbs') {
+        return weight % 1 === 0 ? weight.toString() : weight.toFixed(1);
+    } else {
+        return weight % 1 === 0 ? weight.toString() : weight.toFixed(2);
+    }
 };
 
 /**

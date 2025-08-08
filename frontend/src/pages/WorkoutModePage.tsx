@@ -403,16 +403,18 @@ const WorkoutModePage: React.FC = () => {
                                 </div>
                                 <div className="bg-gray-700 rounded-lg p-3">
                                     <div className="text-2xl font-bold text-green-400">
-                                        {currentExercise.scheduledExercise.reps}
+                                        {currentExercise.scheduledExercise.targetReps} {/* ✅ FIXED: Use targetReps */}
                                     </div>
                                     <div className="text-xs text-gray-300">Target Reps</div>
                                 </div>
-                                {currentExercise.scheduledExercise.weight && (
+                                {currentExercise.scheduledExercise.targetWeight && ( /* ✅ FIXED: Use targetWeight */
                                     <div className="bg-gray-700 rounded-lg p-3">
                                         <div className="text-2xl font-bold text-purple-400">
-                                            {currentExercise.scheduledExercise.weight}
+                                            {currentExercise.scheduledExercise.targetWeight} {/* ✅ FIXED: Use targetWeight */}
                                         </div>
-                                        <div className="text-xs text-gray-300">Weight (lbs)</div>
+                                        <div className="text-xs text-gray-300">
+                                            Weight ({currentExercise.scheduledExercise.targetWeightUnit || 'lbs'}) {/* ✅ FIXED: Show weight unit */}
+                                        </div>
                                     </div>
                                 )}
                                 {currentExercise.scheduledExercise.targetRpe && (
@@ -495,7 +497,7 @@ const WorkoutModePage: React.FC = () => {
                                             <label className="block text-gray-400 mb-1">Target</label>
                                             <div className="text-white">
                                                 {set.targetReps} reps
-                                                {set.targetWeight && ` @ ${set.targetWeight}lbs`}
+                                                {set.targetWeight && ` @ ${set.targetWeight}${set.targetWeightUnit || 'lbs'}`} {/* ✅ FIXED: Show weight unit */}
                                             </div>
                                         </div>
                                         <div>
@@ -504,7 +506,7 @@ const WorkoutModePage: React.FC = () => {
                                                 {set.completed ? (
                                                     <>
                                                         {set.actualReps} reps
-                                                        {set.actualWeight && ` @ ${set.actualWeight}lbs`}
+                                                        {set.actualWeight && ` @ ${set.actualWeight}${set.targetWeightUnit || 'lbs'}`} {/* ✅ FIXED: Show weight unit */}
                                                     </>
                                                 ) : (
                                                     <span className="text-gray-500">-</span>
@@ -584,7 +586,7 @@ const WorkoutModePage: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="text-sm text-gray-400">
-                                        {exercise.sets.length} sets × {exercise.scheduledExercise.reps}
+                                        {exercise.sets.length} sets × {exercise.scheduledExercise.targetReps} {/* ✅ FIXED: Use targetReps */}
                                         {' • '}
                                         {exercise.sets.filter(set => set.completed).length}/{exercise.sets.length} completed
                                     </div>
@@ -668,7 +670,7 @@ const WorkoutModePage: React.FC = () => {
                                     type="number"
                                     value={currentSetInputs.reps}
                                     onChange={(e) => setCurrentSetInputs(prev => ({ ...prev, reps: e.target.value }))}
-                                    placeholder={currentSet.targetReps}
+                                    placeholder={currentSet.targetReps.toString()}
                                     className="w-full px-1 py-1 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none text-center text-xs"
                                 />
                             </div>
@@ -680,6 +682,7 @@ const WorkoutModePage: React.FC = () => {
                                     type="number"
                                     step="0.5"
                                     value={currentSetInputs.weight}
+                                    onChange={(e) => setCurrentSetInputs(prev => ({ ...prev, weight: e.target.value }))}
                                     placeholder={currentSet.targetWeight?.toString() || '0'}
                                     className="w-full px-1 py-1 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none text-center text-xs"
                                 />

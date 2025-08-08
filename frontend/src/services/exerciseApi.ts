@@ -1,16 +1,16 @@
-// src/services/exerciseApi.ts - Enhanced version that uses your infrastructure
+// src/services/exerciseApi.ts - Fixed version with correct type imports
 import {
     Exercise,
     ExerciseType,
     DifficultyLevel,
-    ExerciseFilters as DomainExerciseFilters
+    ExerciseFilters, // ✅ FIXED: Import directly from exercise.ts (no more conflicts)
+    Goal             // ✅ FIXED: Import directly from exercise.ts (no more conflicts)
 } from '../types/exercise';
 import {
     BackendExercise,
-    ExerciseFilters as ApiExerciseFilters,
+    ApiExerciseFilters, // ✅ FIXED: Use the renamed API-specific filters
     GoalData,
-    FiltersData,
-    Goal
+    FiltersData
 } from '../types/api';
 import {
     transformBackendExerciseToFrontend,
@@ -57,7 +57,7 @@ class ExerciseApiService {
     }
 
     // Enhanced public exercises method using your transformation layer
-    async getPublicExercises(filters?: DomainExerciseFilters): Promise<Exercise[]> {
+    async getPublicExercises(filters?: ExerciseFilters): Promise<Exercise[]> {
         try {
             // Transform frontend filters to backend API format
             const apiFilters = this.transformFiltersForBackend(filters);
@@ -89,7 +89,7 @@ class ExerciseApiService {
     }
 
     // Enhanced search with your transformation layer
-    async searchExercises(query: string, filters?: DomainExerciseFilters): Promise<Exercise[]> {
+    async searchExercises(query: string, filters?: ExerciseFilters): Promise<Exercise[]> {
         const apiFilters = this.transformFiltersForBackend(filters);
         apiFilters.q = query;
 
@@ -117,8 +117,8 @@ class ExerciseApiService {
         return transformedExercise;
     }
 
-    // New method: Transform frontend filters to backend API format
-    private transformFiltersForBackend(filters?: DomainExerciseFilters): ApiExerciseFilters {
+    // ✅ FIXED: Transform frontend filters to backend API format
+    private transformFiltersForBackend(filters?: ExerciseFilters): ApiExerciseFilters {
         if (!filters) return {};
 
         return {
@@ -142,7 +142,7 @@ class ExerciseApiService {
     }
 
     // Keep your convenient utility methods
-    async getFilteredExercises(filters: DomainExerciseFilters): Promise<Exercise[]> {
+    async getFilteredExercises(filters: ExerciseFilters): Promise<Exercise[]> {
         if (filters.searchTerm?.trim()) {
             return this.searchExercises(filters.searchTerm.trim(), filters);
         } else {
@@ -168,8 +168,6 @@ class ExerciseApiService {
         }
     }
 }
-
-// Remove the old ExerciseDataTransformer class since you now have the sophisticated transformers module
 
 // Export singleton instance
 export const exerciseApi = new ExerciseApiService();

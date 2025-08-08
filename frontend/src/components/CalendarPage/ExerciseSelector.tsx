@@ -1,5 +1,4 @@
-// src/components/CalendarPage/ExerciseSelector.tsx - Enhanced Mobile-First Design
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Exercise } from '../../types/exercise';
 import {
@@ -64,6 +63,12 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
     const [selectedTab, setSelectedTab] = useState(0);
     const [categories, setCategories] = useState<ExerciseCategory[]>([]);
     const [popularExercises, setPopularExercises] = useState<Exercise[]>([]);
+    const [hasInitialized, setHasInitialized] = useState(false);
+
+    // Refs to prevent duplicate API calls
+    const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+    const lastSearchTermRef = useRef<string>('');
+    const isLoadingRef = useRef<boolean>(false);
 
     // Date navigation functions
     const getCurrentDateIndex = () => {
@@ -124,26 +129,48 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
         return true;
     };
 
-    // API calls
-    const fetchExercises = useCallback(async (query: string = '') => {
-        setLoading(true);
+    // Memoized API functions to prevent recreations
+    const fetchExercises = useCallback(async (query: string = '', skipLoading: boolean = false) => {
+        // Prevent duplicate calls
+        if (isLoadingRef.current && !skipLoading) {
+            console.log('⏳ API call already in progress, skipping duplicate');
+            return;
+        }
+
+        // Check if this is the same search we just did
+        if (query === lastSearchTermRef.current && exercises.length > 0) {
+            console.log('🔄 Same search term, using cached results');
+            return;
+        }
+
+        isLoadingRef.current = true;
+        if (!skipLoading) setLoading(true);
         setError(null);
+
         try {
             console.log('🔍 Searching exercises with real API:', query);
             const results = query
                 ? await exerciseApi.searchExercises(query)
                 : await exerciseApi.getPublicExercises();
+
             setExercises(results);
+            lastSearchTermRef.current = query;
             console.log('✅ Real exercises loaded:', results.length);
         } catch (err) {
             console.error('❌ Exercise search failed:', err);
             setError(err instanceof Error ? err.message : 'Failed to load exercises from backend');
         } finally {
-            setLoading(false);
+            isLoadingRef.current = false;
+            if (!skipLoading) setLoading(false);
         }
-    }, []);
+    }, [exercises.length]); // Only depend on exercises.length to prevent unnecessary recreations
 
     const fetchCategories = useCallback(async () => {
+        if (categories.length > 0) {
+            console.log('🎯 Categories already loaded, skipping');
+            return;
+        }
+
         try {
             console.log('🎯 Loading exercise goals from real API');
             const goalsData = await exerciseApi.getGoals();
@@ -158,9 +185,14 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
         } catch (err) {
             console.error('❌ Failed to fetch categories from backend:', err);
         }
-    }, []);
+    }, [categories.length]);
 
     const fetchPopularExercises = useCallback(async () => {
+        if (popularExercises.length > 0) {
+            console.log('⭐ Popular exercises already loaded, skipping');
+            return;
+        }
+
         try {
             console.log('⭐ Loading popular exercises from real API');
             const allExercises = await exerciseApi.getPublicExercises();
@@ -177,24 +209,68 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
         } catch (err) {
             console.error('❌ Failed to fetch popular exercises from backend:', err);
         }
-    }, []);
+    }, [popularExercises.length]);
 
-    // Effects
+    // Initialize data only once when modal opens
     useEffect(() => {
-        if (open) {
-            fetchExercises();
-            fetchCategories();
-            fetchPopularExercises();
+        if (open && !hasInitialized) {
+            const initializeData = async () => {
+                console.log('🚀 Initializing ExerciseSelector data...');
+
+                // Load all initial data in parallel
+                await Promise.all([
+                    fetchExercises('', true), // Skip loading state for initial load
+                    fetchCategories(),
+                    fetchPopularExercises()
+                ]);
+
+                setHasInitialized(true);
+                console.log('✅ ExerciseSelector initialization complete');
+            };
+
+            initializeData();
         }
-    }, [open, fetchExercises, fetchCategories, fetchPopularExercises]);
+    }, [open, hasInitialized, fetchExercises, fetchCategories, fetchPopularExercises]);
 
+    // Handle search with debouncing
     useEffect(() => {
-        if (!open) return;
-        const timeoutId = setTimeout(() => {
-            fetchExercises(searchTerm);
+        if (!hasInitialized) return;
+
+        // Clear existing timeout
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        // Set new timeout
+        searchTimeoutRef.current = setTimeout(() => {
+            if (searchTerm !== lastSearchTermRef.current) {
+                fetchExercises(searchTerm);
+            }
         }, 300);
-        return () => clearTimeout(timeoutId);
-    }, [searchTerm, fetchExercises, open]);
+
+        // Cleanup
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [searchTerm, hasInitialized, fetchExercises]);
+
+    // Reset state when modal closes
+    useEffect(() => {
+        if (!open) {
+            setSearchTerm('');
+            setSelectedTab(0);
+            setError(null);
+            setHasInitialized(false);
+            lastSearchTermRef.current = '';
+
+            // Clear any pending timeout
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        }
+    }, [open]);
 
     // Helper functions
     const formatGoalName = (goal: string): string => {
@@ -229,7 +305,7 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
 
     const handleClearSearch = () => {
         setSearchTerm('');
-        fetchExercises();
+        // Don't immediately fetch - let the useEffect handle it
     };
 
     const handleDragStart = (exercise: Exercise) => {
@@ -245,6 +321,7 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
             const results = await exerciseApi.searchExercises(categoryId);
             setExercises(results);
             setSelectedTab(0);
+            lastSearchTermRef.current = categoryId; // Update ref to prevent re-fetch
         } catch (err) {
             console.error('❌ Category filter failed:', err);
             setError('Failed to filter by category');
@@ -252,6 +329,17 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
             setLoading(false);
         }
     };
+
+    // Memoized filtered exercises to prevent unnecessary recalculations
+    const filteredExercises = useMemo(() => {
+        return exercises.filter(exercise => {
+            const matchesSearch = !searchTerm ||
+                exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                exercise.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            return matchesSearch;
+        });
+    }, [exercises, searchTerm]);
 
     // Tab content renderer
     const renderTabContent = () => {
@@ -267,9 +355,9 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
                                     </div>
                                 ))}
                             </div>
-                        ) : exercises.length > 0 ? (
+                        ) : filteredExercises.length > 0 ? (
                             <div className="space-y-2">
-                                {exercises.map((exercise) => (
+                                {filteredExercises.map((exercise) => (
                                     <ExerciseCard
                                         key={exercise.id}
                                         exercise={exercise}
@@ -499,7 +587,7 @@ const ExerciseSelector: React.FC<ExerciseSelectorProps> = ({
                             }`}
                         >
                             <MagnifyingGlassIcon className="w-4 h-4 mr-1.5" />
-                            All ({exercises.length})
+                            All ({filteredExercises.length})
                         </button>
                         <button
                             onClick={() => setSelectedTab(1)}

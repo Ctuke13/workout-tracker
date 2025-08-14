@@ -102,6 +102,9 @@ public class Exercise {
     @Column(nullable = false)
     private Boolean published = true;
 
+    @Column(name = "is_favorite")
+    private Boolean isFavorite = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -167,7 +170,94 @@ public class Exercise {
         }
     }
 
+    // =======================
+    // 🆕 STEP 2: FAVORITE METHODS
+    // =======================
+
+    /**
+     * Get the favorite status with null safety
+     */
+    public Boolean getIsFavorite() {
+        return this.isFavorite != null ? this.isFavorite : false;
+    }
+
+    /**
+     * Set the favorite status
+     */
+    public void setIsFavorite(Boolean isFavorite) {
+        this.isFavorite = isFavorite;
+    }
+
+    /**
+     * Check if exercise is marked as favorite (convenience method)
+     */
+    public boolean isFavorite() {
+        return getIsFavorite();
+    }
+
+    /**
+     * Mark this exercise as a favorite
+     */
+    public void markAsFavorite() {
+        this.isFavorite = true;
+    }
+
+    /**
+     * Remove this exercise from favorites
+     */
+    public void removeFromFavorites() {
+        this.isFavorite = false;
+    }
+
+    /**
+     * Toggle favorite status
+     */
+    public void toggleFavorite() {
+        this.isFavorite = !getIsFavorite();
+    }
+
+    // =======================
+    // 🆕 PROFESSIONAL CONTENT METHODS
+    // =======================
+
+    /**
+     * Get the professional creation status with null safety
+     */
+    public Boolean getCreatedByProfessional() {
+        return this.createdByProfessional != null ? this.createdByProfessional : false;
+    }
+
+    /**
+     * Set the professional creation status
+     */
+    public void setCreatedByProfessional(Boolean createdByProfessional) {
+        this.createdByProfessional = createdByProfessional;
+    }
+
+    /**
+     * Check if this exercise was created by a professional (convenience method)
+     */
+    public boolean isCreatedByProfessional() {
+        return getCreatedByProfessional();
+    }
+
+    /**
+     * Mark this exercise as created by a professional
+     */
+    public void markAsProfessionalContent() {
+        this.createdByProfessional = true;
+    }
+
+    /**
+     * Mark this exercise as created by a regular user
+     */
+    public void markAsUserContent() {
+        this.createdByProfessional = false;
+    }
+
+    // =======================
     // 🛠️ ENHANCED DOMAIN METHODS
+    // =======================
 
     public boolean requiresEquipment() {
         return equipmentRequired != null && !equipmentRequired.isEmpty();
@@ -338,7 +428,7 @@ public class Exercise {
         }
     }
 
-    // 🎯 FITNESS GOALS METHODS (unchanged from original)
+    // 🎯 FITNESS GOALS METHODS
 
     /**
      * Get all fitness goals associated with this exercise

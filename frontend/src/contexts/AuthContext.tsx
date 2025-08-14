@@ -217,6 +217,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     lastName: user.lastName,
                     userType: user.userType,
                     isProfessional: user.isProfessional,
+                    subscriptionTier: user.subscriptionTier || 'FREE'
                 };
 
                 dispatch({ type: 'LOGIN_SUCCESS', payload: jwtResponse });

@@ -167,7 +167,7 @@ CREATE TABLE scheduled_workouts (
 
     -- ✅ NEW: Check constraints for exercise configuration fields
                                     CHECK (target_sets IS NULL OR target_sets > 0),
-                                    CHECK (target_reps IS NULL OR target_reps > 0),
+                                    CHECK (target_reps IS NULL OR LENGTH(target_reps) > 0),
                                     CHECK (target_weight IS NULL OR target_weight >= 0),
                                     CHECK (target_weight_unit IN ('kg', 'lbs')),
                                     CHECK (rest_seconds IS NULL OR rest_seconds >= 0),
@@ -228,7 +228,7 @@ CREATE INDEX idx_scheduled_workouts_week_day ON scheduled_workouts(week_number, 
 CREATE INDEX idx_scheduled_workouts_reminder_time ON scheduled_workouts(reminder_time);
 
 -- ✅ NEW: Indexes for exercise configuration fields
-CREATE INDEX idx_scheduled_workouts_target_sets ON scheduled_workouts(target_sets) WHERE sets IS NOT NULL;
+CREATE INDEX idx_scheduled_workouts_target_sets ON scheduled_workouts(target_sets) WHERE target_sets IS NOT NULL;
 CREATE INDEX idx_scheduled_workouts_target_reps ON scheduled_workouts(target_reps) WHERE target_reps IS NOT NULL;
 CREATE INDEX idx_scheduled_workouts_target_weight ON scheduled_workouts(target_weight) WHERE target_weight IS NOT NULL;
 CREATE INDEX idx_scheduled_workouts_target_weight_unit ON scheduled_workouts(target_weight_unit);

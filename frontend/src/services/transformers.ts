@@ -119,7 +119,7 @@ export const transformScheduledWorkoutToExercises = (
 
         const exercise: Exercise = {
             id: workoutPlan.id,
-            name: workoutPlan.name,
+            name: workoutPlan.name || 'Unnamed Workout Plan',
             exerciseName: workoutPlan.name,
             emoji: workoutPlan.exerciseCount === 1 ? '💪' : '📋',
             description: workoutPlan.description || 'Scheduled workout',

@@ -7,12 +7,14 @@ import com.chidituke.workout_tracker.dto.response.subscription.SubscriptionStatu
 import com.chidituke.workout_tracker.dto.response.subscription.SubscriptionStatsDTO;
 import com.chidituke.workout_tracker.exceptions.subscription.FeatureNotAvailableException;
 import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
+import com.chidituke.workout_tracker.exceptions.subscription.SubscriptionLimitExceededException;
 import com.chidituke.workout_tracker.mapper.user.SubscriptionMapper;
 import com.chidituke.workout_tracker.model.user.Subscription;
 import com.chidituke.workout_tracker.model.user.enums.SubscriptionTier;
 import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.repository.user.SubscriptionRepository;
 import com.chidituke.workout_tracker.repository.user.UserRepository;
+import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +36,7 @@ import java.util.Optional;
 public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
+    private final ScheduledWorkoutRepository scheduledWorkoutRepository;
     private final UserRepository userRepository;
     private final SubscriptionMapper subscriptionMapper;
 
@@ -111,6 +115,87 @@ public class SubscriptionService {
         return subscriptionMapper.toResponseDTO(saved);
     }
 
+    // ==================== WORKOUT PLAN ACCESS METHODS ====================
+
+    /**
+     * Check if user can access a specific workout plan based on subscription tier
+     */
+    @Transactional(readOnly = true)
+    @Cacheable(value = "workoutPlanAccess", key = "#userId + ':' + #requiredTier")
+    public boolean canAccessWorkoutPlan(Long userId, String requiredTier) {
+        if (requiredTier == null || "FREE".equals(requiredTier)) {
+            return true; // Everyone can access FREE content
+        }
+
+        Optional<SubscriptionTier> userTier = subscriptionRepository.findActiveSubscriptionTierByUserId(userId);
+        return userTier.map(tier -> canAccessTier(tier, requiredTier)).orElse(false);
+    }
+
+    /**
+     * Gets the daily exercise limit for a subscription tier
+     */
+    @Cacheable(value = "dailyLimits", key = "#tier")
+    public int getDailyExerciseLimit(String tier) {
+        switch (tier.toUpperCase()) {
+            case "FREE": return 3;      // Perfect for FREE tier conversion strategy
+            case "PLUS": return 15;     // Allows complete workout plans
+            case "PRO":
+            case "PRO_PROFESSIONAL": return Integer.MAX_VALUE;
+            default:
+                log.warn("Unknown subscription tier: {}, defaulting to FREE limits", tier);
+                return 3;
+        }
+    }
+
+    /**
+     * Gets the advance scheduling limit for a subscription tier
+     */
+    @Cacheable(value = "schedulingLimits", key = "#tier")
+    public int getAdvanceSchedulingDays(String tier) {
+        switch (tier.toUpperCase()) {
+            case "FREE": return 7;      // 1 week advance
+            case "PLUS": return 30;     // 1 month advance
+            case "PRO":
+            case "PRO_PROFESSIONAL": return 365;  // 1 year advance
+            default:
+                log.warn("Unknown subscription tier: {}, defaulting to FREE limits", tier);
+                return 7;
+        }
+    }
+
+    /**
+     * Gets upgrade suggestions for FREE users
+     */
+    public String getUpgradeSuggestion(String currentTier) {
+        if ("FREE".equals(currentTier)) {
+            return "Upgrade to PLUS to access complete workout plans, schedule up to 15 exercises per day, and plan workouts 30 days in advance!";
+        }
+        return null;
+    }
+
+    /**
+     * Get comprehensive subscription limits for workout features
+     */
+    @Transactional(readOnly = true)
+    @Cacheable(value = "workoutLimits", key = "#userId")
+    public Map<String, Object> getWorkoutSubscriptionLimits(Long userId) {
+        Optional<SubscriptionTier> tierOpt = subscriptionRepository.findActiveSubscriptionTierByUserId(userId);
+        String tierName = tierOpt.map(SubscriptionTier::name).orElse("FREE");
+
+        Map<String, Object> limits = new HashMap<>();
+        limits.put("tier", tierName);
+        limits.put("dailyExerciseLimit", getDailyExerciseLimit(tierName));
+        limits.put("advanceSchedulingDays", getAdvanceSchedulingDays(tierName));
+        limits.put("canAccessWorkoutPlans", !"FREE".equals(tierName) ? "All plans" : "Basic plans only");
+        limits.put("canCreateCustomPlans", !"FREE".equals(tierName));
+
+        if ("FREE".equals(tierName)) {
+            limits.put("upgradeSuggestion", getUpgradeSuggestion(tierName));
+        }
+
+        return limits;
+    }
+
     // ==================== TIER CHECKING METHODS (HIGH PERFORMANCE) ====================
 
     /**
@@ -187,6 +272,36 @@ public class SubscriptionService {
             Optional<SubscriptionTier> currentTier = subscriptionRepository.findActiveSubscriptionTierByUserId(userId);
             String current = currentTier.map(SubscriptionTier::getDisplayName).orElse("Free");
             throw new FeatureNotAvailableException(featureName, requiredTier.getDisplayName() + " (currently: " + current + ")");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void validateWorkoutPlanScheduling(Long userId, LocalDate date, int exerciseCount, String requiredTier) {
+        // Check subscription tier access
+        if (!canAccessWorkoutPlan(userId, requiredTier)) {
+            Optional<SubscriptionTier> userTier = subscriptionRepository.findActiveSubscriptionTierByUserId(userId);
+            String current = userTier.map(SubscriptionTier::name).orElse("FREE");
+
+            throw SubscriptionLimitExceededException.workoutPlanAccess(current, requiredTier);
+        }
+
+        // Check daily exercise limits
+        Optional<SubscriptionTier> userTier = subscriptionRepository.findActiveSubscriptionTierByUserId(userId);
+        String tierName = userTier.map(SubscriptionTier::name).orElse("FREE");
+
+        int dailyLimit = getDailyExerciseLimit(tierName);
+        long currentDayExercises = scheduledWorkoutRepository.countByUserIdAndScheduledDate(userId, date);
+
+        if (currentDayExercises + exerciseCount > dailyLimit) {
+            throw SubscriptionLimitExceededException.workoutPlanExerciseLimit(exerciseCount, dailyLimit, tierName);
+        }
+
+        // Check advance scheduling limits
+        int advanceDays = getAdvanceSchedulingDays(tierName);
+        LocalDate maxDate = LocalDate.now().plusDays(advanceDays);
+
+        if (date.isAfter(maxDate)) {
+            throw SubscriptionLimitExceededException.advanceSchedulingLimit(advanceDays, tierName);
         }
     }
 
@@ -411,5 +526,33 @@ public class SubscriptionService {
     private Subscription findSubscriptionEntity(Long userId) {
         return subscriptionRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("No subscription found for user: " + userId));
+    }
+
+    /**
+     * Checks if user tier can access required tier
+     */
+    private boolean canAccessTier(SubscriptionTier userTier, String requiredTier) {
+        if (requiredTier == null || "FREE".equals(requiredTier)) {
+            return true; // Everyone can access FREE content
+        }
+
+        // Tier hierarchy: FREE < PLUS < PRO < PRO_PROFESSIONAL
+        int userLevel = getTierLevel(userTier.name());
+        int requiredLevel = getTierLevel(requiredTier);
+
+        return userLevel >= requiredLevel;
+    }
+
+    /**
+     * Gets numeric tier level for comparison
+     */
+    private int getTierLevel(String tier) {
+        switch (tier.toUpperCase()) {
+            case "FREE": return 0;
+            case "PLUS": return 1;
+            case "PRO": return 2;
+            case "PRO_PROFESSIONAL": return 3;
+            default: return 0; // Default to FREE level
+        }
     }
 }

@@ -5,6 +5,7 @@ import com.chidituke.workout_tracker.dto.request.auth.RegisterRequest;
 import com.chidituke.workout_tracker.dto.response.auth.JwtResponse;
 import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.model.user.enums.UserType;
+import com.chidituke.workout_tracker.model.user.enums.SubscriptionTier;
 import com.chidituke.workout_tracker.service.user.UserService;
 import com.chidituke.workout_tracker.security.JwtTokenProvider;
 import com.chidituke.workout_tracker.security.CurrentUser;
@@ -66,7 +67,8 @@ public class AuthController {
                 user.getFirstName(),
                 user.getLastName(),
                 user.getUserType(),
-                user.getProfessionalProfile() != null
+                user.getProfessionalProfile() != null,
+                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE // ✅ Added subscription tier
         );
 
         return ResponseEntity.ok(jwtResponse);
@@ -117,7 +119,8 @@ public class AuthController {
                 user.getFirstName(),
                 user.getLastName(),
                 user.getUserType(),
-                user.getProfessionalProfile() != null
+                user.getProfessionalProfile() != null,
+                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE // ✅ Added subscription tier
         );
 
         return ResponseEntity.ok(jwtResponse);
@@ -153,7 +156,8 @@ public class AuthController {
                 user.getAccountStatus(),
                 user.getActivityLevel(),
                 user.getProfessionalProfile() != null,
-                user.getProfessionalProfile() != null ? user.getProfessionalProfile().getIsVerified() : false
+                user.getProfessionalProfile() != null ? user.getProfessionalProfile().getIsVerified() : false,
+                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE // ✅ Added subscription tier
         );
 
         return ResponseEntity.ok(userSummary);
@@ -194,7 +198,8 @@ public class AuthController {
                 user.getFirstName(),
                 user.getLastName(),
                 user.getUserType(),
-                user.getProfessionalProfile() != null
+                user.getProfessionalProfile() != null,
+                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE // ✅ Added subscription tier
         );
 
         return ResponseEntity.ok(jwtResponse);
@@ -228,29 +233,31 @@ public class AuthController {
         private String email;
         private String firstName;
         private String lastName;
-        private UserType userType;  // ✅ Field is userType
+        private UserType userType;
         private User.AccountStatus accountStatus;
         private User.ActivityLevel activityLevel;
         private Boolean isProfessional;
         private Boolean isVerified;
+        private SubscriptionTier subscriptionTier; // ✅ Added subscription tier
 
-        // ✅ Fix constructor - parameter name matches field assignment
+        // ✅ Updated constructor with subscription tier
         public UserSummary(Long id, String username, String email, String firstName, String lastName,
                            UserType userType, User.AccountStatus accountStatus, User.ActivityLevel activityLevel,
-                           Boolean isProfessional, Boolean isVerified) {
+                           Boolean isProfessional, Boolean isVerified, SubscriptionTier subscriptionTier) {
             this.id = id;
             this.username = username;
             this.email = email;
             this.firstName = firstName;
             this.lastName = lastName;
-            this.userType = userType;  // ✅ Now matches parameter name
+            this.userType = userType;
             this.accountStatus = accountStatus;
             this.activityLevel = activityLevel;
             this.isProfessional = isProfessional;
             this.isVerified = isVerified;
+            this.subscriptionTier = subscriptionTier;
         }
 
-        // ✅ Getters and setters with consistent naming
+        // ✅ Getters and setters
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
 
@@ -266,7 +273,6 @@ public class AuthController {
         public String getLastName() { return lastName; }
         public void setLastName(String lastName) { this.lastName = lastName; }
 
-        // ✅ Fixed getter/setter names
         public UserType getUserType() { return userType; }
         public void setUserType(UserType userType) { this.userType = userType; }
 
@@ -281,5 +287,26 @@ public class AuthController {
 
         public Boolean getIsVerified() { return isVerified; }
         public void setIsVerified(Boolean isVerified) { this.isVerified = isVerified; }
+
+        public SubscriptionTier getSubscriptionTier() { return subscriptionTier; }
+        public void setSubscriptionTier(SubscriptionTier subscriptionTier) { this.subscriptionTier = subscriptionTier; }
+
+        // ✅ Utility methods for subscription checks
+        public boolean canAccessPaidPlans() {
+            if (subscriptionTier == null) return false;
+            return subscriptionTier == SubscriptionTier.PLUS ||
+                    subscriptionTier == SubscriptionTier.PRO ||
+                    subscriptionTier == SubscriptionTier.PRO_PROFESSIONAL;
+        }
+
+        public boolean hasProFeatures() {
+            if (subscriptionTier == null) return false;
+            return subscriptionTier == SubscriptionTier.PRO ||
+                    subscriptionTier == SubscriptionTier.PRO_PROFESSIONAL;
+        }
+
+        public boolean isFreeTier() {
+            return subscriptionTier == null || subscriptionTier == SubscriptionTier.FREE;
+        }
     }
 }

@@ -7,10 +7,15 @@ import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanRespon
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanSearchResponse;
 import com.chidituke.workout_tracker.exceptions.workout_plan.WorkoutPlanNotFoundException;
 import com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationException;
+import com.chidituke.workout_tracker.exceptions.subscription.SubscriptionLimitExceededException;
+import com.chidituke.workout_tracker.model.user.User;
+import com.chidituke.workout_tracker.service.user.UserService;
 import com.chidituke.workout_tracker.model.workout.PlanExercise;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan.DifficultyLevel;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan.WorkoutType;
 import com.chidituke.workout_tracker.service.workout.WorkoutPlanService;
+import com.chidituke.workout_tracker.service.user.SubscriptionService;
+import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,6 +40,8 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.time.LocalDate;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -44,6 +51,9 @@ import java.util.Optional;
 public class WorkoutPlanController {
 
     private final WorkoutPlanService workoutPlanService;
+    private final SubscriptionService subscriptionService;
+    private final ScheduledWorkoutRepository scheduledWorkoutRepository;
+    private final UserService userService;
 
     // =======================
     // PUBLIC DISCOVERY ENDPOINTS
@@ -348,6 +358,97 @@ public class WorkoutPlanController {
     }
 
     // =======================
+    // SUBSCRIPTION-AWARE ENDPOINTS
+    // =======================
+
+    /**
+     * Get workout plans filtered by category with subscription validation
+     */
+    @GetMapping("/category/{category}/accessible")
+    @Operation(summary = "Get accessible workout plans by category",
+            description = "Get workout plans by category that user can access based on subscription")
+    public ResponseEntity<WorkoutPlanListResponse> getAccessibleWorkoutPlansByCategory(
+            @Parameter(description = "Workout category") @PathVariable String category,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        // Use existing method but filter by subscription
+        List<WorkoutPlanResponse> allPlans = workoutPlanService.getWorkoutPlansByCategory(category);
+        List<WorkoutPlanResponse> accessiblePlans = filterBySubscription(allPlans, userDetails.getUsername());
+
+        WorkoutPlanListResponse response = WorkoutPlanListResponse.builder()
+                .workoutPlans(accessiblePlans)
+                .totalCount(accessiblePlans.size())
+                .category(category)
+                .isFiltered(true)
+                .appliedFilters(List.of("category=" + category, "subscription-accessible"))
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get detailed workout plan with subscription validation
+     */
+    @GetMapping("/{id}/details/accessible")
+    @Operation(summary = "Get workout plan details with access validation",
+            description = "Get workout plan details with subscription tier validation")
+    public ResponseEntity<WorkoutPlanResponse> getAccessibleWorkoutPlanDetails(
+            @Parameter(description = "Workout plan ID") @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        try {
+            Optional<WorkoutPlanResponse> workoutPlan = workoutPlanService.getWorkoutPlanById(id, userDetails.getUsername());
+
+            if (workoutPlan.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Check subscription access
+            if (!canUserAccessWorkoutPlan(workoutPlan.get(), userDetails.getUsername())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .header("X-Upgrade-Required", "true")
+                        .header("X-Error-Message", "Upgrade to access this workout plan")
+                        .build();
+            }
+
+            return ResponseEntity.ok(workoutPlan.get());
+
+        } catch (Exception e) {
+            log.error("Error getting workout plan details: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Get user's subscription limits and current usage
+     */
+    @GetMapping("/subscription-limits")
+    @Operation(summary = "Get user subscription limits",
+            description = "Get current subscription limits and daily usage")
+    public ResponseEntity<Map<String, Object>> getUserSubscriptionLimits(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            // Get user ID using UserService
+            Long userId = userService.getUserIdByUsername(userDetails.getUsername());
+
+            Map<String, Object> limits = subscriptionService.getWorkoutSubscriptionLimits(userId);
+
+            // Add current usage for today
+            LocalDate today = LocalDate.now();
+            long todayExercises = scheduledWorkoutRepository.countByUserIdAndScheduledDate(userId, today);
+
+            limits.put("todayExerciseCount", todayExercises);
+            limits.put("todayExercisesRemaining",
+                    Math.max(0, (Integer) limits.get("dailyExerciseLimit") - todayExercises));
+
+            return ResponseEntity.ok(limits);
+        } catch (Exception e) {
+            log.error("Error fetching subscription limits: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // =======================
     // WORKOUT PLAN CRUD
     // =======================
 
@@ -507,6 +608,20 @@ public class WorkoutPlanController {
     // EXCEPTION HANDLERS
     // =======================
 
+    @ExceptionHandler(SubscriptionLimitExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleSubscriptionLimitExceeded(SubscriptionLimitExceededException ex) {
+        Map<String, Object> error = Map.of(
+                "error", "Subscription Limit Exceeded",
+                "message", ex.getMessage(),
+                "upgradeRequired", true,
+                "timestamp", System.currentTimeMillis()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .header("X-Upgrade-Required", "true")
+                .header("X-Error-Type", "SUBSCRIPTION_LIMIT")
+                .body(error);
+    }
+
     @ExceptionHandler(WorkoutPlanNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleWorkoutPlanNotFound(WorkoutPlanNotFoundException ex) {
         Map<String, Object> error = Map.of(
@@ -555,6 +670,39 @@ public class WorkoutPlanController {
             return "FULL_TEXT";
         } else {
             return "BROWSE";
+        }
+    }
+
+    /**
+     * Filter workout plans by user's subscription tier
+     */
+    private List<WorkoutPlanResponse> filterBySubscription(List<WorkoutPlanResponse> plans, String username) {
+        try {
+            Long userId = userService.getUserIdByUsername(username);
+
+            return plans.stream()
+                    .filter(plan -> {
+                        String requiredTier = plan.getSubscriptionTierRequired();
+                        return subscriptionService.canAccessWorkoutPlan(userId, requiredTier);
+                    })
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Error filtering plans by subscription: {}", e.getMessage());
+            return plans; // Return all plans on error
+        }
+    }
+
+    /**
+     * Check if user can access a specific workout plan
+     */
+    private boolean canUserAccessWorkoutPlan(WorkoutPlanResponse plan, String username) {
+        try {
+            Long userId = userService.getUserIdByUsername(username);
+            String requiredTier = plan.getSubscriptionTierRequired();
+            return subscriptionService.canAccessWorkoutPlan(userId, requiredTier);
+        } catch (Exception e) {
+            log.error("Error checking workout plan access: {}", e.getMessage());
+            return false; // Deny access on error
         }
     }
 }

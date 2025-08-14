@@ -17,6 +17,7 @@ import com.chidituke.workout_tracker.dto.response.program_plan.ProgramPlanRespon
 import com.chidituke.workout_tracker.dto.response.program_plan.ProgramStructureAnalyticsResponse;
 import com.chidituke.workout_tracker.model.workout.ProgramPlan;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan;
+import com.chidituke.workout_tracker.model.user.enums.SubscriptionTier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -473,12 +474,14 @@ public class TestController {
             userType = UserType.REGULAR; // fallback
         }
 
+        // ✅ FIXED: Added SubscriptionTier parameter (6th parameter)
         return new UserPrincipal(
-                1L, // Mock user ID
-                username,
-                username + "@example.com", // Mock email
-                "", // Password not needed for testing
-                userType
+                1L,                           // Mock user ID
+                username,                     // Username
+                username + "@example.com",    // Mock email
+                "",                          // Password not needed for testing
+                userType,                    // UserType enum
+                SubscriptionTier.FREE        // ✅ SubscriptionTier enum (this was missing)
         );
     }
 

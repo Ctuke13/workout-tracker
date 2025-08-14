@@ -1,6 +1,7 @@
 package com.chidituke.workout_tracker.dto.response.auth;
 
 import com.chidituke.workout_tracker.model.user.enums.UserType;
+import com.chidituke.workout_tracker.model.user.enums.SubscriptionTier;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -18,6 +19,7 @@ public class JwtResponse {
     private String lastName;
     private UserType userType;
     private Boolean isProfessional;
+    private SubscriptionTier subscriptionTier; // ✅ Added subscription tier
 
     // ═══════════════════════════════════════════════════════════════════
     // 🔧 CONSTRUCTORS
@@ -25,6 +27,24 @@ public class JwtResponse {
 
     /**
      * Complete constructor used by AuthController
+     */
+    public JwtResponse(String accessToken, Long id, String username, String email,
+                       String firstName, String lastName, UserType userType, Boolean isProfessional,
+                       SubscriptionTier subscriptionTier) {
+        this.token = accessToken;
+        this.type = "Bearer";
+        this.id = id;
+        this.username = username;
+        this.email = email;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.userType = userType;
+        this.isProfessional = isProfessional;
+        this.subscriptionTier = subscriptionTier;
+    }
+
+    /**
+     * Backward compatible constructor (without subscription tier)
      */
     public JwtResponse(String accessToken, Long id, String username, String email,
                        String firstName, String lastName, UserType userType, Boolean isProfessional) {
@@ -37,6 +57,7 @@ public class JwtResponse {
         this.lastName = lastName;
         this.userType = userType;
         this.isProfessional = isProfessional;
+        this.subscriptionTier = SubscriptionTier.FREE; // Default to FREE
     }
 
     /**
@@ -47,6 +68,7 @@ public class JwtResponse {
         this.type = "Bearer";
         this.username = username;
         this.email = email;
+        this.subscriptionTier = SubscriptionTier.FREE; // Default to FREE
         // Other fields will be null - should be avoided in favor of complete constructor
     }
 
@@ -107,5 +129,48 @@ public class JwtResponse {
      */
     public String getAuthorizationHeader() {
         return type + " " + token;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🔒 SUBSCRIPTION TIER UTILITY METHODS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Check if user can access paid workout plans
+     */
+    public boolean canAccessPaidPlans() {
+        if (subscriptionTier == null) return false;
+        return subscriptionTier == SubscriptionTier.PLUS ||
+                subscriptionTier == SubscriptionTier.PRO ||
+                subscriptionTier == SubscriptionTier.PRO_PROFESSIONAL;
+    }
+
+    /**
+     * Check if user has PRO-level features
+     */
+    public boolean hasProFeatures() {
+        if (subscriptionTier == null) return false;
+        return subscriptionTier == SubscriptionTier.PRO ||
+                subscriptionTier == SubscriptionTier.PRO_PROFESSIONAL;
+    }
+
+    /**
+     * Get subscription display name
+     */
+    public String getSubscriptionDisplayName() {
+        if (subscriptionTier == null) return "Free";
+        return switch (subscriptionTier) {
+            case FREE -> "Free";
+            case PLUS -> "Plus";
+            case PRO -> "Pro";
+            case PRO_PROFESSIONAL -> "Pro Professional";
+        };
+    }
+
+    /**
+     * Check if user is on free tier
+     */
+    public boolean isFreeTier() {
+        return subscriptionTier == null || subscriptionTier == SubscriptionTier.FREE;
     }
 }

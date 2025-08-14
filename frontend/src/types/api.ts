@@ -187,16 +187,53 @@ export interface ScheduledWorkoutResponse {
 // SUPPORTING INTERFACES FOR SCHEDULED WORKOUTS
 // =============================================================================
 
+// ==================== WORKOUT PLAN TYPES ====================
+
+export interface WorkoutPlanFilters {
+    category?: string;
+    difficulty?: string;
+    workoutType?: string;
+    equipment?: string;
+    muscleGroup?: string;
+    subscriptionTier?: string;
+    minRating?: number;
+    maxDuration?: number;
+    minDuration?: number;
+}
+
+// You should also make sure your existing WorkoutPlanInfo interface is complete:
 export interface WorkoutPlanInfo {
     id: number;
-    name: string;
-    description?: string;
-    difficulty: string; // BEGINNER, INTERMEDIATE, ADVANCED
-    estimatedDurationMinutes?: number;
-    exerciseCount: number;
-    category?: string;
-    imageUrl?: string;
-    isPublic?: boolean;
+    workoutName: string; // ✅ Matches backend: workoutName
+    workoutDescription: string; // ✅ Matches backend: workoutDescription
+    workoutCategory: string; // ✅ Matches backend: workoutCategory
+    workoutImageUrl?: string; // ✅ Matches backend: workoutImageUrl
+    isCardio: boolean; // ✅ Matches backend: isCardio
+    workoutType: string; // ✅ Matches backend: workoutType
+    estimatedDurationMinutes: number; // ✅ Matches backend: estimatedDurationMinutes
+    difficultyLevel: string; // ✅ Matches backend: difficultyLevel
+    targetMuscleGroups: string; // ✅ Matches backend: targetMuscleGroups (comma-separated string)
+    equipmentNeeded: string; // ✅ Matches backend: equipmentNeeded (comma-separated string)
+    subscriptionTierRequired: string; // ✅ Matches backend: subscriptionTierRequired
+
+    // Creator info
+    createdByUserId?: number; // ✅ Matches backend: createdByUserId
+    isPublic: boolean; // ✅ Matches backend: isPublic
+
+    // Popularity metrics
+    timesUsed: number; // ✅ Matches backend: timesUsed
+    averageRating: number; // ✅ Matches backend: averageRating
+
+    // Metadata
+    createdAt?: string; // ✅ Matches backend: createdAt (ISO string)
+    updatedAt?: string; // ✅ Matches backend: updatedAt (ISO string)
+
+    // Computed properties for frontend compatibility
+    name?: string; // Alias for workoutName
+    description?: string; // Alias for workoutDescription
+    category?: string; // Alias for workoutCategory
+    difficulty?: string; // Alias for difficultyLevel
+    exerciseCount?: number; // May be computed or added separately
 }
 
 export interface UserInfo {
@@ -307,6 +344,43 @@ export interface WorkoutStatsResponse {
     // ===== GOAL TRACKING =====
     weeklyGoalAchievementRate?: number;  // Percentage of weeks where weekly goal was met
     consistencyScore?: number;  // Algorithm-based consistency rating (0-100)
+}
+
+export interface WorkoutPlanScheduleRequest {
+    workoutPlanId: number;
+    scheduledDate: string;
+    customNotes?: string;
+}
+
+// ==================== RESPONSE WRAPPER TYPES ====================
+
+export interface WorkoutPlanListResponse {
+    workoutPlans: WorkoutPlanInfo[];
+    totalCount: number;
+    currentPage?: number;
+    totalPages?: number;
+    pageSize?: number;
+    hasNext?: boolean;
+    hasPrevious?: boolean;
+    isFiltered?: boolean;
+    category?: string;
+    difficulty?: string;
+    workoutType?: string;
+    sortBy?: string;
+    sortDirection?: string;
+    appliedFilters?: string[];
+    totalUserPlans?: number;
+}
+
+export interface WorkoutPlanSearchResponse {
+    results: WorkoutPlanInfo[];
+    searchTerm?: string;
+    totalResults: number;
+    page?: number;
+    size?: number;
+    hasMore?: boolean;
+    searchTimeMs?: number;
+    searchType?: string;
 }
 
 // ==================== PERFORMANCE RECORD TYPES ====================
@@ -593,19 +667,26 @@ export const API_ENDPOINTS = {
     // Calendar & Scheduling
     CALENDAR: {
         BASE: '/api/calendar',
+
+        SCHEDULE_EXERCISE: '/api/calendar/schedule-exercise',
         EXERCISES: '/api/calendar/exercises',
         EXERCISE_BY_ID: (id: string) => `/api/calendar/exercises/${id}`,
         EXERCISE_COMPLETE: (id: string) => `/api/calendar/exercises/${id}/complete`,
         EXERCISE_BY_DATE: (date: string) => `/api/calendar/exercises/date/${date}`,
+
+
+        SCHEDULE_WORKOUT_PLAN: '/api/calendar/schedule-workout-plan',
+        SCHEDULE_MULTIPLE_EXERCISES: '/api/calendar/schedule-multiple-exercises',
+
+
         TODAY: '/api/calendar/today',
         UPCOMING: '/api/calendar/upcoming',
         OVERDUE: '/api/calendar/overdue',
-        SCHEDULE: '/api/calendar/schedule',
         RESCHEDULE: (id: number) => `/api/calendar/${id}/reschedule`,
         START: (id: number) => `/api/calendar/${id}/start`,
         DELETE: (id: number) => `/api/calendar/${id}`,
         STATS: '/api/calendar/stats',
-        WORKOUT_PLANS: '/api/calendar/workout-plans'
+
     },
 
     // Workout Sessions

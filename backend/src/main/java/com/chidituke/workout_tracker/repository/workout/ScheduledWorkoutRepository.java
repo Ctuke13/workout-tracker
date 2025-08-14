@@ -87,6 +87,17 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
             User user, WorkoutPlan workoutPlan);
 
     // =======================
+    // WORKOUT PLAN SCHEDULING SUPPORT (ADD THIS SECTION)
+    // =======================
+
+    // Count exercises scheduled for user on specific date (for daily limit validation)
+    @Query("SELECT COUNT(sw) FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.scheduledDate = :date")
+    long countByUserIdAndScheduledDate(@Param("userId") Long userId, @Param("date") LocalDate date);
+
+    // Alternative method using User entity (choose one based on your preference)
+    long countByUserAndScheduledDate(User user, LocalDate date);
+
+    // =======================
     // PROGRAM TRACKING QUERIES
     // =======================
 

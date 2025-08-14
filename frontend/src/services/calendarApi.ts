@@ -5,7 +5,7 @@ export class CalendarApiService {
     // ==================== INDIVIDUAL EXERCISE SCHEDULING ====================
 
     /**
-     * ✅ FIXED: Schedule individual exercise using correct endpoint
+     * ✅ UPDATED: Schedule individual exercise using unified endpoint
      */
     async scheduleIndividualExercise(exerciseData: {
         exerciseId: number;
@@ -25,8 +25,8 @@ export class CalendarApiService {
         try {
             console.log('📅 API: Scheduling individual exercise:', exerciseData);
 
-            // ✅ Use the CalendarController endpoint for individual exercises
-            const response = await apiClient.post<ScheduledWorkoutResponse>('/api/calendar/exercises', exerciseData);
+            // ✅ UPDATED: Use the unified ScheduledWorkoutController endpoint
+            const response = await apiClient.post<ScheduledWorkoutResponse>('/api/calendar/schedule-exercise', exerciseData);
 
             console.log(`✅ Successfully scheduled exercise: ${exerciseData.exerciseId}`);
             return response;
@@ -39,7 +39,7 @@ export class CalendarApiService {
     // ==================== WORKOUT PLAN SCHEDULING ====================
 
     /**
-     * Schedule a workout plan (existing method)
+     * ✅ UPDATED: Schedule a workout plan using unified endpoint
      */
     async scheduleWorkout(workoutData: {
         workoutPlanId: number;
@@ -49,8 +49,8 @@ export class CalendarApiService {
         try {
             console.log('📅 API: Scheduling workout plan:', workoutData);
 
-            // Use the ScheduledWorkoutController endpoint for workout plans
-            const response = await apiClient.post<ScheduledWorkoutResponse>('/api/calendar/schedule', workoutData);
+            // ✅ UPDATED: Use the unified ScheduledWorkoutController endpoint
+            const response = await apiClient.post<ScheduledWorkoutResponse>('/api/calendar/schedule-workout-plan', workoutData);
 
             console.log(`✅ Successfully scheduled workout plan: ${workoutData.workoutPlanId}`);
             return response;
@@ -86,7 +86,7 @@ export class CalendarApiService {
         try {
             console.log('📅 API: Getting scheduled workouts from', startDate, 'to', endDate);
 
-            // ✅ FIXED: Use direct query parameters (not nested in params object)
+            // ✅ UNIFIED: Use the main calendar endpoint
             const response = await apiClient.get('/api/calendar', {
                 startDate,
                 endDate
@@ -140,12 +140,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Get scheduled exercises for date range (alternative endpoint)
+     * ✅ UNIFIED: Get scheduled exercises for date range
      */
     async getScheduledExercises(startDate: string, endDate: string): Promise<ScheduledWorkoutResponse[]> {
         try {
             console.log('📅 API: Getting scheduled exercises from', startDate, 'to', endDate);
 
+            // ✅ UNIFIED: Use the main exercises endpoint
             const response = await apiClient.get<ScheduledWorkoutResponse[]>('/api/calendar/exercises', {
                 startDate,
                 endDate
@@ -160,12 +161,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Get exercises for a specific date
+     * ✅ UNIFIED: Get exercises for a specific date
      */
     async getExercisesForDate(date: string): Promise<ScheduledWorkoutResponse[]> {
         try {
             console.log('📅 API: Getting exercises for date:', date);
 
+            // ✅ UNIFIED: This endpoint remains the same
             const response = await apiClient.get<ScheduledWorkoutResponse[]>(`/api/calendar/exercises/date/${date}`);
 
             console.log(`✅ Successfully fetched ${response.length} exercises for ${date}`);
@@ -179,12 +181,13 @@ export class CalendarApiService {
     // ==================== WORKOUT MANAGEMENT ====================
 
     /**
-     * Update a scheduled exercise
+     * ✅ UNIFIED: Update a scheduled exercise
      */
     async updateScheduledExercise(exerciseId: string, updates: any): Promise<ScheduledWorkoutResponse> {
         try {
             console.log('📅 API: Updating scheduled exercise:', exerciseId);
 
+            // ✅ UNIFIED: This endpoint remains the same
             const response = await apiClient.put<ScheduledWorkoutResponse>(`/api/calendar/exercises/${exerciseId}`, updates);
 
             console.log(`✅ Successfully updated exercise: ${exerciseId}`);
@@ -196,12 +199,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Delete a scheduled exercise
+     * ✅ UNIFIED: Delete a scheduled exercise
      */
     async deleteScheduledExercise(exerciseId: string): Promise<void> {
         try {
             console.log('📅 API: Deleting scheduled exercise:', exerciseId);
 
+            // ✅ UNIFIED: This endpoint remains the same
             await apiClient.delete(`/api/calendar/exercises/${exerciseId}`);
 
             console.log(`✅ Successfully deleted exercise: ${exerciseId}`);
@@ -212,12 +216,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Mark exercise as completed
+     * ✅ UNIFIED: Mark exercise as completed
      */
     async markExerciseCompleted(exerciseId: string): Promise<ScheduledWorkoutResponse> {
         try {
             console.log('✅ API: Marking exercise as completed:', exerciseId);
 
+            // ✅ UNIFIED: This endpoint remains the same
             const response = await apiClient.put<ScheduledWorkoutResponse>(`/api/calendar/exercises/${exerciseId}/complete`);
 
             console.log(`✅ Successfully marked exercise as completed: ${exerciseId}`);
@@ -229,12 +234,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Cancel a scheduled workout
+     * ✅ UNIFIED: Cancel a scheduled workout
      */
     async cancelScheduledWorkout(scheduledWorkoutId: number): Promise<void> {
         try {
             console.log('📅 API: Cancelling scheduled workout:', scheduledWorkoutId);
 
+            // ✅ UNIFIED: This endpoint remains the same
             await apiClient.delete(`/api/calendar/${scheduledWorkoutId}`);
 
             console.log(`✅ Successfully cancelled workout: ${scheduledWorkoutId}`);
@@ -245,12 +251,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Start a scheduled workout
+     * ✅ UNIFIED: Start a scheduled workout
      */
     async startWorkout(workoutId: string): Promise<ScheduledWorkoutResponse> {
         try {
             console.log('▶️ API: Starting workout:', workoutId);
 
+            // ✅ UNIFIED: This endpoint remains the same
             const response = await apiClient.post<ScheduledWorkoutResponse>(`/api/calendar/${workoutId}/start`);
 
             console.log(`✅ Successfully started workout: ${workoutId}`);
@@ -262,12 +269,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Delete a workout
+     * ✅ UNIFIED: Delete a workout
      */
     async deleteWorkout(workoutId: string): Promise<void> {
         try {
             console.log('🗑️ API: Deleting workout:', workoutId);
 
+            // ✅ UNIFIED: This endpoint remains the same
             await apiClient.delete(`/api/calendar/${workoutId}`);
 
             console.log(`✅ Successfully deleted workout: ${workoutId}`);
@@ -280,12 +288,13 @@ export class CalendarApiService {
     // ==================== ANALYTICS & STATISTICS ====================
 
     /**
-     * Get workout statistics
+     * ✅ UNIFIED: Get workout statistics
      */
     async getWorkoutStats(date?: string): Promise<any> {
         try {
             console.log('📊 API: Getting workout statistics', date ? `for ${date}` : '');
 
+            // ✅ UNIFIED: This endpoint remains the same
             const params = date ? { date } : {};
             const response = await apiClient.get('/api/calendar/stats', params);
 
@@ -298,12 +307,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Get today's workouts
+     * ✅ UNIFIED: Get today's workouts
      */
     async getTodaysWorkouts(): Promise<ScheduledWorkoutResponse[]> {
         try {
             console.log('📅 API: Getting today\'s workouts');
 
+            // ✅ UNIFIED: This endpoint remains the same
             const response = await apiClient.get<ScheduledWorkoutResponse[]>('/api/calendar/today');
 
             console.log(`✅ Successfully fetched ${response.length} workouts for today`);
@@ -315,12 +325,13 @@ export class CalendarApiService {
     }
 
     /**
-     * Get upcoming workouts
+     * ✅ UNIFIED: Get upcoming workouts
      */
     async getUpcomingWorkouts(days: number = 7): Promise<ScheduledWorkoutResponse[]> {
         try {
             console.log(`📅 API: Getting upcoming workouts for next ${days} days`);
 
+            // ✅ UNIFIED: This endpoint remains the same
             const response = await apiClient.get<ScheduledWorkoutResponse[]>('/api/calendar/upcoming', { days });
 
             console.log(`✅ Successfully fetched ${response.length} upcoming workouts`);

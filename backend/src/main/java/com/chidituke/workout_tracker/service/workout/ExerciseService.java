@@ -44,7 +44,143 @@ public class ExerciseService {
     private final UserExerciseRatingRepository ratingRepository;
     private final UserExerciseHistoryRepository historyRepository;
 
+    // =======================
+    // 🆕 STEP 5: WORKOUT TRACKING MODE SERVICE METHODS
+    // =======================
+
+    /**
+     * Find cardio exercises (TIME_BASED tracking mode)
+     */
+    public List<Exercise> findCardioExercises() {
+        return exerciseRepository.findByIsCardioTrueAndPublishedTrueOrderByAverageRatingDesc();
+    }
+
+    /**
+     * Find isometric exercises (HOLD_BASED tracking mode)
+     */
+    public List<Exercise> findIsometricExercises() {
+        return exerciseRepository.findByIsIsometricTrueAndPublishedTrueOrderByAverageRatingDesc();
+    }
+
+    /**
+     * Find strength exercises (REP_BASED tracking mode)
+     */
+    public List<Exercise> findRepBasedExercises() {
+        return exerciseRepository.findByIsCardioFalseAndIsIsometricFalseAndPublishedTrueOrderByAverageRatingDesc();
+    }
+
+    /**
+     * Find exercises by workout tracking mode
+     */
+    public List<Exercise> findExercisesByTrackingMode(Exercise.WorkoutTrackingMode mode) {
+        return switch (mode) {
+            case TIME_BASED -> findCardioExercises();
+            case HOLD_BASED -> findIsometricExercises();
+            case REP_BASED -> findRepBasedExercises();
+        };
+    }
+
+    /**
+     * Find exercises by workout tracking mode with limit
+     */
+    public List<Exercise> findExercisesByTrackingMode(Exercise.WorkoutTrackingMode mode, int limit) {
+        return findExercisesByTrackingMode(mode).stream()
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    // =======================
+    // 🆕 STEP 5: FAVORITE EXERCISES SERVICE METHODS
+    // =======================
+
+    /**
+     * Find user's favorite exercises
+     * Note: This is a simplified implementation. In a real system, you'd want
+     * user-specific favorites, not just exercises marked as globally favorite.
+     */
+    public List<Exercise> findFavoriteExercises(String username) {
+        // For now, return globally marked favorites
+        // TODO: Implement user-specific favorites with a UserFavoriteExercise entity
+        return exerciseRepository.findByIsFavoriteTrueAndPublishedTrueOrderByExerciseNameAsc();
+    }
+
+    /**
+     * Find favorite exercises with pagination
+     */
+    public Page<Exercise> findFavoriteExercises(String username, Pageable pageable) {
+        // For now, return globally marked favorites with pagination
+        // TODO: Implement user-specific favorites
+        return exerciseRepository.findByIsFavoriteTrueAndPublishedTrue(pageable);
+    }
+
+    /**
+     * Mark exercise as favorite for user
+     * TODO: Implement proper user-specific favorites
+     */
+    @Transactional
+    public void markExerciseAsFavorite(Long exerciseId, String username) {
+        Exercise exercise = findById(exerciseId);
+        exercise.markAsFavorite();
+        exerciseRepository.save(exercise);
+
+        log.info("Exercise {} marked as favorite by user {}", exerciseId, username);
+    }
+
+    /**
+     * Remove exercise from favorites for user
+     * TODO: Implement proper user-specific favorites
+     */
+    @Transactional
+    public void removeExerciseFromFavorites(Long exerciseId, String username) {
+        Exercise exercise = findById(exerciseId);
+        exercise.removeFromFavorites();
+        exerciseRepository.save(exercise);
+
+        log.info("Exercise {} removed from favorites by user {}", exerciseId, username);
+    }
+
+    // =======================
+    // 🆕 STEP 5: PROFESSIONAL CONTENT SERVICE METHODS
+    // =======================
+
+    /**
+     * Find professional exercises
+     */
+    public List<Exercise> findProfessionalExercises() {
+        return exerciseRepository.findByCreatedByProfessionalTrueAndPublishedTrueOrderByAverageRatingDesc();
+    }
+
+    /**
+     * Find professional exercises with pagination
+     */
+    public Page<Exercise> findProfessionalExercises(Pageable pageable) {
+        return exerciseRepository.findByCreatedByProfessionalTrueAndPublishedTrue(pageable);
+    }
+
+    /**
+     * Find all published exercises with professional content prioritized
+     */
+    public List<Exercise> findExercisesWithProfessionalFirst() {
+        return exerciseRepository.findPublishedExercisesOrderByProfessionalFirst();
+    }
+
+    /**
+     * Find exercises by professional status
+     */
+    public List<Exercise> findExercisesByProfessionalStatus(boolean isProfessional) {
+        if (isProfessional) {
+            return findProfessionalExercises();
+        } else {
+            // Return community exercises (non-professional)
+            return exerciseRepository.findPublishedExercises().stream()
+                    .filter(exercise -> !exercise.isCreatedByProfessional())
+                    .collect(Collectors.toList());
+        }
+    }
+
+    // =======================
     // 🔍 EXERCISE DISCOVERY & SEARCH (NO SUBSCRIPTION FILTERING - ALL FREE!)
+    // =======================
 
     public List<Exercise> findSuitableExercises(User user, List<String> availableEquipment,
                                                 Exercise.DifficultyLevel maxDifficulty) {
@@ -112,24 +248,6 @@ public class ExerciseService {
     public Exercise findById(Long id) {
         return exerciseRepository.findById(id)
                 .orElseThrow(() -> new ExerciseNotFoundException(id));
-    }
-
-    public List<Exercise> findCardioExercises() {
-        return exerciseRepository.findPublishedExercises().stream()
-                .filter(Exercise::getIsCardio)
-                .collect(Collectors.toList());
-    }
-
-    public List<Exercise> findIsometricExercises() {
-        return exerciseRepository.findPublishedExercises().stream()
-                .filter(Exercise::getIsIsometric)
-                .collect(Collectors.toList());
-    }
-
-    public List<Exercise> findRepBasedExercises() {
-        return exerciseRepository.findPublishedExercises().stream()
-                .filter(exercise -> !exercise.getIsCardio() && !exercise.getIsIsometric())
-                .collect(Collectors.toList());
     }
 
     @Cacheable(value = "popular-exercises", key = "#limit")
@@ -476,22 +594,22 @@ public class ExerciseService {
         }
 
         // 🔧 COMMENT OUT: This functionality doesn't exist in WorkoutPlanRequest yet
-
-    if (request.getPreferredWorkoutModes() != null && !request.getPreferredWorkoutModes().isEmpty()) {
-        availableExercises = availableExercises.stream()
-                .filter(exercise -> {
-                    Exercise.WorkoutTrackingMode mode = exercise.getWorkoutTrackingMode();
-                    return request.getPreferredWorkoutModes().contains(mode);
-                })
-                .collect(Collectors.toList());
-    }
+        /*
+        if (request.getPreferredWorkoutModes() != null && !request.getPreferredWorkoutModes().isEmpty()) {
+            availableExercises = availableExercises.stream()
+                    .filter(exercise -> {
+                        Exercise.WorkoutTrackingMode mode = exercise.getWorkoutTrackingMode();
+                        return request.getPreferredWorkoutModes().contains(mode);
+                    })
+                    .collect(Collectors.toList());
+        }
 
         if (request.getHomeWorkout() != null && request.getHomeWorkout()) {
             availableExercises = availableExercises.stream()
                     .filter(Exercise::canDoAtHome)
                     .collect(Collectors.toList());
         }
-
+        */
 
         // Rest of your existing logic stays the same...
         Map<String, List<Exercise>> exercisesByMuscleGroup = availableExercises.stream()

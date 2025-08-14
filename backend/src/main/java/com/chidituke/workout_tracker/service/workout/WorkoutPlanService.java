@@ -1,6 +1,8 @@
 package com.chidituke.workout_tracker.service.workout;
 
+import com.chidituke.workout_tracker.dto.request.workout_plan.ScheduleMultipleExercisesRequestDTO;
 import com.chidituke.workout_tracker.dto.request.workout_plan.WorkoutTemplateRequestDTO;
+import com.chidituke.workout_tracker.dto.response.scheduled_workouts.ScheduledWorkoutResponse;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanResponse;
 import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanAnalyticsResponse;
 import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
@@ -8,6 +10,7 @@ import com.chidituke.workout_tracker.exceptions.workout_plan.WorkoutPlanNotFound
 import com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationException;
 import com.chidituke.workout_tracker.mapper.workout.WorkoutPlanMapper;
 import com.chidituke.workout_tracker.model.workout.PlanExercise;
+import com.chidituke.workout_tracker.model.workout.ScheduledWorkout;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan.DifficultyLevel;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan.WorkoutType;
@@ -16,6 +19,10 @@ import com.chidituke.workout_tracker.repository.user.UserRepository;
 import com.chidituke.workout_tracker.repository.workout.PlanExerciseRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutPlanRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutSessionRepository;
+import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
+import com.chidituke.workout_tracker.service.user.SubscriptionService;
+import com.chidituke.workout_tracker.service.workout.ScheduledWorkoutService;
+import com.chidituke.workout_tracker.mapper.workout.ScheduledWorkoutMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -23,12 +30,15 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -40,7 +50,11 @@ public class WorkoutPlanService {
     private final UserRepository userRepository;
     private final PlanExerciseRepository planExerciseRepository;
     private final WorkoutSessionRepository workoutSessionRepository;
+    private final ScheduledWorkoutRepository scheduledWorkoutRepository;
     private final WorkoutPlanMapper workoutPlanMapper;
+    private final ScheduledWorkoutService scheduledWorkoutService;
+    private final SubscriptionService subscriptionService;
+    private final ScheduledWorkoutMapper scheduledWorkoutMapper;
 
     // =======================
     // PUBLIC WORKOUT PLAN DISCOVERY
@@ -93,6 +107,76 @@ public class WorkoutPlanService {
         return workoutPlanMapper.toResponseList(workoutPlans);
     }
 
+    /**
+     * Schedule multiple exercises from a workout plan with subscription validation
+     */
+    @Transactional
+    public List<ScheduledWorkoutResponse> scheduleWorkoutPlan(String username, ScheduleMultipleExercisesRequestDTO request) {
+        User user = findUserByUsername(username);
+        WorkoutPlan workoutPlan = findWorkoutPlanById(request.getWorkoutPlanId());
+
+        // Get exercises from the workout plan
+        List<PlanExercise> planExercises = planExerciseRepository.findByWorkoutPlanOrderByOrderInWorkout(workoutPlan);
+
+        // Validate subscription limits BEFORE scheduling
+        subscriptionService.validateWorkoutPlanScheduling(
+                user.getId(),
+                request.getScheduledDate(),
+                planExercises.size(),
+                workoutPlan.getSubscriptionTierRequired()
+        );
+
+        List<ScheduledWorkout> scheduledWorkouts = new ArrayList<>();
+
+        // Convert each plan exercise to a scheduled workout
+        for (PlanExercise planExercise : planExercises) {
+            ScheduledWorkout scheduledWorkout = new ScheduledWorkout();
+            scheduledWorkout.setUser(user);
+            scheduledWorkout.setWorkoutPlan(workoutPlan);
+            scheduledWorkout.setScheduledDate(request.getScheduledDate());
+            scheduledWorkout.setCustomNotes(request.getNotes());
+
+            // Set exercise configuration from PlanExercise
+            // Map the prescribed values from the plan
+            scheduledWorkout.setEstimatedDurationMinutes(planExercise.getPrescribedSets() != null ?
+                    planExercise.getPrescribedSets() * 2 : workoutPlan.getEstimatedDurationMinutes());
+
+            scheduledWorkouts.add(scheduledWorkout);
+        }
+
+        // Save all scheduled workouts
+        List<ScheduledWorkout> saved = scheduledWorkoutRepository.saveAll(scheduledWorkouts);
+
+        // ✅ USE YOUR MAPPER HERE
+        return scheduledWorkoutMapper.toResponseList(saved);
+    }
+
+    public List<WorkoutPlanResponse> getWorkoutPlansByCategory(String category, String username) {
+        List<WorkoutPlan> plans = workoutPlanRepository.findByWorkoutCategoryIgnoreCaseAndIsPublicTrue(category);
+
+        // Filter by subscription if user provided
+        if (username != null) {
+            User user = findUserByUsername(username);
+            return plans.stream()
+                    .filter(plan -> subscriptionService.canAccessWorkoutPlan(user.getId(), plan.getSubscriptionTierRequired()))
+                    .map(workoutPlanMapper::toResponse)
+                    .collect(Collectors.toList());
+        }
+
+        return workoutPlanMapper.toResponseList(plans);
+    }
+
+    public WorkoutPlanResponse getWorkoutPlanDetails(Long id, String username) {
+        WorkoutPlan plan = findWorkoutPlanById(id);
+        User user = findUserByUsername(username);
+
+        if (!subscriptionService.canAccessWorkoutPlan(user.getId(), plan.getSubscriptionTierRequired())) {
+            throw new AccessDeniedException("Subscription upgrade required");
+        }
+
+        return workoutPlanMapper.toResponse(plan);
+    }
+
     // =======================
     // SEARCH & FILTERING
     // =======================
@@ -127,11 +211,28 @@ public class WorkoutPlanService {
     // =======================
 
     public List<WorkoutPlanResponse> getAccessibleWorkoutPlans(String username) {
-        User user = findUserByUsername(username);
-        String userTier = user.getSubscriptionTier().name();
+        try {
+            User user = findUserByUsername(username);
 
-        List<WorkoutPlan> workoutPlans = workoutPlanRepository.findAccessibleWorkouts(userTier);
-        return workoutPlanMapper.toResponseList(workoutPlans);
+            // ✅ SAFE NULL CHECK for subscription tier
+            String userTier;
+            if (user.getSubscriptionTier() != null) {
+                userTier = user.getSubscriptionTier().name();
+            } else {
+                // Default to FREE tier for users without subscription data
+                userTier = "FREE";
+                log.warn("User {} has no subscription tier, defaulting to FREE", username);
+            }
+
+            List<WorkoutPlan> workoutPlans = workoutPlanRepository.findAccessibleWorkouts(userTier);
+            return workoutPlanMapper.toResponseList(workoutPlans);
+
+        } catch (Exception e) {
+            log.error("Error getting accessible workout plans for user {}: {}", username, e.getMessage());
+
+            // ✅ FALLBACK: Return all public plans if anything fails
+            return getAllPublicWorkoutPlans();
+        }
     }
 
     // =======================

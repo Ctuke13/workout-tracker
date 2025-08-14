@@ -30,6 +30,7 @@ export interface JwtResponse {
     lastName: string;
     userType: UserType;
     isProfessional: boolean;
+    subscriptionTier: 'FREE' | 'PLUS' | 'PRO' | 'PRO_PROFESSIONAL';
 }
 
 export interface ApiResponse {
@@ -48,6 +49,7 @@ export interface UserSummary {
     activityLevel?: ActivityLevel;
     isProfessional: boolean;
     isVerified: boolean;
+    subscriptionTier: 'FREE' | 'PLUS' | 'PRO' | 'PRO_PROFESSIONAL';
 }
 
 // ==================== AUTH STATE ====================

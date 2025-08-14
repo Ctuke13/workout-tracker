@@ -102,6 +102,19 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises/{id}").permitAll();               // Individual exercise details
 
                     // ===================================================================
+                    // 🌍 PUBLIC WORKOUT PLAN LIBRARY - Browse, search, view workout plans
+                    // ===================================================================
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans").permitAll();                // Browse all public workout plans
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/popular").permitAll();        // Popular workout plans
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/trending").permitAll();       // Trending workout plans
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/statistics").permitAll();     // Workout plan statistics
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/category/**").permitAll();    // Plans by category
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/difficulty/**").permitAll();  // Plans by difficulty
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/search").permitAll();         // Search workout plans
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/highly-rated").permitAll();   // Highly rated plans
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/{id}").permitAll();           // Individual workout plan details
+
+                    // ===================================================================
                     // 🔐 USER AUTHENTICATED - Requires login
                     // ===================================================================
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises/*/rate").authenticated();        // Rate exercises
@@ -112,11 +125,22 @@ public class SecurityConfig {
 
                     auth.requestMatchers("/api/calendar/**").authenticated();                               // All calendar operations
 
+                    // 🔐 AUTHENTICATED WORKOUT PLAN FEATURES - User-specific workout plans
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/accessible").authenticated();  // User's accessible plans based on subscription
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/my/**").authenticated();       // User's created plans
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/subscription-limits").authenticated(); // User's subscription limits
+                    auth.requestMatchers(HttpMethod.POST, "/api/workout-plans/*/rate").authenticated();     // Rate workout plans
+                    auth.requestMatchers(HttpMethod.POST, "/api/workout-plans/*/record-usage").authenticated(); // Record usage
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/recommended").authenticated(); // Personal recommendations
+
                     // ===================================================================
                     // 💼 PROFESSIONAL ROLE - Content creation
                     // ===================================================================
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises").hasRole("PROFESSIONAL");       // Create exercises
                     auth.requestMatchers(HttpMethod.PUT, "/api/exercises/**").hasRole("PROFESSIONAL");     // Update exercises
+
+                    auth.requestMatchers(HttpMethod.POST, "/api/workout-plans").hasRole("PROFESSIONAL");   // Create workout plans
+                    auth.requestMatchers(HttpMethod.PUT, "/api/workout-plans/**").hasRole("PROFESSIONAL"); // Update workout plans
 
                     // ===================================================================
                     // 🔐 ADMIN ROLE - Management operations
@@ -124,6 +148,10 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.DELETE, "/api/exercises/**").hasRole("ADMIN");         // Delete exercises
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises/bulk-action").hasRole("ADMIN");  // Bulk operations
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises/analytics").hasRole("ADMIN");     // Analytics
+
+                    auth.requestMatchers(HttpMethod.DELETE, "/api/workout-plans/**").hasRole("ADMIN");     // Delete workout plans
+                    auth.requestMatchers(HttpMethod.POST, "/api/workout-plans/bulk-action").hasRole("ADMIN"); // Bulk operations
+                    auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/analytics").hasRole("ADMIN"); // Analytics
 
                     // ===================================================================
                     // 🔐 OTHER AUTHENTICATED ENDPOINTS

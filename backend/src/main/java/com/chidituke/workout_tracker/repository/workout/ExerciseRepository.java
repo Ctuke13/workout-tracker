@@ -23,6 +23,62 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
 
     Page<Exercise> findByPublishedTrueOrderByExerciseNameAsc(Pageable pageable);
 
+    // =======================
+    // WORKOUT TRACKING MODE QUERIES
+    // =======================
+
+    /**
+     * Find cardio exercises (TIME_BASED tracking mode)
+     */
+    List<Exercise> findByIsCardioTrueAndPublishedTrueOrderByAverageRatingDesc();
+
+    /**
+     * Find isometric exercises (HOLD_BASED tracking mode)
+     */
+    List<Exercise> findByIsIsometricTrueAndPublishedTrueOrderByAverageRatingDesc();
+
+    /**
+     * Find strength exercises (REP_BASED tracking mode)
+     */
+    List<Exercise> findByIsCardioFalseAndIsIsometricFalseAndPublishedTrueOrderByAverageRatingDesc();
+
+    // =======================
+    // FAVORITE EXERCISES QUERIES
+    // =======================
+
+    /**
+     * Find user's favorite exercises
+     */
+    List<Exercise> findByIsFavoriteTrueAndPublishedTrueOrderByExerciseNameAsc();
+
+    /**
+     * Find user's favorite exercises with pagination
+     */
+    Page<Exercise> findByIsFavoriteTrueAndPublishedTrue(Pageable pageable);
+
+    // =======================
+    // PROFESSIONAL CONTENT QUERIES
+    // =======================
+
+    /**
+     * Find professional exercises
+     */
+    List<Exercise> findByCreatedByProfessionalTrueAndPublishedTrueOrderByAverageRatingDesc();
+
+    /**
+     * Find professional exercises with pagination
+     */
+    Page<Exercise> findByCreatedByProfessionalTrueAndPublishedTrue(Pageable pageable);
+
+    /**
+     * Find published exercises created by professionals and community
+     */
+    @Query("SELECT e FROM Exercise e WHERE e.published = true " +
+            "ORDER BY " +
+            "CASE WHEN e.createdByProfessional = true THEN 0 ELSE 1 END, " +
+            "e.averageRating DESC, e.usageCount DESC")
+    List<Exercise> findPublishedExercisesOrderByProfessionalFirst();
+
     // 🎯 EXERCISE TYPE & DIFFICULTY QUERIES
     List<Exercise> findByDifficultyLevelAndPublishedTrueOrderByExerciseNameAsc(Exercise.DifficultyLevel difficultyLevel);
 
@@ -142,7 +198,6 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
     List<Exercise> findBodyweightExercises();
 
     // 💪 MUSCLE GROUP QUERIES
-    // 🔄 FIXED - Renamed for consistency and removed duplicate method
     @Query("SELECT e FROM Exercise e WHERE e.published = true AND " +
             ":muscleGroup MEMBER OF e.targetMuscleGroups")
     List<Exercise> findByTargetMuscleGroupContainingAndPublishedTrue(@Param("muscleGroup") String muscleGroup);
@@ -235,7 +290,6 @@ public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
     List<Exercise> findPendingProfessionalApproval();
 
     // 📊 ANALYTICS QUERIES
-    // ✅ UNCHANGED - These work correctly
     @Query("SELECT e.exerciseType, COUNT(e) FROM Exercise e WHERE e.published = true GROUP BY e.exerciseType")
     List<Object[]> countByExerciseType();
 

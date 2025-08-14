@@ -1,305 +1,172 @@
-# Workout Tracker - Complete Project File Tree
+# 🏋️ Workout Tracker Application - Complete File Tree
 
-## 📁 **Project Structure Overview**
+## 📊 Project Statistics
+
+| Category | Count | Description |
+|----------|-------|-------------|
+| **Java Files** | 265 | Backend source code and tests |
+| **TypeScript/TSX** | 72 | Frontend React components and logic |
+| **JavaScript/JSX** | 9 | Frontend utilities and configs |
+| **SQL Migrations** | 25 | Database schema and data files |
+| **Test Files** | 14 | Backend unit and integration tests |
+| **Config Files** | 20 | Application and build configuration |
+| **HTTP Tests** | 7 | API testing files |
+
+## 🏗️ Architecture Overview
+
+**Backend**: Spring Boot REST API with PostgreSQL database
+**Frontend**: React TypeScript SPA with Tailwind CSS
+**Database**: PostgreSQL with Flyway migrations
+**Authentication**: JWT-based security
+**Build Tools**: Maven (Backend), npm (Frontend)
+
+---
+
+## 📁 Complete Project Structure
 
 ```
-workout-tracker/
-├── 📋 Project Documentation
-│   ├── README.md
-│   ├── backend-workout-modules-diagram.md
-│   └── .gitignore
-│   └── .gitattributes
+🏋️ workout-tracker/
+├── 📋 CURRENT-FILE-TREE.md
+├── 📖 README.md
+├── 🗃️ backend-workout-modules-diagram.md
+├── 📦 package.json                    # Root package.json
+├── 🔒 package-lock.json               # Root lockfile
+├── 📋 project-file-tree.md            # This file
+├── ⚙️ .gitattributes                  # Git attributes config
+├── 🚫 .gitignore                      # Git ignore rules
 │
-├── 🔧 Development Environment
-│   ├── .claude/
-│   │   └── settings.local.json
-│   └── .idea/                             # IntelliJ IDEA configuration
-│       ├── compiler.xml
-│       ├── encodings.xml
-│       ├── jarRepositories.xml
-│       ├── misc.xml
-│       ├── modules.xml
-│       ├── vcs.xml
-│       └── workspace.xml
+├── 🧪 api-tests/                      # API Testing Files
+│   ├── 🔐 auth-tests.http
+│   ├── 💪 exercise-library-tests.http
+│   ├── 📈 performance-tests.http
+│   ├── 💳 subscription-tests.http
+│   └── 🏋️ workout-tests.http
 │
-├── 🧪 API Testing
-│   └── api-tests/
-│       ├── auth-tests.http
-│       ├── exercise-library-tests.http
-│       ├── performance-tests.http
-│       ├── subscription-tests.http
-│       └── workout-tests.http
+├── 🔧 .claude/                        # Claude Code Configuration
+│   └── ⚙️ settings.local.json
 │
-├── 🏗️ Backend (Spring Boot)
-│   └── backend/
-│       ├── 📦 Build & Configuration
-│       │   ├── pom.xml
-│       │   ├── mvnw
-│       │   ├── docker-compose.yml
-│       │   ├── init-permissions.sql
-│       │   ├── error-details.txt
-│       │   └── .mvn/wrapper/
-│       │       └── maven-wrapper.properties
-│       │
-│       ├── 📁 src/main/java/com/chidituke/workout_tracker/
-│       │   ├── 🚀 Application Entry Point
-│       │   │   └── WorkoutTrackerApplication.java
-│       │   │
-│       │   ├── ⚙️ Configuration
-│       │   │   └── config/
-│       │   │       └── ExerciseDataLoader.java
-│       │   │
-│       │   ├── 🎮 Controllers (REST API Endpoints)
-│       │   │   ├── controller/auth/
-│       │   │   │   └── AuthController.java
-│       │   │   ├── controller/messaging/
-│       │   │   │   ├── ConversationController.java
-│       │   │   │   └── MessagingController.java
-│       │   │   ├── controller/social/
-│       │   │   │   └── SocialController.java
-│       │   │   ├── controller/test/
-│       │   │   │   └── TestController.java
-│       │   │   ├── controller/user/
-│       │   │   │   ├── ProfessionalProfileController.java
-│       │   │   │   ├── SubscriptionController.java
-│       │   │   │   └── UserController.java
-│       │   │   └── controller/workout/
-│       │   │       ├── ExerciseController.java
-│       │   │       ├── PerformanceController.java
-│       │   │       ├── PlanExerciseController.java
-│       │   │       ├── ProgramPlanController.java
-│       │   │       ├── ScheduledWorkoutController.java
-│       │   │       ├── WorkoutPlanController.java
-│       │   │       ├── WorkoutProgramController.java
-│       │   │       └── WorkoutSessionController.java
-│       │   │
-│       │   ├── 📊 Data Transfer Objects (DTOs)
-│       │   │   ├── dto/request/
-│       │   │   │   ├── auth/
-│       │   │   │   │   ├── LoginRequest.java
-│       │   │   │   │   └── RegisterRequest.java
-│       │   │   │   ├── exercise/
-│       │   │   │   │   ├── BulkExerciseActionRequestDTO.java
-│       │   │   │   │   ├── ExerciseCreateRequestDTO.java
-│       │   │   │   │   ├── ExerciseRatingRequestDTO.java
-│       │   │   │   │   ├── ExerciseSearchRequestDTO.java
-│       │   │   │   │   ├── ExerciseUpdateRequestDTO.java
-│       │   │   │   │   └── WorkoutPlanRequestDTO.java
-│       │   │   │   ├── messaging/
-│       │   │   │   │   ├── CreateConversationRequest.java
-│       │   │   │   │   ├── CreateGroupConversationRequest.java
-│       │   │   │   │   ├── EditMessageRequest.java
-│       │   │   │   │   ├── ProgressCheckInRequest.java
-│       │   │   │   │   ├── SendMediaMessageRequest.java
-│       │   │   │   │   ├── SendTextMessageRequest.java
-│       │   │   │   │   ├── SendWorkoutMessageRequest.java
-│       │   │   │   │   └── WorkoutAssignmentRequest.java
-│       │   │   │   ├── performance/
-│       │   │   │   │   └── PerformanceRequest.java
-│       │   │   │   ├── plan_exercise/
-│       │   │   │   │   └── PlanExerciseRequest.java
-│       │   │   │   ├── professional_user/
-│       │   │   │   │   ├── ProfessionalProfileCreateRequestDTO.java
-│       │   │   │   │   ├── ProfessionalProfileUpdateRequestDTO.java
-│       │   │   │   │   ├── ProfessionalSearchRequestDTO.java
-│       │   │   │   │   └── ProfessionalVerificationRequestDTO.java
-│       │   │   │   ├── program_plan/
-│       │   │   │   │   ├── BulkAddRequest.java
-│       │   │   │   │   ├── UpdateProgramPlanRequest.java
-│       │   │   │   │   └── WorkoutScheduleRequest.java
-│       │   │   │   ├── scheduled_workouts/
-│       │   │   │   │   ├── ProgramScheduleRequest.java
-│       │   │   │   │   ├── RescheduleWorkoutRequest.java
-│       │   │   │   │   └── ScheduledWorkoutRequest.java
-│       │   │   │   ├── subscription/
-│       │   │   │   │   ├── SubscriptionCreateRequestDTO.java
-│       │   │   │   │   └── SubscriptionUpdateRequestDTO.java
-│       │   │   │   ├── user/
-│       │   │   │   │   ├── UserSearchRequest.java
-│       │   │   │   │   └── UserUpdateRequest.java
-│       │   │   │   ├── workout_plan/
-│       │   │   │   │   └── WorkoutPlanRequest.java
-│       │   │   │   ├── workout_program/
-│       │   │   │   │   ├── ProgramEnrollmentRequest.java
-│       │   │   │   │   └── WorkoutProgramRequest.java
-│       │   │   │   └── workout_session/
-│       │   │   │       └── WorkoutSessionRequest.java
-│       │   │   └── dto/response/
-│       │   │       ├── auth/
-│       │   │       │   └── JwtResponse.java
-│       │   │       ├── common/
-│       │   │       │   ├── ApiResponse.java
-│       │   │       │   └── PageResponse.java
-│       │   │       ├── exercise/
-│       │   │       │   ├── ExerciseAnalyticsResponseDTO.java
-│       │   │       │   ├── ExerciseFiltersDTO.java
-│       │   │       │   ├── ExerciseListResponseDTO.java
-│       │   │       │   └── ExerciseResponseDTO.java
-│       │   │       ├── messaging/
-│       │   │       │   ├── ConversationListResponse.java
-│       │   │       │   ├── ConversationParticipantResponse.java
-│       │   │       │   ├── ConversationResponse.java
-│       │   │       │   ├── ConversationUnreadResponse.java
-│       │   │       │   ├── MessageResponse.java
-│       │   │       │   ├── MessageSearchResponse.java
-│       │   │       │   ├── UnreadCountResponse.java
-│       │   │       │   ├── UserSummaryResponse.java
-│       │   │       │   ├── WorkoutPlanSummaryResponse.java
-│       │   │       │   └── WorkoutSessionSummaryResponse.java
-│       │   │       ├── performance/
-│       │   │       │   └── PerformanceResponse.java
-│       │   │       ├── plan_exercise/
-│       │   │       │   ├── PlanExerciseResponse.java
-│       │   │       │   ├── SupersetResponse.java
-│       │   │       │   └── WorkoutStructureResponse.java
-│       │   │       ├── professionional_user/
-│       │   │       │   ├── ProfessionalProfileResponseDTO.java
-│       │   │       │   ├── ProfessionalSearchResponseDTO.java
-│       │   │       │   ├── ProfessionalStatsResponseDTO.java
-│       │   │       │   └── ProfessionalVerificationResponseDTO.java
-│       │   │       ├── program_plan/
-│       │   │       │   ├── ProgramPlanResponse.java
-│       │   │       │   ├── ProgramStructureAnalyticsResponse.java
-│       │   │       │   └── WeekScheduleResponse.java
-│       │   │       ├── scheduled_workouts/
-│       │   │       │   ├── CalendarViewResponse.java
-│       │   │       │   ├── ProgramScheduleResponse.java
-│       │   │       │   ├── ScheduledWorkoutResponse.java
-│       │   │       │   ├── SchedulingAnalyticsResponse.java
-│       │   │       │   ├── UpcomingWorkoutsResponse.java
-│       │   │       │   └── WorkoutConflictResponse.java
-│       │   │       ├── subscription/
-│       │   │       │   ├── SubscriptionResponseDTO.java
-│       │   │       │   ├── SubscriptionStatsDTO.java
-│       │   │       │   └── SubscriptionStatusDTO.java
-│       │   │       ├── user/
-│       │   │       │   ├── UserListResponse.java
-│       │   │       │   ├── UserProfileResponse.java
-│       │   │       │   └── UserSearchResponse.java
-│       │   │       ├── workout_plan/
-│       │   │       │   ├── WorkoutPlanAnalyticsResponse.java
-│       │   │       │   └── WorkoutPlanResponse.java
-│       │   │       ├── workout_program/
-│       │   │       │   ├── ProgramAnalyticsResponse.java
-│       │   │       │   ├── ProgramEnrollmentResponse.java
-│       │   │       │   ├── ProgramProgressResponse.java
-│       │   │       │   └── WorkoutProgramResponse.java
-│       │   │       └── workout_session/
-│       │   │           ├── WorkoutSessionAnalyticsResponse.java
-│       │   │           └── WorkoutSessionResponse.java
-│       │   │
-│       │   ├── 🚨 Exception Handling
-│       │   │   ├── exceptions/
+├── 🖥️ backend/                        # Spring Boot Backend
+│   ├── 🐳 docker-compose.yml          # Development database
+│   ├── 🚨 error-details.txt           # Error logs
+│   ├── 🗃️ init-permissions.sql        # Database permissions
+│   ├── ⚙️ mvnw                        # Maven wrapper (Unix)
+│   ├── ⚙️ mvnw.cmd                    # Maven wrapper (Windows)
+│   ├── 📋 pom.xml                     # Maven configuration
+│   ├── 🎯 test-output.txt             # Test results
+│   │
+│   ├── 🔧 .mvn/                       # Maven Wrapper
+│   │   └── wrapper/
+│   │       └── maven-wrapper.properties
+│   │
+│   └── 📁 src/
+│       ├── 🏗️ main/
+│       │   ├── ☕ java/com/chidituke/workout_tracker/
+│       │   │   ├── 🚀 WorkoutTrackerApplication.java    # Main application
+│       │   │   │
+│       │   │   ├── ⚙️ config/                           # Configuration
+│       │   │   │   └── ExerciseDataLoader.java
+│       │   │   │
+│       │   │   ├── 🎮 controller/                       # REST Controllers (18 files)
+│       │   │   │   ├── 🔐 auth/
+│       │   │   │   │   └── AuthController.java
+│       │   │   │   ├── 📅 calendar/
+│       │   │   │   │   └── CalendarController.java
+│       │   │   │   ├── 💬 messaging/
+│       │   │   │   │   ├── ConversationController.java
+│       │   │   │   │   └── MessagingController.java
+│       │   │   │   ├── 🌐 social/
+│       │   │   │   │   └── SocialController.java
+│       │   │   │   ├── 🏥 system/
+│       │   │   │   │   └── HealthController.java
+│       │   │   │   ├── 🧪 test/
+│       │   │   │   │   └── TestController.java
+│       │   │   │   ├── 👥 user/
+│       │   │   │   │   ├── ProfessionalProfileController.java
+│       │   │   │   │   ├── SubscriptionController.java
+│       │   │   │   │   └── UserController.java
+│       │   │   │   └── 🏋️ workout/
+│       │   │   │       ├── ExerciseController.java
+│       │   │   │       ├── PerformanceController.java
+│       │   │   │       ├── PlanExerciseController.java
+│       │   │   │       ├── ProgramPlanController.java
+│       │   │   │       ├── ScheduledWorkoutController.java
+│       │   │   │       ├── WorkoutPlanController.java
+│       │   │   │       ├── WorkoutProgramController.java
+│       │   │   │       └── WorkoutSessionController.java
+│       │   │   │
+│       │   │   ├── 📦 dto/                              # Data Transfer Objects (85 files)
+│       │   │   │   ├── 📥 request/
+│       │   │   │   │   ├── 🔐 auth/ (2 files)
+│       │   │   │   │   ├── 💪 exercise/ (7 files)
+│       │   │   │   │   ├── 💬 messaging/ (8 files)
+│       │   │   │   │   ├── 📈 performance/ (1 file)
+│       │   │   │   │   ├── 🎯 plan_exercise/ (1 file)
+│       │   │   │   │   ├── 👨‍⚕️ professional_user/ (4 files)
+│       │   │   │   │   ├── 📋 program_plan/ (3 files)
+│       │   │   │   │   ├── 📅 scheduled_workouts/ (3 files)
+│       │   │   │   │   ├── 💳 subscription/ (2 files)
+│       │   │   │   │   ├── 👤 user/ (2 files)
+│       │   │   │   │   ├── 📝 workout_plan/ (2 files)
+│       │   │   │   │   ├── 🏆 workout_program/ (2 files)
+│       │   │   │   │   └── 📊 workout_session/ (1 file)
+│       │   │   │   └── 📤 response/
+│       │   │   │       ├── 🔐 auth/ (1 file)
+│       │   │   │       ├── 🔗 common/ (2 files)
+│       │   │   │       ├── 💪 exercise/ (4 files)
+│       │   │   │       ├── 💬 messaging/ (10 files)
+│       │   │   │       ├── 📈 performance/ (1 file)
+│       │   │   │       ├── 🎯 plan_exercise/ (3 files)
+│       │   │   │       ├── 👨‍⚕️ professionional_user/ (4 files)
+│       │   │   │       ├── 📋 program_plan/ (3 files)
+│       │   │   │       ├── 📅 scheduled_workouts/ (6 files)
+│       │   │   │       ├── 💳 subscription/ (3 files)
+│       │   │   │       ├── 👤 user/ (3 files)
+│       │   │   │       ├── 📝 workout_plan/ (2 files)
+│       │   │   │       ├── 🏆 workout_program/ (4 files)
+│       │   │   │       └── 📊 workout_session/ (2 files)
+│       │   │   │
+│       │   │   ├── ⚠️ exceptions/                        # Exception Handling (68 files)
 │       │   │   │   ├── ErrorResponse.java
 │       │   │   │   ├── GlobalExceptionHandler.java
-│       │   │   │   ├── auth/
-│       │   │   │   │   ├── AuthException.java
-│       │   │   │   │   ├── InvalidCredentialsException.java
-│       │   │   │   │   ├── TokenExpiredException.java
-│       │   │   │   │   └── UnauthorizedAccessException.java
-│       │   │   │   ├── common/
-│       │   │   │   │   ├── BusinessRuleViolationException.java
-│       │   │   │   │   ├── DuplicateResourceException.java
-│       │   │   │   │   ├── ErrorResponse.java
-│       │   │   │   │   ├── FileProcessingException.java
-│       │   │   │   │   ├── ResourceNotFoundException.java
-│       │   │   │   │   ├── UnauthorizedOperationException.java
-│       │   │   │   │   └── WorkoutTrackerException.java
-│       │   │   │   ├── exercise/
-│       │   │   │   │   ├── ExerciseException.java
-│       │   │   │   │   ├── ExerciseNotFoundException.java
-│       │   │   │   │   └── InvalidExerciseDataException.java
-│       │   │   │   ├── performance/
-│       │   │   │   │   ├── InvalidPerformanceDataException.java
-│       │   │   │   │   ├── PerformanceException.java
-│       │   │   │   │   └── PerformanceNotFoundException.java
-│       │   │   │   ├── plan_program/
-│       │   │   │   │   ├── BulkOperationException.java
-│       │   │   │   │   ├── InvalidProgramStructureException.java
-│       │   │   │   │   ├── ProgramPlanNotFoundException.java
-│       │   │   │   │   ├── ProgramTemplateNotFoundException.java
-│       │   │   │   │   └── ScheduleConflictException.java
-│       │   │   │   ├── scheduled_workout/
-│       │   │   │   │   ├── DataRetentionException.java
-│       │   │   │   │   ├── InvalidWorkoutStateException.java
-│       │   │   │   │   ├── ProgramSchedulingException.java
-│       │   │   │   │   ├── ScheduledWorkoutExceptionHandler.java
-│       │   │   │   │   ├── ScheduledWorkoutNotFoundException.java
-│       │   │   │   │   ├── SchedulingConflictException.java
-│       │   │   │   │   ├── SchedulingConstraintException.java
-│       │   │   │   │   ├── SubscriptionLimitException.java
-│       │   │   │   │   ├── UnauthorizedScheduledWorkoutAccessException.java
-│       │   │   │   │   └── WorkoutInProgressException.java
-│       │   │   │   ├── subscription/
-│       │   │   │   │   ├── FeatureNotAvailableException.java
-│       │   │   │   │   ├── PaymentProcessingException.java
-│       │   │   │   │   └── SubscriptionException.java
-│       │   │   │   ├── user/
-│       │   │   │   │   ├── ProfessionalVerificationException.java
-│       │   │   │   │   ├── UserException.java
-│       │   │   │   │   └── UserNotFoundException.java
-│       │   │   │   ├── workout/
-│       │   │   │   │   ├── InvalidWorkoutConfigException.java
-│       │   │   │   │   ├── WorkoutException.java
-│       │   │   │   │   ├── WorkoutInProgressException.java
-│       │   │   │   │   └── WorkoutLogNotFoundException.java
-│       │   │   │   ├── workout_plan/
-│       │   │   │   │   ├── WorkoutPlanListResponse.java
-│       │   │   │   │   ├── WorkoutPlanNotFoundException.java
-│       │   │   │   │   └── WorkoutPlanSearchResponse.java
-│       │   │   │   ├── workout_program/
-│       │   │   │   │   └── WorkoutProgramNotFoundException.java
-│       │   │   │   └── workout_session/
-│       │   │   │       └── WorkoutSessionNotFoundException.java
-│       │   │
-│       │   ├── 🔄 Mappers (Entity-DTO Conversion)
-│       │   │   ├── mapper/
-│       │   │   │   ├── messaging/
-│       │   │   │   │   ├── ConversationMapper.java
-│       │   │   │   │   └── MessageMapper.java
-│       │   │   │   ├── user/
-│       │   │   │   │   ├── ProfessionalProfileMapper.java
-│       │   │   │   │   ├── SubscriptionMapper.java
-│       │   │   │   │   └── UserMapper.java
-│       │   │   │   └── workout/
-│       │   │   │       ├── ExerciseMapper.java
-│       │   │   │       ├── PerformanceMapper.java
-│       │   │   │       ├── PlanExerciseMapper.java
-│       │   │   │       ├── ProgramPlanMapper.java
-│       │   │   │       ├── ScheduledWorkoutMapper.java
-│       │   │   │       ├── WorkoutPlanMapper.java
-│       │   │   │       ├── WorkoutProgramMapper.java
-│       │   │   │       └── WorkoutSessionMapper.java
-│       │   │
-│       │   ├── 🗄️ Database Models (JPA Entities)
-│       │   │   ├── model/
-│       │   │   │   ├── common/
+│       │   │   │   ├── 🔐 auth/ (4 files)
+│       │   │   │   ├── 🔧 common/ (7 files)
+│       │   │   │   ├── 💪 exercise/ (3 files)
+│       │   │   │   ├── 📈 performance/ (3 files)
+│       │   │   │   ├── 📋 plan_program/ (5 files)
+│       │   │   │   ├── 📅 scheduled_workout/ (10 files)
+│       │   │   │   ├── 💳 subscription/ (4 files)
+│       │   │   │   ├── 👤 user/ (3 files)
+│       │   │   │   ├── 🏋️ workout/ (4 files)
+│       │   │   │   ├── 📝 workout_plan/ (3 files)
+│       │   │   │   ├── 🏆 workout_program/ (1 file)
+│       │   │   │   └── 📊 workout_session/ (1 file)
+│       │   │   │
+│       │   │   ├── 🗂️ mapper/                           # Entity-DTO Mappers (16 files)
+│       │   │   │   ├── 💬 messaging/ (2 files)
+│       │   │   │   ├── 👤 user/ (3 files)
+│       │   │   │   └── 🏋️ workout/ (8 files)
+│       │   │   │
+│       │   │   ├── 🏗️ model/                            # JPA Entities (43 files)
+│       │   │   │   ├── 🔧 common/
 │       │   │   │   │   └── BaseEntity.java
-│       │   │   │   ├── messaging/
+│       │   │   │   ├── 💬 messaging/
 │       │   │   │   │   ├── Conversation.java
 │       │   │   │   │   ├── ConversationParticipant.java
 │       │   │   │   │   ├── Message.java
-│       │   │   │   │   └── enums/
-│       │   │   │   │       ├── ConversationType.java
-│       │   │   │   │       ├── MessageType.java
-│       │   │   │   │       ├── ParticipantRole.java
-│       │   │   │   │       └── RequestStatus.java
-│       │   │   │   ├── social/
+│       │   │   │   │   └── 🎯 enums/ (4 files)
+│       │   │   │   ├── 🌐 social/
 │       │   │   │   │   ├── ContentReport.java
 │       │   │   │   │   ├── PostHashtag.java
 │       │   │   │   │   ├── PostLike.java
 │       │   │   │   │   ├── SocialComment.java
 │       │   │   │   │   └── SocialPost.java
-│       │   │   │   ├── user/
+│       │   │   │   ├── 👤 user/
 │       │   │   │   │   ├── ProfessionalProfile.java
 │       │   │   │   │   ├── Subscription.java
 │       │   │   │   │   ├── User.java
 │       │   │   │   │   ├── UserRelationship.java
-│       │   │   │   │   └── enums/
-│       │   │   │   │       ├── ActivityLevel.java
-│       │   │   │   │       ├── SubscriptionTier.java
-│       │   │   │   │       └── UserType.java
-│       │   │   │   └── workout/
+│       │   │   │   │   └── 🎯 enums/ (3 files)
+│       │   │   │   └── 🏋️ workout/
 │       │   │   │       ├── Exercise.java
 │       │   │   │       ├── ExerciseGoalMapping.java
 │       │   │   │       ├── ExerciseGoalMappingId.java
@@ -313,228 +180,249 @@ workout-tracker/
 │       │   │   │       ├── WorkoutPlan.java
 │       │   │   │       ├── WorkoutProgram.java
 │       │   │   │       └── WorkoutSession.java
-│       │   │
-│       │   ├── 🏪 Data Access Layer (JPA Repositories)
-│       │   │   ├── repository/
-│       │   │   │   ├── messaging/
-│       │   │   │   │   ├── ConversationParticipantRepository.java
-│       │   │   │   │   ├── ConversationRepository.java
-│       │   │   │   │   └── MessageRepository.java
-│       │   │   │   ├── social/
-│       │   │   │   │   ├── PostLikeRepository.java
-│       │   │   │   │   ├── SocialCommentRepository.java
-│       │   │   │   │   └── SocialPostRepository.java
-│       │   │   │   ├── user/
-│       │   │   │   │   ├── ProfessionalProfileRepository.java
-│       │   │   │   │   ├── SubscriptionRepository.java
-│       │   │   │   │   ├── UserRelationshipRepository.java
-│       │   │   │   │   └── UserRepository.java
-│       │   │   │   └── workout/
-│       │   │   │       ├── ExerciseGoalMappingRepository.java
-│       │   │   │       ├── ExerciseRepository.java
-│       │   │   │       ├── FitnessGoalRepository.java
-│       │   │   │       ├── PerformanceRecordRepository.java
-│       │   │   │       ├── PlanExerciseRepository.java
-│       │   │   │       ├── ProgramPlanRepository.java
-│       │   │   │       ├── ScheduledWorkoutRepository.java
-│       │   │   │       ├── UserExerciseHistoryRepository.java
-│       │   │   │       ├── UserExerciseRatingRepository.java
-│       │   │   │       ├── WorkoutPlanRepository.java
-│       │   │   │       ├── WorkoutProgramRepository.java
-│       │   │   │       └── WorkoutSessionRepository.java
-│       │   │
-│       │   ├── 🔐 Security Configuration
-│       │   │   ├── security/
+│       │   │   │
+│       │   │   ├── 🗃️ repository/                        # JPA Repositories (22 files)
+│       │   │   │   ├── 💬 messaging/ (3 files)
+│       │   │   │   ├── 🌐 social/ (3 files)
+│       │   │   │   ├── 👤 user/ (4 files)
+│       │   │   │   └── 🏋️ workout/ (12 files)
+│       │   │   │
+│       │   │   ├── 🔐 security/                          # Security Configuration (6 files)
 │       │   │   │   ├── CurrentUser.java
 │       │   │   │   ├── CustomUserDetailsService.java
 │       │   │   │   ├── JwtAuthenticationFilter.java
 │       │   │   │   ├── JwtTokenProvider.java
 │       │   │   │   ├── SecurityConfig.java
 │       │   │   │   └── UserPrincipal.java
+│       │   │   │
+│       │   │   ├── 🎯 service/                           # Business Logic (21 files)
+│       │   │   │   ├── 📅 calendar/ (1 file)
+│       │   │   │   ├── 💬 messaging/ (2 files)
+│       │   │   │   ├── 🔔 notification/ (1 file)
+│       │   │   │   ├── 🌐 social/ (4 files)
+│       │   │   │   ├── 👤 user/ (4 files)
+│       │   │   │   └── 🏋️ workout/ (9 files)
+│       │   │   │
+│       │   │   └── 🛠️ util/                             # Utilities (2 files)
+│       │   │       ├── SecurityUtil.java
+│       │   │       └── WorkoutPlanMethodFinder.java
 │       │   │
-│       │   ├── ⚙️ Business Logic Layer (Services)
-│       │   │   ├── service/
-│       │   │   │   ├── messaging/
-│       │   │   │   │   ├── ConversationService.java
-│       │   │   │   │   └── MessageService.java
-│       │   │   │   ├── notification/
-│       │   │   │   │   └── NotificationService.java
-│       │   │   │   ├── social/
-│       │   │   │   │   ├── PostLikeService.java
-│       │   │   │   │   ├── ProgramPlanService.java
-│       │   │   │   │   ├── SocialCommentService.java
-│       │   │   │   │   └── SocialPostService.java
-│       │   │   │   ├── user/
-│       │   │   │   │   ├── ProfessionalProfileService.java
-│       │   │   │   │   ├── SubscriptionService.java
-│       │   │   │   │   ├── UserRelationshipService.java
-│       │   │   │   │   └── UserService.java
-│       │   │   │   └── workout/
-│       │   │   │       ├── ExerciseService.java
-│       │   │   │       ├── PerformanceService.java
-│       │   │   │       ├── PlanExerciseService.java
-│       │   │   │       ├── ScheduledWorkoutService.java
-│       │   │   │       ├── WorkoutPlanService.java
-│       │   │   │       ├── WorkoutProgramService.java
-│       │   │   │       ├── WorkoutSessionService.java
-│       │   │   │       └── WorkoutSharingService.java
-│       │   │
-│       │   └── 🛠️ Utilities
-│       │       └── util/
-│       │           ├── SecurityUtil.java
-│       │           └── WorkoutPlanMethodFinder.java
+│       │   └── 📦 resources/                            # Application Resources
+│       │       ├── 🧪 api-test.http                     # API testing
+│       │       ├── ⚙️ application.properties            # Main config
+│       │       ├── 🧪 application-test.properties       # Test config
+│       │       └── 🗃️ db/migration/                     # Flyway Migrations (12 files)
+│       │           ├── V001__Create_Core_User_System.sql
+│       │           ├── V002__Create_Functions_And_Triggers.sql
+│       │           ├── V003__Create_Exercise_System.sql
+│       │           ├── V004__Create_Exercise_System_Triggers.sql
+│       │           ├── V005__Create_Workout_Tracking_System.sql
+│       │           ├── V006__Create_Workout_Tracking_Triggers.sql
+│       │           ├── V007__Create_Program_System.sql
+│       │           ├── V008__Create_Program_System_Triggers.sql
+│       │           ├── V009__Create_Social_System.sql
+│       │           ├── V010__Social_System_Optimizations.sql
+│       │           ├── V011__Create_Messaging_System.sql
+│       │           └── V012__Add_Foundation_Exercises.sql
 │       │
-│       ├── 📁 src/main/resources/
-│       │   ├── 🗄️ Database Migrations
-│       │   │   └── db/migration/
-│       │   │       ├── V001__Create_Core_User_System.sql
-│       │   │       ├── V002__Create_Functions_And_Triggers.sql
-│       │   │       ├── V003__Create_Exercise_System.sql
-│       │   │       ├── V004__Create_Exercise_System_Triggers.sql
-│       │   │       ├── V005__Create_Workout_Tracking_System.sql
-│       │   │       ├── V006__Create_Workout_Tracking_Triggers.sql
-│       │   │       ├── V007__Create_Program_System.sql
-│       │   │       ├── V008__Create_Program_System_Triggers.sql
-│       │   │       ├── V009__Create_Social_System.sql
-│       │   │       ├── V010__Social_System_Optimizations.sql
-│       │   │       └── V011__Create_Messaging_System.sql
-│       │   ├── ⚙️ Configuration Files
-│       │   │   ├── application.properties
-│       │   │   ├── application-test.properties
-│       │   │   └── api-test.http
-│       │
-│       └── 📁 src/test/
-│           ├── 🧪 Test Classes
-│           │   └── java/com/chidituke/workout_tracker/
-│           │       ├── WorkoutTrackerApplicationTests.java
-│           │       ├── config/
-│           │       │   └── BaseIntegrationTest.java
-│           │       ├── controller/
-│           │       │   ├── auth/
-│           │       │   │   └── AuthControllerTest.java
-│           │       │   ├── user/
-│           │       │   │   └── UserControllerTest.java
-│           │       │   └── workout/
-│           │       │       └── ExerciseControllerTest.java
-│           │       ├── migration/
-│           │       │   ├── V001MigrationTest.java
-│           │       │   ├── V003MigrationTest.java
-│           │       │   ├── V005MigrationTest.java
-│           │       │   ├── V007MigrationTest.java
-│           │       │   ├── V009MigrationTest.java
-│           │       │   ├── V010MigrationTest.java
-│           │       │   └── V011MigrationTest.java
-│           │       └── security/
-│           │           └── SecurityConfigTest.java
-│           └── 📁 test/resources/
-│               ├── application-test.properties
-│               └── application-test.yml
+│       └── 🧪 test/                                    # Test Sources
+│           ├── ☕ java/com/chidituke/workout_tracker/
+│           │   ├── WorkoutTrackerApplicationTests.java
+│           │   ├── ⚙️ config/
+│           │   │   └── BaseIntegrationTest.java
+│           │   ├── 🎮 controller/
+│           │   │   ├── 🔐 auth/
+│           │   │   │   └── AuthControllerTest.java
+│           │   │   ├── 👤 user/
+│           │   │   │   └── UserControllerTest.java
+│           │   │   └── 🏋️ workout/
+│           │   │       └── ExerciseControllerTest.java
+│           │   ├── 🗃️ migration/                        # Migration Tests (7 files)
+│           │   │   ├── V001MigrationTest.java
+│           │   │   ├── V003MigrationTest.java
+│           │   │   ├── V005MigrationTest.java
+│           │   │   ├── V007MigrationTest.java
+│           │   │   ├── V009MigrationTest.java
+│           │   │   ├── V010MigrationTest.java
+│           │   │   └── V011MigrationTest.java
+│           │   └── 🔐 security/
+│           │       └── SecurityConfigTest.java
+│           └── 📦 resources/
+│               ├── ⚙️ application-test.properties
+│               └── ⚙️ application-test.yml
 │
-└── 🎨 Frontend (React + TypeScript)
-    └── frontend/
-        ├── 📦 Configuration & Build
-        │   ├── package.json
-        │   ├── package-lock.json
-        │   ├── tailwind.config.js
-        │   ├── tsconfig.json
-        │   └── postcss.config.js
+└── 🎨 frontend/                                       # React Frontend
+    ├── 📖 README.md                                   # Frontend docs
+    ├── 📦 package.json                                # Dependencies
+    ├── 🔒 package-lock.json                           # Lockfile
+    ├── 🎨 tailwind.config.js                          # Tailwind CSS config
+    ├── 📝 tsconfig.json                               # TypeScript config
+    ├── 🎨 postcss.config.js                           # PostCSS config
+    ├── 🔧 components.json                             # Shadcn/ui config
+    ├── 🔐 .env                                        # Environment variables
+    ├── 🚫 .gitignore                                  # Git ignore
+    │
+    ├── 🌍 public/                                     # Static Assets
+    │   ├── 🔖 favicon.ico
+    │   ├── 📄 index.html
+    │   ├── 🖼️ logo192.png
+    │   ├── 🖼️ logo512.png
+    │   ├── 📋 manifest.json
+    │   └── 🤖 robots.txt
+    │
+    └── 📁 src/                                        # Source Code
+        ├── 🎨 App.css                                 # Global styles
+        ├── 🧪 App.test.js                             # App tests
+        ├── 🚀 App.tsx                                 # Main App component
+        ├── 🎨 index.css                               # Global CSS
+        ├── 🚀 index.js                                # App entry point
+        ├── 🖼️ logo.svg                                # Logo asset
+        ├── 📊 reportWebVitals.js                      # Performance monitoring
+        ├── 🧪 setupTests.js                           # Test setup
+        ├── 🎨 theme.js                                # Theme configuration
         │
-        ├── 🌐 Public Assets
-        │   └── public/
-        │       ├── index.html
-        │       ├── manifest.json
-        │       └── robots.txt
+        ├── 🧩 components/                             # React Components
+        │   ├── 🧪 ApiTestPanel.tsx                    # API testing UI
+        │   ├── 📋 index.ts                            # Component exports
+        │   │
+        │   ├── 📅 CalendarPage/                       # Calendar Components (4 files)
+        │   │   ├── ExerciseConfigModal.tsx
+        │   │   ├── ExerciseSelector.tsx
+        │   │   ├── InWorkoutExerciseSelector.tsx
+        │   │   └── index.ts
+        │   │
+        │   ├── 💪 ExercisePage/                       # Exercise Components (4 files)
+        │   │   ├── DesktopFilters.tsx
+        │   │   ├── ExerciseCard.tsx
+        │   │   ├── MobileFilterDrawerProps.tsx
+        │   │   └── index.ts
+        │   │
+        │   ├── 🌟 LandingPage/                        # Landing Components (9 files)
+        │   │   ├── BetaAccess.tsx
+        │   │   ├── ExerciseLibrary.tsx
+        │   │   ├── FinalCTA.tsx
+        │   │   ├── HeroSection.tsx
+        │   │   ├── Navigation.tsx
+        │   │   ├── PricingSection.tsx
+        │   │   ├── ProblemSection.tsx
+        │   │   ├── SolutionSection.tsx
+        │   │   └── index.ts
+        │   │
+        │   ├── 📊 WorkoutTracking/                    # Workout Components (1 file)
+        │   │   └── WorkoutTrackingInterface.tsx
+        │   │
+        │   ├── 🔐 auth/                               # Auth Components (2 files)
+        │   │   ├── LoginForm.tsx
+        │   │   └── RegisterForm.tsx
+        │   │
+        │   ├── 🎨 layout/                             # Layout Components (7 files)
+        │   │   ├── BottomNavigation.tsx
+        │   │   ├── FloatingActionButton.tsx
+        │   │   ├── MobileLayout.tsx
+        │   │   ├── QuickWorkoutModal.tsx
+        │   │   ├── SearchModal.tsx
+        │   │   ├── TopNavigation.tsx
+        │   │   └── WorkoutModeOverlay.tsx
+        │   │
+        │   └── 🎯 ui/                                 # UI Components (7 files)
+        │       ├── badge.tsx
+        │       ├── button.tsx
+        │       ├── card.tsx
+        │       ├── input.tsx
+        │       ├── label.tsx
+        │       ├── select.tsx
+        │       └── textarea.tsx
         │
-        └── 📁 src/
-            ├── 🎯 Application Entry Points
-            │   ├── App.js
-            │   ├── App.css
-            │   ├── App.test.js
-            │   ├── index.js
-            │   ├── index.css
-            │   ├── theme.js
-            │   ├── reportWebVitals.js
-            │   └── setupTests.js
-            │
-            ├── 🧩 Components
-            │   ├── components/
-            │   │   ├── 🏃‍♂️ Exercise Page Components
-            │   │   │   └── ExercisePage/
-            │   │   │       ├── DesktopFilters.tsx
-            │   │   │       ├── ExerciseCard.tsx
-            │   │   │       └── MobileFilterDrawerProps.tsx
-            │   │   ├── 🏠 Landing Page Components
-            │   │   │   └── LandingPage/
-            │   │   └── 📋 Individual Components
-            │   │       ├── BetaAccess.js
-            │   │       ├── ExerciseLibrary.js
-            │   │       ├── FinalCTA.js
-            │   │       ├── HeroSection.js
-            │   │       ├── Navigation.js
-            │   │       ├── PricingSection.js
-            │   │       ├── ProblemSection.js
-            │   │       └── SolutionSection.js
-            │
-            ├── 🎣 Custom Hooks
-            │   └── hooks/
-            │       └── useExerciseFilters.ts
-            │
-            ├── 📄 Pages
-            │   └── pages/
-            │       ├── ExercisesPage.tsx
-            │       └── LandingPage.js
-            │
-            ├── 🔌 Services (API Layer)
-            │   └── services/
-            │       ├── exerciseApi.ts
-            │       └── mockData.ts
-            │
-            ├── 📊 TypeScript Types
-            │   └── types/
-            │       ├── api.ts
-            │       └── exercise.ts
-            │
-            └── 🛠️ Utilities
-                └── utils/
-                    └── exerciseFormatters.ts
+        ├── 🔄 contexts/                               # React Contexts (2 files)
+        │   ├── AuthContext.tsx
+        │   └── WorkoutContext.tsx
+        │
+        ├── 🪝 hooks/                                  # Custom Hooks (2 files)
+        │   ├── index.ts
+        │   └── useExerciseFilters.ts
+        │
+        ├── 🛠️ lib/                                    # Utilities (1 file)
+        │   └── utils.ts
+        │
+        ├── 📄 pages/                                  # Page Components (14 files)
+        │   ├── BillingPage.tsx
+        │   ├── CalendarPage.tsx
+        │   ├── CommunityPage.tsx
+        │   ├── ExercisesPage.tsx
+        │   ├── HelpPage.tsx
+        │   ├── LandingPage.tsx
+        │   ├── LoginPage.tsx
+        │   ├── MessagesPage.tsx
+        │   ├── NotificationsPage.tsx
+        │   ├── ProgressPage.tsx
+        │   ├── RegisterPage.tsx
+        │   ├── SettingsPage.tsx
+        │   ├── WelcomePage.tsx
+        │   └── WorkoutModePage.tsx
+        │
+        ├── 🌐 services/                               # API Services (7 files)
+        │   ├── apiClient.ts
+        │   ├── authService.ts
+        │   ├── calendarApi.ts
+        │   ├── exerciseApi.ts
+        │   ├── index.ts
+        │   ├── mockData.ts
+        │   └── transformers.ts
+        │
+        ├── 🏷️ types/                                  # TypeScript Types (5 files)
+        │   ├── api.ts
+        │   ├── auth.ts
+        │   ├── enums.ts
+        │   ├── exercise.ts
+        │   └── index.ts
+        │
+        └── 🛠️ utils/                                  # Utility Functions (4 files)
+            ├── dateUtils.ts
+            ├── exerciseFormatters.ts
+            ├── index.ts
+            └── validation.ts
 ```
 
-## 📊 **File Statistics**
+## 🚀 Key Features & Modules
 
-### **Backend (Java)**
-- **Total Java Files:** ~200+ files
-- **Controllers:** 9 controllers across 4 domains
-- **Services:** 15+ service classes
-- **Repositories:** 20+ repository interfaces
-- **DTOs:** 60+ request/response classes
-- **Entities:** 25+ JPA entities
-- **Exceptions:** 50+ custom exception classes
-- **Mappers:** 10+ mapper classes
-- **Database Migrations:** 11 SQL migration files
+### 🔐 Authentication & User Management
+- JWT-based authentication
+- User profiles and professional accounts
+- Subscription management
+- Social relationships
 
-### **Frontend (React + TypeScript)**
-- **Total TypeScript/JavaScript Files:** ~25 files
-- **Components:** 15+ React components
-- **Pages:** 2 main pages
-- **Custom Hooks:** 1 complex filtering hook
-- **Services:** 2 service files
-- **Types:** 2 TypeScript definition files
-- **Utilities:** 1 utility file
+### 💪 Exercise Library & Management
+- Comprehensive exercise database
+- Custom exercise creation
+- Exercise ratings and history
+- Goal mapping and analytics
 
-### **Testing & Configuration**
-- **Test Files:** 10+ test classes
-- **API Tests:** 5 HTTP test files
-- **Configuration Files:** 15+ config files
-- **Documentation:** 3 markdown files
+### 📅 Workout Planning & Scheduling
+- Workout plan templates
+- Program creation and enrollment
+- Scheduled workouts with calendar integration
+- Progress tracking and analytics
 
-## 🔥 **Key Highlights**
+### 💬 Social & Messaging
+- User conversations and messaging
+- Progress check-ins and assignments
+- Social posts and community features
+- Professional-client communication
 
-1. **Comprehensive Architecture** - Full-stack application with clear separation of concerns
-2. **Enterprise-Grade Backend** - Proper layering with controllers, services, repositories, and DTOs
-3. **Modern Frontend** - React with TypeScript, custom hooks, and responsive design
-4. **Database-First Design** - Flyway migrations with proper schema evolution
-5. **Security-Focused** - JWT authentication, role-based access, and comprehensive exception handling
-6. **Test Coverage** - Unit tests, integration tests, and API tests
-7. **Developer Experience** - Hot reload, comprehensive tooling, and clear documentation
+### 📊 Performance & Analytics
+- Performance tracking and records
+- Workout analytics and insights
+- Progress visualization
+- Goal achievement monitoring
 
-This file tree represents a mature, production-ready full-stack application with enterprise-level architecture and modern development practices.
+### 🎨 Modern Frontend
+- Responsive React TypeScript application
+- Tailwind CSS for styling
+- Mobile-first design approach
+- Component-based architecture
+
+---
+
+*Generated on: August 8, 2025*
+*Total Files Analyzed: 400+*
+*Project Status: Active Development*

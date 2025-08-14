@@ -67,11 +67,12 @@ public interface WorkoutPlanRepository extends JpaRepository<WorkoutPlan, Long> 
     // SUBSCRIPTION TIER FILTERING
     // =======================
 
-    // Find workouts accessible to user's subscription tier
+    // Replace your existing findAccessibleWorkouts method with this:
     @Query("SELECT w FROM WorkoutPlan w WHERE w.isPublic = true " +
             "AND (w.subscriptionTierRequired = 'FREE' " +
             "OR (:userTier = 'PLUS' AND w.subscriptionTierRequired IN ('FREE', 'PLUS')) " +
-            "OR (:userTier = 'PRO' AND w.subscriptionTierRequired IN ('FREE', 'PLUS', 'PRO'))) " +
+            "OR (:userTier = 'PRO' AND w.subscriptionTierRequired IN ('FREE', 'PLUS', 'PRO')) " +
+            "OR (:userTier = 'PRO_PROFESSIONAL' AND w.subscriptionTierRequired IN ('FREE', 'PLUS', 'PRO', 'PRO_PROFESSIONAL'))) " +
             "ORDER BY w.averageRating DESC")
     List<WorkoutPlan> findAccessibleWorkouts(@Param("userTier") String userSubscriptionTier);
 
@@ -92,6 +93,19 @@ public interface WorkoutPlanRepository extends JpaRepository<WorkoutPlan, Long> 
     @Query("SELECT w FROM WorkoutPlan w WHERE w.isPublic = true " +
             "AND w.averageRating >= :minRating ORDER BY w.averageRating DESC")
     List<WorkoutPlan> findHighlyRatedWorkouts(@Param("minRating") Double minRating);
+
+    @Query("SELECT wp FROM WorkoutPlan wp WHERE wp.subscriptionTierRequired = :tier AND wp.isPublic = true")
+    List<WorkoutPlan> findBySubscriptionTierRequired(@Param("tier") String tier);
+
+    // =======================
+// WORKOUT PLAN SCHEDULING SUPPORT
+// =======================
+
+    @Query("SELECT wp FROM WorkoutPlan wp WHERE wp.isPublic = true ORDER BY wp.timesUsed DESC, wp.averageRating DESC")
+    List<WorkoutPlan> findAllPublicPlansOrderByPopularity();
+
+    @Query("SELECT wp FROM WorkoutPlan wp WHERE wp.isPublic = true AND wp.workoutCategory = :category ORDER BY wp.timesUsed DESC")
+    List<WorkoutPlan> findByCategory(@Param("category") String category);
 
     // =======================
     // USAGE TRACKING
@@ -120,7 +134,7 @@ public interface WorkoutPlanRepository extends JpaRepository<WorkoutPlan, Long> 
 
     // Find trending workouts (most used in recent period)
     @Query(
-            value = "SELECT * FROM workout_plan " +
+            value = "SELECT * FROM workout_plans " +
                     "WHERE is_public = true " +
                     "AND updated_at >= CURRENT_DATE - INTERVAL '30 days' " +
                     "ORDER BY times_used DESC",

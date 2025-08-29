@@ -27,7 +27,6 @@ import java.util.List;
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ScheduledWorkoutResponse {
-
     // =============================================================================
     // CORE IDENTIFICATION & SCHEDULING
     // =============================================================================
@@ -99,6 +98,7 @@ public class ScheduledWorkoutResponse {
     private UserInfo user;
     private WorkoutProgramInfo program;      // Optional - only if part of program
     private WorkoutSessionInfo completedSession; // Only if completed
+    private ExerciseInfo exercise;
 
     // =============================================================================
     // NESTED DTOS FOR RELATED ENTITIES
@@ -165,6 +165,62 @@ public class ScheduledWorkoutResponse {
         private Boolean completed;
     }
 
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ExerciseInfo {
+        private Long id;
+        private String name;
+        private String emoji;
+        private String description;
+        private String exerciseType;           // STRENGTH, CARDIO, FLEXIBILITY, etc.
+        private String difficultyLevel;       // BEGINNER, INTERMEDIATE, ADVANCED
+        private Integer estimatedDurationMinutes;
+        private Integer estimatedCalories;
+        private List<String> targetMuscleGroups;
+        private List<String> equipmentRequired;
+        private String videoUrl;
+        private List<String> benefits;
+        private List<String> tips;
+
+        //  These are the flags that fix the frontend exercise type detection!
+        private Boolean isCardio;
+        private Boolean isIsometric;
+        private String workoutTrackingMode;   // TIME_BASED, HOLD_BASED, REP_BASED
+
+        // Additional metadata
+        private Double averageRating;
+        private Integer totalRatings;
+        private Integer usageCount;
+        private Boolean isFromVerifiedSource;
+
+        // Convenience methods for frontend
+        @JsonIgnore
+        public boolean isCardioExercise() {
+            return isCardio != null && isCardio;
+        }
+
+        @JsonIgnore
+        public boolean isIsometricExercise() {
+            return isIsometric != null && isIsometric;
+        }
+
+        @JsonIgnore
+        public boolean isStrengthExercise() {
+            return !isCardioExercise() && !isIsometricExercise();
+        }
+
+        @JsonIgnore
+        public String getTrackingModeForFrontend() {
+            if (isCardioExercise()) return "cardio";
+            if (isIsometricExercise()) return "isometric";
+            return "strength";
+        }
+    }
+
+
     // =============================================================================
     // BUSINESS LOGIC METHODS (Status & State Checking)
     // =============================================================================
@@ -201,11 +257,25 @@ public class ScheduledWorkoutResponse {
     }
 
     // Status checking methods
-    public boolean isCompleted() { return "COMPLETED".equals(status); }
-    public boolean isInProgress() { return "IN_PROGRESS".equals(status); }
-    public boolean isCancelled() { return "CANCELLED".equals(status); }
-    public boolean isSkipped() { return "SKIPPED".equals(status); }
-    public boolean isRescheduled() { return "RESCHEDULED".equals(status); }
+    public boolean isCompleted() {
+        return "COMPLETED".equals(status);
+    }
+
+    public boolean isInProgress() {
+        return "IN_PROGRESS".equals(status);
+    }
+
+    public boolean isCancelled() {
+        return "CANCELLED".equals(status);
+    }
+
+    public boolean isSkipped() {
+        return "SKIPPED".equals(status);
+    }
+
+    public boolean isRescheduled() {
+        return "RESCHEDULED".equals(status);
+    }
 
     // Context checking methods
     public boolean isPartOfProgram() {

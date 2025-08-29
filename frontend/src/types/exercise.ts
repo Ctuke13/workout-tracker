@@ -44,6 +44,10 @@ export interface ScheduledExercise {
     userId: string;
 }
 
+export interface ScheduledExerciseWithResults extends ScheduledExercise {
+    workoutResults?: WorkoutResults;
+}
+
 export interface CalendarDay {
     date: Date;
     dateString: string;
@@ -71,11 +75,139 @@ export interface WorkoutStats {
     averageWorkoutDuration: number;
 }
 
+export interface WorkoutResults {
+    // Basic completion info
+    exerciseId: string;
+    workoutSessionId?: string;
+    scheduledExerciseId?: string;
+    completedAt: string;
+    totalDurationMinutes: number;
+
+    // Performance rating
+    performanceRating: 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL';
+
+    // ✅ CHANGE 1: Make sets array REQUIRED (remove the ? after sets)
+    sets: {
+        setNumber: number;
+        targetReps: number;
+        actualReps: number;
+        targetWeight?: number;
+        actualWeight?: number;
+        targetWeightUnit: 'kg' | 'lbs';
+        rpe?: number;
+        formRating?: number;
+        restSeconds?: number;
+        setDurationSeconds?: number;
+        completed: boolean;
+        performanceVsTarget?: 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL';
+        notes?: string;
+        cardioData?: {
+            durationMinutes: number;
+            distanceKm?: number;
+            pace?: number;
+            averageHeartRate?: number;
+            caloriesBurned?: number;
+        };
+        isometricData?: {
+            holdDurationSeconds: number;
+            targetHoldSeconds: number;
+        };
+    }[]; // ← REQUIRED array (no ?)
+
+    // Cardio specific (existing fields enhanced)
+    actualDurationMinutes?: number;
+    actualDistanceKm?: number;
+    actualPace?: number;
+    averageHeartRate?: number;
+    caloriesBurned?: number;
+
+    // Isometric specific (existing fields enhanced)
+    actualHoldDurations?: number[];
+    averageHoldTime?: number;
+    longestHoldSeconds?: number;
+
+    // Exercise type specific metrics (keep optional)
+    strengthMetrics?: {
+        totalVolume: number;
+        averageRpe: number;
+        maxWeight: number;
+        totalReps: number;
+        completionRate: number;
+        strengthGains?: {
+            previousMaxWeight?: number;
+            weightIncrease?: number;
+            previousTotalVolume?: number;
+            volumeIncrease?: number;
+        };
+    };
+
+    cardioMetrics?: {
+        totalDurationMinutes: number;
+        totalDistanceKm?: number;
+        averagePace?: number;
+        averageHeartRate?: number;
+        totalCaloriesBurned?: number;
+        cardioGains?: {
+            previousBestPace?: number;
+            paceImprovement?: number;
+            previousLongestDuration?: number;
+            enduranceImprovement?: number;
+        };
+    };
+
+    isometricMetrics?: {
+        totalHoldTimeSeconds: number;
+        averageHoldTimeSeconds: number;
+        longestHoldSeconds: number;
+        completionRate: number;
+        isometricGains?: {
+            previousLongestHold?: number;
+            holdTimeImprovement?: number;
+            previousTotalHoldTime?: number;
+            totalTimeImprovement?: number;
+        };
+    };
+
+    // ✅ CHANGE 2: Make personalRecords array REQUIRED (remove the ?)
+    personalRecords: {
+        type: 'MAX_WEIGHT' | 'MAX_REPS' | 'LONGEST_HOLD' | 'FASTEST_PACE' | 'LONGEST_DISTANCE';
+        exerciseId: number;
+        exerciseName: string;
+        previousValue?: number;
+        newValue: number;
+        unit: string;
+        achievedAt: string;
+    }[]; // ← REQUIRED array (no ?)
+
+    // ✅ CHANGE 3: Make improvements array REQUIRED (remove the ?)
+    improvements: {
+        metric: 'volume' | 'weight' | 'reps' | 'pace' | 'duration' | 'hold_time';
+        previousValue: number;
+        currentValue: number;
+        improvementPercentage: number;
+        comparisonPeriod: 'last_workout' | 'last_week' | 'last_month';
+    }[]; // ← REQUIRED array (no ?)
+
+    // Enhanced session feedback (keep optional)
+    notes?: string;
+    workoutNotes?: string;
+    mood?: 'ENERGETIC' | 'TIRED' | 'MOTIVATED' | 'FOCUSED' | 'STRESSED' | 'RELAXED' | 'PUMPED' | 'SLUGGISH';
+    location?: 'HOME' | 'GYM' | 'OUTDOOR' | 'OFFICE';
+    perceivedEffort?: number;
+}
+
 // =============================================================================
 // CORE ENUMS AND TYPES
 // =============================================================================
 
-export type ExerciseType = 'STRENGTH' | 'CARDIO' | 'FLEXIBILITY' | 'BALANCE' | 'PLYOMETRIC' | 'REHABILITATION' | 'SPORTS_SPECIFIC';
+export type ExerciseType =
+    'STRENGTH'
+    | 'CARDIO'
+    | 'FLEXIBILITY'
+    | 'BALANCE'
+    | 'PLYOMETRIC'
+    | 'REHABILITATION'
+    | 'SPORTS_SPECIFIC';
 export type DifficultyLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
 export type SortOption = 'relevance' | 'rating' | 'popularity' | 'duration' | 'calories' | 'newest';
 export type FilterType =
@@ -385,6 +517,234 @@ export interface FilterOptionsResponse {
 }
 
 // =============================================================================
+// PERFORMANCE ANALYTICS INTERFACES
+// =============================================================================
+
+/**
+ * Enhanced workout session summary
+ */
+export interface WorkoutSessionSummary {
+    sessionId: string;
+    date: string;
+    totalDurationMinutes: number;
+    totalExercises: number;
+    completedExercises: number;
+    completionPercentage: number;
+
+    // Overall performance
+    overallPerformanceRating: 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'NEEDS_IMPROVEMENT';
+    totalVolume?: number; // For strength workouts
+    totalCalories?: number; // For cardio workouts
+    totalHoldTime?: number; // For isometric workouts
+
+    // Achievements (using types from WorkoutResults)
+    personalRecords: NonNullable<WorkoutResults['personalRecords']>;
+    improvements: NonNullable<WorkoutResults['improvements']>;
+
+    // Session feedback (using types from WorkoutResults)
+    mood?: WorkoutResults['mood'];
+    location?: WorkoutResults['location'];
+    perceivedEffort?: number;
+    sessionNotes?: string;
+
+    // Exercise breakdown
+    exercises: WorkoutResults[];
+}
+
+/**
+ * Performance analytics for dashboard/progress tracking
+ */
+export interface PerformanceAnalytics {
+    timeframe: 'week' | 'month' | 'quarter' | 'year';
+
+    // Volume and frequency
+    totalWorkouts: number;
+    totalDurationMinutes: number;
+    averageWorkoutDuration: number;
+    workoutFrequency: number; // workouts per week
+
+    // Performance trends
+    strengthProgress?: {
+        totalVolumeIncrease: number;
+        averageWeightIncrease: number;
+        strengthScore: number; // 1-100
+    };
+
+    cardioProgress?: {
+        paceImprovement: number;
+        enduranceIncrease: number;
+        cardioScore: number; // 1-100
+    };
+
+    isometricProgress?: {
+        holdTimeIncrease: number;
+        stabilityScore: number; // 1-100
+    };
+
+    // Personal records achieved (using type from WorkoutResults)
+    personalRecords: NonNullable<WorkoutResults['personalRecords']>;
+
+    // Consistency metrics
+    consistencyScore: number; // 1-100
+    streaks: {
+        current: number;
+        longest: number;
+    };
+}
+
+// =============================================================================
+// PERFORMANCE UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Calculate performance score (0-100) based on workout results
+ */
+export const calculateWorkoutPerformanceScore = (workoutResults: WorkoutResults): number => {
+    let score = 0;
+    let factors = 0;
+
+    // Completion factor (40% of score)
+    const completionRate = workoutResults.sets.filter(s => s.completed).length / workoutResults.sets.length;
+    score += completionRate * 40;
+    factors++;
+
+    // Performance vs target factor (40% of score)
+    const performanceScores = workoutResults.sets.map(set => {
+        switch (set.performanceVsTarget) {
+            case 'EXCEEDED':
+                return 100;
+            case 'MET':
+                return 85;
+            case 'PARTIAL':
+                return 60;
+            case 'BELOW_TARGET':
+                return 30;
+            default:
+                return 50;
+        }
+    });
+    const avgPerformanceScore = performanceScores.reduce((a, b) => a + b, 0) / performanceScores.length;
+    score += (avgPerformanceScore / 100) * 40;
+    factors++;
+
+    // RPE factor (20% of score) - lower RPE for same performance is better
+    if (workoutResults.strengthMetrics?.averageRpe) {
+        const rpeScore = Math.max(0, 100 - (workoutResults.strengthMetrics.averageRpe * 8));
+        score += (rpeScore / 100) * 20;
+    } else {
+        score += 15; // Default decent score if no RPE data
+    }
+    factors++;
+
+    return Math.round(score / factors);
+};
+
+/**
+ * Format workout results for display
+ */
+export const formatWorkoutResultsForDisplay = (workoutResults: WorkoutResults): {
+    summary: string;
+    highlights: string[];
+    metrics: Array<{ label: string; value: string; trend?: 'up' | 'down' | 'neutral' }>;
+} => {
+    const summary = `Completed ${workoutResults.sets.filter(s => s.completed).length} of ${workoutResults.sets.length} sets`;
+
+    const highlights: string[] = [];
+    const metrics: Array<{ label: string; value: string; trend?: 'up' | 'down' | 'neutral' }> = [];
+
+    // Add personal records to highlights
+    if (workoutResults.personalRecords && workoutResults.personalRecords.length > 0) {
+        highlights.push(`🏆 ${workoutResults.personalRecords.length} new personal record${workoutResults.personalRecords.length > 1 ? 's' : ''}!`);
+    }
+
+    // Add improvements to highlights
+    if (workoutResults.improvements && workoutResults.improvements.length > 0) {
+        highlights.push(`📈 Improved in ${workoutResults.improvements.length} metric${workoutResults.improvements.length > 1 ? 's' : ''}`);
+    }
+
+    // Add type-specific metrics
+    if (workoutResults.strengthMetrics) {
+        metrics.push(
+            {label: 'Total Volume', value: `${workoutResults.strengthMetrics.totalVolume} lbs`},
+            {label: 'Total Reps', value: workoutResults.strengthMetrics.totalReps.toString()},
+            {label: 'Average RPE', value: `${workoutResults.strengthMetrics.averageRpe.toFixed(1)}/10`}
+        );
+    }
+
+    if (workoutResults.cardioMetrics) {
+        metrics.push(
+            {label: 'Duration', value: `${workoutResults.cardioMetrics.totalDurationMinutes} min`}
+        );
+
+        if (workoutResults.cardioMetrics.totalDistanceKm) {
+            metrics.push({
+                label: 'Distance',
+                value: `${(workoutResults.cardioMetrics.totalDistanceKm * 0.621371).toFixed(1)} mi`
+            });
+        }
+
+        if (workoutResults.cardioMetrics.totalCaloriesBurned) {
+            metrics.push({
+                label: 'Calories',
+                value: workoutResults.cardioMetrics.totalCaloriesBurned.toString()
+            });
+        }
+    }
+
+    if (workoutResults.isometricMetrics) {
+        metrics.push(
+            {label: 'Total Hold Time', value: `${workoutResults.isometricMetrics.totalHoldTimeSeconds}s`},
+            {label: 'Best Hold', value: `${workoutResults.isometricMetrics.longestHoldSeconds}s`}
+        );
+    }
+
+    return {summary, highlights, metrics};
+};
+
+/**
+ * Get performance rating display info
+ */
+export const getPerformanceRatingInfo = (rating: WorkoutResults['performanceRating']) => {
+    switch (rating) {
+        case 'EXCEEDED':
+            return {
+                icon: '🚀',
+                message: 'Crushed it!',
+                color: 'text-green-600 bg-green-100 border-green-300',
+                textColor: 'text-green-800'
+            };
+        case 'MET':
+            return {
+                icon: '🎯',
+                message: 'Target achieved',
+                color: 'text-blue-600 bg-blue-100 border-blue-300',
+                textColor: 'text-blue-800'
+            };
+        case 'PARTIAL':
+            return {
+                icon: '⚡',
+                message: 'Good effort',
+                color: 'text-yellow-600 bg-yellow-100 border-yellow-300',
+                textColor: 'text-yellow-800'
+            };
+        case 'BELOW_TARGET':
+            return {
+                icon: '💪',
+                message: 'Keep pushing',
+                color: 'text-red-600 bg-red-100 border-red-300',
+                textColor: 'text-red-800'
+            };
+        default:
+            return {
+                icon: '✅',
+                message: 'Completed',
+                color: 'text-gray-600 bg-gray-100 border-gray-300',
+                textColor: 'text-gray-800'
+            };
+    }
+};
+
+// =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
@@ -488,27 +848,42 @@ export const filterExercisesByTrackingType = (
 };
 
 // Validation helpers
-export const validateExerciseData = (exercise: Exercise): boolean => {
-    // Ensure isCardio consistency with exerciseType
-    const shouldBeCardio = exercise.exerciseType === 'CARDIO';
+export const validateExerciseData = (exercise: Exercise): {
+    isValid: boolean;
+    issues: string[];
+    recommendations: string[];
+} => {
+    const issues: string[] = [];
+    const recommendations: string[] = [];
 
-    if (exercise.isCardio !== shouldBeCardio) {
-        console.warn(
-            `Exercise "${exercise.name}" has inconsistent cardio flags: ` +
-            `exerciseType="${exercise.exerciseType}" but isCardio=${exercise.isCardio}`
-        );
-        return false;
-    }
-
-    // Ensure exercises can't be both cardio and isometric
+    // Check for conflicting flags
     if (exercise.isCardio && exercise.isIsometric) {
-        console.warn(
-            `Exercise "${exercise.name}" cannot be both cardio and isometric`
-        );
-        return false;
+        issues.push('Exercise cannot be both cardio and isometric');
+        recommendations.push('Choose either cardio OR isometric, not both');
     }
 
-    return true;
+    // Check exerciseType consistency
+    const shouldBeCardio = exercise.exerciseType === 'CARDIO';
+    if (exercise.isCardio !== shouldBeCardio) {
+        issues.push(`isCardio flag (${exercise.isCardio}) doesn't match exerciseType (${exercise.exerciseType})`);
+        if (shouldBeCardio) {
+            recommendations.push('Set isCardio to true for CARDIO exercises');
+        } else {
+            recommendations.push('Set isCardio to false for non-CARDIO exercises');
+        }
+    }
+
+    // Check for missing names
+    if (!exercise.name && !exercise.exerciseName) {
+        issues.push('Exercise missing name');
+        recommendations.push('Add a name or exerciseName property');
+    }
+
+    return {
+        isValid: issues.length === 0,
+        issues,
+        recommendations
+    };
 };
 
 // Exercise creation helper
@@ -689,11 +1064,120 @@ export const getDefaultConfigForExercise = (exercise: Exercise): ExerciseConfigu
             } as CardioConfiguration;
         }
         case 'isometric':
-            return { ...DEFAULT_ISOMETRIC_CONFIG };
+            return {...DEFAULT_ISOMETRIC_CONFIG};
         case 'strength':
         default:
-            return { ...DEFAULT_STRENGTH_CONFIG };
+            return {...DEFAULT_STRENGTH_CONFIG};
     }
+};
+
+/**
+ * ✅ NEW: Debug exercise type for troubleshooting in CalendarPage
+ */
+export const debugExerciseType = (exercise: Exercise): void => {
+    console.group(`🔍 Exercise Type Debug: "${exercise.name}"`);
+    console.log('Basic Info:', {
+        id: exercise.id,
+        name: exercise.name,
+        emoji: exercise.emoji
+    });
+    console.log('Type Flags:', {
+        exerciseType: exercise.exerciseType,
+        isCardio: exercise.isCardio,
+        isIsometric: exercise.isIsometric
+    });
+    console.log('Computed Values:', {
+        trackingType: getWorkoutTrackingType(exercise),
+        interfaceColor: getExerciseInterfaceColor(exercise)
+    });
+    console.groupEnd();
+};
+
+/**
+ * ✅ NEW: Get exercise interface color based on type
+ */
+export const getExerciseInterfaceColor = (exercise: Exercise): string => {
+    const trackingType = getWorkoutTrackingType(exercise);
+
+    switch (trackingType) {
+        case 'cardio':
+            return 'red'; // Red interface for cardio
+        case 'isometric':
+            return 'purple'; // Purple interface for isometric/holds
+        case 'strength':
+        default:
+            return 'blue'; // Blue interface for strength training
+    }
+};
+
+/**
+ * ✅ NEW: Batch validate multiple exercises
+ */
+export const validateExerciseBatch = (exercises: Exercise[]): {
+    valid: Exercise[];
+    invalid: Exercise[];
+    summary: {
+        total: number;
+        validCount: number;
+        invalidCount: number;
+        cardioCount: number;
+        isometricCount: number;
+        strengthCount: number;
+    }
+} => {
+    const valid: Exercise[] = [];
+    const invalid: Exercise[] = [];
+
+    exercises.forEach(exercise => {
+        const validation = validateExerciseData(exercise);
+        if (validation.isValid) {
+            valid.push(exercise);
+        } else {
+            invalid.push(exercise);
+            console.warn(`⚠️ Invalid exercise: ${exercise.name}`, validation.issues);
+        }
+    });
+
+    const cardioCount = valid.filter(ex => ex.isCardio).length;
+    const isometricCount = valid.filter(ex => ex.isIsometric).length;
+    const strengthCount = valid.filter(ex => !ex.isCardio && !ex.isIsometric).length;
+
+    return {
+        valid,
+        invalid,
+        summary: {
+            total: exercises.length,
+            validCount: valid.length,
+            invalidCount: invalid.length,
+            cardioCount,
+            isometricCount,
+            strengthCount
+        }
+    };
+};
+
+/**
+ * ✅ NEW: Create exercise summary for debugging
+ */
+export const createExerciseSummary = (exercise: Exercise): {
+    name: string;
+    type: string;
+    tracking: WorkoutTrackingType;
+    interface: string;
+    duration: string;
+    valid: boolean;
+} => {
+    const validation = validateExerciseData(exercise);
+    const trackingType = getWorkoutTrackingType(exercise);
+
+    return {
+        name: exercise.name || exercise.exerciseName || 'Unknown',
+        type: exercise.exerciseTypeDisplay || exercise.exerciseType || 'Unknown',
+        tracking: trackingType,
+        interface: getExerciseInterfaceColor(exercise),
+        duration: exercise.estimatedDurationMinutes ? `${exercise.estimatedDurationMinutes} min` : 'Varies',
+        valid: validation.isValid
+    };
 };
 
 export const DISTANCE_PRESETS = {

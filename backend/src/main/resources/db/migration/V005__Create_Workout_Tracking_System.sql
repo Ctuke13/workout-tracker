@@ -21,6 +21,14 @@ CREATE TABLE workout_sessions (
                                   difficulty_rating INTEGER,
                                   overall_effort DOUBLE PRECISION,
 
+    -- Session status and completion tracking
+                                  session_status VARCHAR(20) DEFAULT 'PLANNED',
+                                  total_exercises_planned INTEGER DEFAULT 0,
+                                  total_exercises_completed INTEGER DEFAULT 0,
+                                  completion_percentage DECIMAL(5,2) DEFAULT 0.0,
+                                  workout_feedback TEXT,
+                                  performance_summary TEXT,
+
     -- Session context
                                   mood VARCHAR(20),
                                   location VARCHAR(20),
@@ -63,6 +71,18 @@ ALTER TABLE workout_sessions ADD CONSTRAINT chk_workout_sessions_location
 ALTER TABLE workout_sessions ADD CONSTRAINT chk_workout_sessions_week_number
     CHECK (week_number IS NULL OR week_number >= 1);
 
+ALTER TABLE workout_sessions ADD CONSTRAINT chk_workout_sessions_session_status
+    CHECK (session_status IN ('PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'PAUSED'));
+
+ALTER TABLE workout_sessions ADD CONSTRAINT chk_workout_sessions_total_exercises_planned
+    CHECK (total_exercises_planned >= 0);
+
+ALTER TABLE workout_sessions ADD CONSTRAINT chk_workout_sessions_total_exercises_completed
+    CHECK (total_exercises_completed >= 0);
+
+ALTER TABLE workout_sessions ADD CONSTRAINT chk_workout_sessions_completion_percentage
+    CHECK (completion_percentage >= 0.0 AND completion_percentage <= 100.0);
+
 -- =====================================================
 -- PERFORMANCE_RECORDS TABLE (matches PerformanceRecord.java exactly)
 -- =====================================================
@@ -90,6 +110,21 @@ CREATE TABLE performance_records (
                                      form_rating INTEGER,
                                      rest_seconds INTEGER,
                                      tempo VARCHAR(20),
+
+    --  Rest time tracking and set timing
+                                     rest_time_before_set_seconds INTEGER,
+                                     set_start_time TIMESTAMP,
+                                     set_end_time TIMESTAMP,
+                                     actual_set_duration_seconds INTEGER,
+
+    --  Exercise completion tracking
+                                     is_exercise_completed BOOLEAN DEFAULT FALSE,
+                                     exercise_completion_notes TEXT,
+
+    --  Target comparison fields
+                                     target_reps_planned INTEGER,
+                                     target_weight_planned DECIMAL(5,2),
+                                     performance_vs_target VARCHAR(20) DEFAULT 'NOT_SET',
 
     -- Specialized exercise metrics
                                      hold_duration_seconds INTEGER,
@@ -172,6 +207,26 @@ ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_achieveme
 ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_tempo
     CHECK (tempo IS NULL OR tempo ~ '^\\d{1,2}-\\d{1,2}-\\d{1,2}-\\d{1,2}$' OR tempo = '');
 
+ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_rest_time_before_set
+    CHECK (rest_time_before_set_seconds IS NULL OR rest_time_before_set_seconds >= 0);
+
+ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_target_reps_planned
+    CHECK (target_reps_planned IS NULL OR target_reps_planned >= 0);
+
+ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_target_weight_planned
+    CHECK (target_weight_planned IS NULL OR target_weight_planned >= 0.0);
+
+ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_performance_vs_target
+    CHECK (performance_vs_target IN ('NOT_SET', 'EXCEEDED', 'MET', 'BELOW', 'STRUGGLED'));
+
+-- Add constraint for set timing logic
+ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_set_timing
+    CHECK (
+        (set_start_time IS NULL AND set_end_time IS NULL) OR
+        (set_start_time IS NOT NULL AND set_end_time IS NULL) OR
+        (set_start_time IS NOT NULL AND set_end_time IS NOT NULL AND set_end_time >= set_start_time)
+        );
+
 -- =====================================================
 -- INDEXES FOR PERFORMANCE (Based on Entity @Index annotations and Expected Queries)
 -- =====================================================
@@ -188,6 +243,12 @@ CREATE INDEX idx_workout_sessions_mood ON workout_sessions(mood);
 CREATE INDEX idx_workout_sessions_location ON workout_sessions(location);
 CREATE INDEX idx_workout_sessions_is_shared ON workout_sessions(is_shared);
 
+-- Indexes for enhanced session tracking
+CREATE INDEX idx_workout_sessions_session_status ON workout_sessions(session_status);
+CREATE INDEX idx_workout_sessions_completion_percentage ON workout_sessions(completion_percentage);
+CREATE INDEX idx_workout_sessions_user_status ON workout_sessions(user_id, session_status);
+CREATE INDEX idx_workout_sessions_completion_analysis ON workout_sessions(user_id, session_status, completion_percentage, created_at);
+
 -- Performance records table indexes (matching entity @Index annotations)
 CREATE INDEX idx_performance_workout_session ON performance_records(workout_session_id);
 CREATE INDEX idx_performance_exercise ON performance_records(exercise_id);
@@ -203,11 +264,100 @@ CREATE INDEX idx_performance_records_weight ON performance_records(weight);
 CREATE INDEX idx_performance_records_created_at ON performance_records(created_at);
 CREATE INDEX idx_performance_records_assigned_by_trainer ON performance_records(assigned_by_trainer_id);
 
+-- Indexes for enhanced performance tracking
+CREATE INDEX idx_performance_records_exercise_completed ON performance_records(is_exercise_completed);
+CREATE INDEX idx_performance_records_performance_vs_target ON performance_records(performance_vs_target);
+CREATE INDEX idx_performance_records_set_timing ON performance_records(set_start_time, set_end_time);
+CREATE INDEX idx_performance_records_rest_time ON performance_records(rest_time_before_set_seconds);
+CREATE INDEX idx_performance_records_target_analysis ON performance_records(exercise_id, target_reps_planned, target_weight_planned, performance_vs_target);
+
 -- Composite indexes for complex queries
 CREATE INDEX idx_workout_sessions_user_program ON workout_sessions(user_id, workout_program_id);
 CREATE INDEX idx_workout_sessions_user_workout_plan ON workout_sessions(user_id, workout_plan_id);
 CREATE INDEX idx_performance_records_exercise_date ON performance_records(exercise_id, created_at);
 CREATE INDEX idx_performance_records_weight_reps ON performance_records(exercise_id, weight, reps);
+
+-- Function to calculate workout completion percentage
+CREATE OR REPLACE FUNCTION calculate_workout_completion_percentage(
+    p_workout_session_id BIGINT
+) RETURNS DECIMAL(5,2) AS $$
+DECLARE
+total_planned INTEGER;
+    total_completed INTEGER;
+    completion_pct DECIMAL(5,2);
+BEGIN
+    -- Get totals from workout session
+SELECT total_exercises_planned, total_exercises_completed
+INTO total_planned, total_completed
+FROM workout_sessions
+WHERE workout_session_id = p_workout_session_id;
+
+-- Calculate percentage
+IF total_planned IS NULL OR total_planned = 0 THEN
+        RETURN 0.0;
+END IF;
+
+    completion_pct := (total_completed::DECIMAL / total_planned::DECIMAL) * 100.0;
+
+    -- Ensure it's within bounds
+    IF completion_pct > 100.0 THEN
+        completion_pct := 100.0;
+END IF;
+
+RETURN completion_pct;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to calculate rest time between sets
+CREATE OR REPLACE FUNCTION calculate_rest_time_seconds(
+    p_previous_set_end TIMESTAMP,
+    p_current_set_start TIMESTAMP
+) RETURNS INTEGER AS $$
+BEGIN
+    IF p_previous_set_end IS NULL OR p_current_set_start IS NULL THEN
+        RETURN NULL;
+END IF;
+
+    IF p_current_set_start <= p_previous_set_end THEN
+        RETURN 0;
+END IF;
+
+RETURN EXTRACT(EPOCH FROM (p_current_set_start - p_previous_set_end))::INTEGER;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- COMPLETION TRACKING TRIGGER
+-- =====================================================
+
+-- Trigger to automatically update completion percentage when exercises are completed
+CREATE OR REPLACE FUNCTION update_workout_completion()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Update the workout session completion when performance record changes
+    IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+UPDATE workout_sessions
+SET
+    total_exercises_completed = (
+        SELECT COUNT(DISTINCT exercise_id)
+        FROM performance_records
+        WHERE workout_session_id = NEW.workout_session_id
+          AND is_exercise_completed = TRUE
+    ),
+    completion_percentage = calculate_workout_completion_percentage(NEW.workout_session_id),
+    updated_at = CURRENT_TIMESTAMP
+WHERE workout_session_id = NEW.workout_session_id;
+END IF;
+
+RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for automatic completion tracking
+CREATE TRIGGER trg_update_workout_completion
+    AFTER INSERT OR UPDATE OF is_exercise_completed ON performance_records
+    FOR EACH ROW
+    EXECUTE FUNCTION update_workout_completion();
 
 -- =====================================================
 -- UNIQUE CONSTRAINTS

@@ -1,18 +1,33 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Play, Clock, CheckCircle, Target, Plus, Weight, Settings } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { toast } from 'react-hot-toast';
+import React, {useState, useEffect, useMemo, useRef} from 'react';
+import {
+    Calendar,
+    ChevronLeft,
+    ChevronRight,
+    Play,
+    Clock,
+    CheckCircle,
+    Target,
+    Plus,
+    Weight,
+    Settings, RefreshCw
+} from 'lucide-react';
+import {Button} from '../components/ui/button';
+import {Card, CardContent, CardHeader, CardTitle} from '../components/ui/card';
+import {Badge} from '../components/ui/badge';
+import {toast} from 'react-hot-toast';
+import {useWorkout} from '../contexts/WorkoutContext';
+import {useNavigate, useLocation} from 'react-router-dom';
 
 // Import your existing components
 import FloatingActionButton from '../components/layout/FloatingActionButton';
-import { ExerciseConfigModal } from '../components/CalendarPage/index';
+import {ExerciseConfigModal} from '../components/CalendarPage/index';
 import EnhancedExerciseSelector from '../components/CalendarPage/ExerciseSelector';
 import WorkoutPlanConfigModal from '../components/CalendarPage/WorkoutPlanConfigModal';
+import CompletedWorkoutDisplay from '../components/CalendarPage/CompletedWorkoutDisplay';
+import WorkoutDetailsModal from '../components/CalendarPage/WorkoutDetailsModal';
 
 // Import types and services
-import { ScheduledWorkoutResponse, WorkoutPlanInfo, WorkoutPlanScheduleRequest } from '../types/api';
+import {ScheduledWorkoutResponse, WorkoutPlanInfo, WorkoutPlanScheduleRequest} from '../types/api';
 import {
     Exercise,
     ExerciseConfiguration,
@@ -22,10 +37,13 @@ import {
     getDefaultConfigForExercise,
     StrengthConfiguration,
     CardioConfiguration,
-    IsometricConfiguration
+    IsometricConfiguration,
+    WorkoutResults
 } from '../types/exercise';
-import { calendarApi } from '../services/calendarApi';
-import { transformScheduledWorkoutsToCalendarData } from '../services/transformers';
+import {calendarApi} from '../services/calendarApi';
+import {transformScheduledWorkoutsToCalendarData} from '../services/transformers';
+import {StarIcon, StarIcon as StarIconSolid} from "@heroicons/react/24/outline";
+import {exerciseApi} from "../services/exerciseApi";
 
 // ==================== INTERFACES ====================
 
@@ -97,6 +115,13 @@ interface WorkoutSessionData {
 // ==================== MAIN COMPONENT ====================
 
 const CalendarPage: React.FC = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const previousLocation = useRef(location.pathname);
+
+    // Use correct method name from WorkoutContext
+    const {startWorkout, isWorkoutActive} = useWorkout();
+
     // ==================== CORE STATE ====================
 
     const [viewingDate, setViewingDate] = useState(new Date());
@@ -108,6 +133,7 @@ const CalendarPage: React.FC = () => {
 
     const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
     const [exerciseConfig, setExerciseConfig] = useState<ExerciseConfiguration | null>(null);
+    const [userFavoriteIds, setUserFavoriteIds] = useState<Set<number>>(new Set());
 
     // ==================== WORKOUT PLAN STATE ====================
 
@@ -119,6 +145,11 @@ const CalendarPage: React.FC = () => {
     const [showExerciseSelector, setShowExerciseSelector] = useState(false);
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [schedulingMode, setSchedulingMode] = useState<'exercise' | 'workout-plan'>('exercise');
+    const [workoutResults, setWorkoutResults] = useState<Record<string, WorkoutResults>>({});
+
+    const [showWorkoutDetailsModal, setShowWorkoutDetailsModal] = useState(false);
+    const [selectedExerciseForDetails, setSelectedExerciseForDetails] = useState<ScheduledExercise | null>(null);
+    const [selectedWorkoutResults, setSelectedWorkoutResults] = useState<WorkoutResults | null>(null);
 
     // ==================== EDITING STATE ====================
 
@@ -145,15 +176,15 @@ const CalendarPage: React.FC = () => {
         loadWorkoutStats();
     }, [viewingDateString]);
 
-    const loadDayData = async () => {
-        if (loading) {
+    const loadDayData = async (forceCacheBust = false) => {
+        if (loading && !forceCacheBust) {
             console.log('⏳ Already loading, skipping duplicate call');
             return;
         }
 
         try {
             setLoading(true);
-            console.log('📅 Loading data for:', viewingDateString);
+            console.log('📅 Loading data for:', viewingDateString, forceCacheBust ? '(cache bust)' : '');
 
             // Load a week of data around the viewing date for context
             const startDate = new Date(viewingDate);
@@ -164,19 +195,76 @@ const CalendarPage: React.FC = () => {
             const startDateStr = startDate.toISOString().split('T')[0];
             const endDateStr = endDate.toISOString().split('T')[0];
 
-            const apiResponse: ScheduledWorkoutResponse[] = await calendarApi.getScheduledWorkouts(startDateStr, endDateStr);
+            // Add cache busting parameter if needed
+            const apiParams = forceCacheBust ? {
+                startDate: startDateStr,
+                endDate: endDateStr,
+                _cacheBust: Date.now()
+            } : {startDate: startDateStr, endDate: endDateStr};
+
+            // 🔥 PARALLEL LOADING: Load both workouts and favorites
+            const [apiResponse, favoriteIds] = await Promise.all([
+                calendarApi.getScheduledWorkouts(startDateStr, endDateStr),
+                exerciseApi.getFavoriteExerciseIds().catch(() => new Set<number>()) // Don't fail if this errors
+            ]);
+
             console.log('📊 Raw API response (first 2 items):', apiResponse.slice(0, 2));
 
             const transformedWorkouts = transformScheduledWorkoutsToCalendarData(apiResponse);
-            console.log('🔄 Transformed workouts (first 2):', transformedWorkouts.slice(0, 2).map(ex => ({
+
+            // 🌟 SYNC FAVORITES: Update exercises with favorite status
+            const workoutsWithFavorites = transformedWorkouts.map(workout => ({
+                ...workout,
+                exercise: {
+                    ...workout.exercise,
+                    isFavorite: favoriteIds.has(workout.exercise.id)
+                }
+            }));
+
+            // ✅ ENHANCED: Sort by completion status and priority
+            const sortedWorkouts = workoutsWithFavorites.sort((a, b) => {
+                // Completed exercises go to the end
+                if (a.completed !== b.completed) {
+                    return a.completed ? 1 : -1;
+                }
+                // Within same completion status, sort by creation time (newer first for pending)
+                if (!a.completed && !b.completed) {
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                }
+                // For completed exercises, sort by completion time (most recent first)
+                return 0;
+            });
+
+            console.log('🔄 Transformed workouts (first 2):', sortedWorkouts.slice(0, 2).map(ex => ({
                 id: ex.id,
                 name: ex.exercise.name || ex.exercise.exerciseName,
                 completed: ex.completed,
+                isFavorite: ex.exercise.isFavorite,
                 status: (ex as any).status
             })));
 
-            setScheduledWorkouts(transformedWorkouts);
-            console.log(`✅ Loaded ${transformedWorkouts.length} scheduled workouts around ${viewingDate.toDateString()}`);
+            setScheduledWorkouts(sortedWorkouts);
+            setUserFavoriteIds(favoriteIds);
+
+            console.log(`✅ Loaded ${sortedWorkouts.length} scheduled workouts with favorite status`);
+            console.log(`📈 Completion status: ${sortedWorkouts.filter(w => w.completed).length} completed, ${sortedWorkouts.filter(w => !w.completed).length} pending`);
+
+            // If we have completed exercises, load their results
+            const completedExercises = sortedWorkouts.filter(ex => ex.completed);
+            if (completedExercises.length > 0) {
+                console.log('🏋️‍♂️ Loading results for completed exercises...');
+                try {
+                    const exerciseIds = completedExercises.map(ex => ex.id);
+                    const results = await calendarApi.getBatchWorkoutResults(exerciseIds);
+                    setWorkoutResults(results);
+                    console.log(`✅ Loaded results for ${Object.keys(results).length} exercises`);
+                } catch (error) {
+                    console.error('Failed to load workout results:', error);
+                    // Don't fail the entire refresh for this
+                    setWorkoutResults({});
+                }
+            }
+
         } catch (error) {
             console.error('Error loading day data:', error);
             toast.error('Failed to load scheduled workouts');
@@ -186,9 +274,11 @@ const CalendarPage: React.FC = () => {
         }
     };
 
-    const loadWorkoutStats = async () => {
+    const loadWorkoutStats = async (forceCacheBust = false) => {
         try {
+            const cacheParam = forceCacheBust ? {_cacheBust: Date.now()} : {};
             const apiStats: WorkoutStatsResponse = await calendarApi.getWorkoutStats();
+
             const transformedStats: WorkoutStats = {
                 totalWorkouts: apiStats.exercisesScheduledThisMonth || 0,
                 completedWorkouts: apiStats.exercisesCompletedThisMonth || 0,
@@ -217,9 +307,193 @@ const CalendarPage: React.FC = () => {
         }
     };
 
-    const refreshCalendarData = async () => {
-        await loadDayData();
-        await loadWorkoutStats();
+    useEffect(() => {
+        const loadWorkoutResults = async () => {
+            const completedExercises = viewingDateExercises.filter(ex => ex.completed);
+            if (completedExercises.length > 0) {
+                try {
+                    const exerciseIds = completedExercises.map(ex => ex.id);
+                    const results = await calendarApi.getBatchWorkoutResults(exerciseIds);
+                    setWorkoutResults(results);
+                } catch (error) {
+                    console.error('Failed to load workout results:', error);
+                }
+            }
+        };
+
+        if (viewingDateExercises.length > 0) {
+            loadWorkoutResults();
+        }
+    }, [viewingDateExercises]);
+
+    // Real-time sync check (optional - for multi-device sync)
+    useEffect(() => {
+        // Set up periodic sync check every 30 seconds when page is visible
+        let syncInterval: NodeJS.Timeout;
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                // Page became visible - check for updates
+                syncInterval = setInterval(async () => {
+                    if (isToday()) {
+                        // Only sync today's data to avoid unnecessary requests
+                        await refreshCalendarData();
+                    }
+                }, 30000); // 30 seconds
+            } else {
+                // Page hidden - stop syncing
+                if (syncInterval) {
+                    clearInterval(syncInterval);
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        handleVisibilityChange(); // Set up initial state
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (syncInterval) {
+                clearInterval(syncInterval);
+            }
+        };
+    }, [viewingDateString]);
+
+    useEffect(() => {
+        // Check if we're returning from workout mode
+        if (previousLocation.current === '/workout' && location.pathname === '/calendar') {
+            console.log('🔄 Returning from workout mode - refreshing calendar data...');
+            handleWorkoutReturn();
+        }
+        previousLocation.current = location.pathname;
+    }, [location.pathname]);
+
+    const handleWorkoutReturn = async () => {
+        try {
+            setLoading(true);
+
+            console.log('Handling workout return with enhanced refresh...');
+
+            // Add a small delay to ensure backend processing completes
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Check session storage flags
+            const workoutCompleted = sessionStorage.getItem('workoutJustCompleted') === 'true';
+
+            if (workoutCompleted) {
+                console.log('Detected completed workout, forcing cache bust...');
+
+                // Clear the flags
+                sessionStorage.removeItem('workoutJustCompleted');
+                sessionStorage.removeItem('completedWorkoutDate');
+
+                // Force complete refresh with cache bust
+                await refreshCalendarData(false, true);
+            } else {
+                // Regular refresh
+                await refreshCalendarData(false, false);
+            }
+
+            console.log('Calendar refresh completed');
+
+        } catch (error) {
+            console.error('Failed to refresh calendar after workout return:', error);
+            toast.error('Failed to refresh calendar data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ✅ NEW: Check for workout achievements
+    const checkForWorkoutAchievements = () => {
+        const completedToday = viewingDateExercises.filter(ex => ex.completed).length;
+        const totalToday = viewingDateExercises.length;
+
+        if (completedToday === totalToday && totalToday > 0) {
+            // All exercises completed for today
+            setTimeout(() => {
+                toast.success('🎉 Outstanding! You completed all your exercises for today!', {
+                    duration: 5000,
+                    style: {
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        fontSize: '16px',
+                        padding: '16px',
+                    },
+                });
+            }, 1500);
+        } else if (completedToday > 0) {
+            // Some exercises completed
+            setTimeout(() => {
+                toast.success(`Great progress! You completed ${completedToday} of ${totalToday} exercises.`, {
+                    duration: 3000,
+                });
+            }, 800);
+        }
+
+        // Check for streaks and milestones
+        if (stats) {
+            if (stats.currentStreak >= 7) {
+                setTimeout(() => {
+                    toast.success(`🔥 Amazing! ${stats.currentStreak} day streak!`, {
+                        duration: 4000,
+                        style: {
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            color: 'white',
+                        },
+                    });
+                }, 2500);
+            }
+
+            if (stats.completedWorkouts > 0 && stats.completedWorkouts % 10 === 0) {
+                setTimeout(() => {
+                    toast.success(`🏆 Milestone reached: ${stats.completedWorkouts} completed workouts!`, {
+                        duration: 4000,
+                        style: {
+                            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                            color: 'white',
+                        },
+                    });
+                }, 3500);
+            }
+        }
+    };
+
+
+    const refreshCalendarData = async (showToast = false, forceCacheBust = false) => {
+        try {
+            console.log(`🔄 Refreshing calendar data... (cacheBust: ${forceCacheBust})`);
+
+            // Add timestamp to force cache busting if needed
+            const cacheParam = forceCacheBust ? `?_t=${Date.now()}` : '';
+
+            // Use Promise.allSettled to handle partial failures gracefully
+            const [workoutResult, statsResult] = await Promise.allSettled([
+                loadDayData(forceCacheBust),
+                loadWorkoutStats(forceCacheBust)
+            ]);
+
+            // Log results
+            if (workoutResult.status === 'rejected') {
+                console.error('Failed to load workout data:', workoutResult.reason);
+            }
+            if (statsResult.status === 'rejected') {
+                console.error('Failed to load stats:', statsResult.reason);
+            }
+
+            // Show success message if requested and at least workouts succeeded
+            if (showToast && workoutResult.status === 'fulfilled') {
+                toast.success('Calendar updated successfully!');
+            }
+
+            console.log('✅ Calendar data refresh completed');
+
+        } catch (error) {
+            console.error('❌ Failed to refresh calendar data:', error);
+            if (showToast) {
+                toast.error('Failed to refresh calendar data');
+            }
+        }
     };
 
     // ==================== NAVIGATION HANDLERS ====================
@@ -495,6 +769,73 @@ const CalendarPage: React.FC = () => {
 
     // ==================== EDITING HANDLERS ====================
 
+    const handleFavoriteToggle = async (exercise: Exercise) => {
+        try {
+            console.log(`🌟 Toggling favorite for exercise: ${exercise.name}`);
+
+            // 🚀 OPTIMISTIC UPDATE: Update UI immediately
+            const wasFavorited = exercise.isFavorite;
+            const newFavoriteStatus = !wasFavorited;
+
+            // Update the exercise object immediately
+            exercise.isFavorite = newFavoriteStatus;
+
+            // Update scheduled workouts state
+            setScheduledWorkouts(prev => prev.map(workout =>
+                workout.exercise.id === exercise.id
+                    ? {...workout, exercise: {...workout.exercise, isFavorite: newFavoriteStatus}}
+                    : workout
+            ));
+
+            // Update favorite IDs set
+            const newFavoriteIds = new Set(userFavoriteIds);
+            if (newFavoriteStatus) {
+                newFavoriteIds.add(exercise.id);
+            } else {
+                newFavoriteIds.delete(exercise.id);
+            }
+            setUserFavoriteIds(newFavoriteIds);
+
+            // 🌐 API CALL: Sync with backend
+            const result = await exerciseApi.toggleFavorite(exercise.id);
+
+            // ✅ VERIFY: Ensure optimistic update was correct
+            if (result.isFavorite !== newFavoriteStatus) {
+                console.warn('⚠️ Optimistic update mismatch, correcting...');
+                exercise.isFavorite = result.isFavorite;
+
+                setScheduledWorkouts(prev => prev.map(workout =>
+                    workout.exercise.id === exercise.id
+                        ? {...workout, exercise: {...workout.exercise, isFavorite: result.isFavorite}}
+                        : workout
+                ));
+
+                const correctedFavoriteIds = new Set(userFavoriteIds);
+                if (result.isFavorite) {
+                    correctedFavoriteIds.add(exercise.id);
+                } else {
+                    correctedFavoriteIds.delete(exercise.id);
+                }
+                setUserFavoriteIds(correctedFavoriteIds);
+            }
+
+            toast.success(result.isFavorite ? 'Added to favorites' : 'Removed from favorites');
+
+        } catch (error) {
+            console.error('❌ Failed to toggle favorite:', error);
+
+            // 🔄 REVERT: Undo optimistic update on error
+            exercise.isFavorite = !exercise.isFavorite;
+            setScheduledWorkouts(prev => prev.map(workout =>
+                workout.exercise.id === exercise.id
+                    ? {...workout, exercise: {...workout.exercise, isFavorite: !exercise.isFavorite}}
+                    : workout
+            ));
+
+            toast.error('Failed to update favorites');
+        }
+    };
+
     const handleEditExercise = (scheduledExercise: ScheduledExercise) => {
         console.log('🔧 Editing exercise:', scheduledExercise);
 
@@ -612,6 +953,10 @@ const CalendarPage: React.FC = () => {
 
     // ==================== SCHEDULING MODE HANDLERS ====================
 
+    const handleManualRefresh = () => {
+        refreshCalendarData(true);
+    };
+
     const handleModeChange = (mode: 'exercise' | 'workout-plan') => {
         setSchedulingMode(mode);
 
@@ -634,17 +979,147 @@ const CalendarPage: React.FC = () => {
 
     // ==================== WORKOUT MANAGEMENT HANDLERS ====================
 
-    const handleCompleteWorkout = async (workoutId: string) => {
+    const handleStartWorkout = async (exerciseId: string) => {
         try {
-            await calendarApi.startWorkout(workoutId);
-            toast.success('Workout completed!');
-            await loadDayData();
-            await loadWorkoutStats();
+            console.log('🎯 Starting workout with exercise:', exerciseId);
+
+            // Find the exercise in current scheduled workouts
+            const targetExercise = viewingDateExercises.find(ex => ex.id === exerciseId);
+
+            if (!targetExercise) {
+                toast.error('Exercise not found');
+                return;
+            }
+
+            // ✅ FIXED: Transform single exercise to match WorkoutContext expectations
+            const compatibleExercise = {
+                ...targetExercise,
+                exercise: {
+                    ...targetExercise.exercise,
+                    name: targetExercise.exercise.name || targetExercise.exercise.exerciseName || 'Unknown Exercise',
+                    exerciseName: targetExercise.exercise.exerciseName || targetExercise.exercise.name || 'Unknown Exercise'
+                },
+                // Ensure all required fields are present
+                targetSets: targetExercise.targetSets || (targetExercise.exercise.isCardio ? 1 : targetExercise.exercise.isIsometric ? 3 : 3),
+                targetReps: targetExercise.targetReps || (targetExercise.exercise.isCardio ? targetExercise.exercise.estimatedDurationMinutes || 20 : targetExercise.exercise.isIsometric ? targetExercise.holdDurationSeconds || 30 : 10),
+                targetWeight: targetExercise.targetWeight || undefined,
+                targetWeightUnit: targetExercise.targetWeightUnit || 'lbs',
+                restSeconds: targetExercise.restSeconds || (targetExercise.exercise.isCardio ? 0 : targetExercise.exercise.isIsometric ? 60 : 90),
+                targetRpe: targetExercise.targetRpe || 7,
+                completed: false,
+                createdAt: targetExercise.createdAt || new Date().toISOString(),
+                userId: targetExercise.userId || 'current_user'
+            };
+
+            // Start workout with single exercise
+            startWorkout([compatibleExercise], viewingDateString);
+
+            // Navigate to workout mode
+            navigate('/workout');
+
+            toast.success(`Started workout with ${compatibleExercise.exercise.name}!`);
+
         } catch (error) {
-            console.error('Error completing workout:', error);
-            toast.error('Failed to complete workout');
+            console.error('❌ Failed to start workout:', error);
+            toast.error('Failed to start workout');
         }
     };
+
+    const handleStartFullWorkout = async () => {
+        try {
+            console.log('🎯 Starting workout with all today\'s exercises');
+
+            if (viewingDateExercises.length === 0) {
+                toast.error('No exercises scheduled for today');
+                return;
+            }
+
+            // ✅ FIXED: Transform exercises to match WorkoutContext expectations
+            const compatibleExercises = viewingDateExercises.map(scheduledExercise => {
+                // Ensure the exercise has the required properties
+                const exercise = {
+                    ...scheduledExercise.exercise,
+                    // Add any missing properties that WorkoutContext expects
+                    name: scheduledExercise.exercise.name || scheduledExercise.exercise.exerciseName || 'Unknown Exercise',
+                    exerciseName: scheduledExercise.exercise.exerciseName || scheduledExercise.exercise.name || 'Unknown Exercise'
+                };
+
+                // Return ScheduledExercise with proper structure
+                return {
+                    ...scheduledExercise,
+                    exercise: exercise,
+                    // Ensure all required fields are present with proper types
+                    targetSets: scheduledExercise.targetSets || (exercise.isCardio ? 1 : exercise.isIsometric ? 3 : 3),
+                    targetReps: scheduledExercise.targetReps || (exercise.isCardio ? exercise.estimatedDurationMinutes || 20 : exercise.isIsometric ? scheduledExercise.holdDurationSeconds || 30 : 10),
+                    targetWeight: scheduledExercise.targetWeight || undefined,
+                    targetWeightUnit: scheduledExercise.targetWeightUnit || 'lbs',
+                    restSeconds: scheduledExercise.restSeconds || (exercise.isCardio ? 0 : exercise.isIsometric ? 60 : 90),
+                    targetRpe: scheduledExercise.targetRpe || 7,
+                    holdDurationSeconds: scheduledExercise.holdDurationSeconds || (exercise.isIsometric ? 30 : undefined),
+                    notes: scheduledExercise.notes || '',
+                    completed: scheduledExercise.completed || false,
+                    createdAt: scheduledExercise.createdAt || new Date().toISOString(),
+                    userId: scheduledExercise.userId || 'current_user'
+                };
+            });
+
+            console.log('✅ Transformed exercises for workout:', compatibleExercises.map(ex => ({
+                id: ex.id,
+                name: ex.exercise.name,
+                targetSets: ex.targetSets,
+                targetReps: ex.targetReps,
+                isCardio: ex.exercise.isCardio,
+                isIsometric: ex.exercise.isIsometric
+            })));
+
+            // Start the workout with compatible data
+            startWorkout(compatibleExercises, viewingDateString);
+
+            // Navigate to workout mode
+            navigate('/workout');
+
+            toast.success(`Started workout with ${compatibleExercises.length} exercises!`);
+
+        } catch (error) {
+            console.error('❌ Failed to start full workout:', error);
+            toast.error('Failed to start workout');
+        }
+    };
+
+    const debugWorkoutData = () => {
+        console.log('🔍 DEBUGGING CALENDAR WORKOUT DATA');
+        console.log('===================================');
+
+        console.log('Current viewing date:', viewingDateString);
+        console.log('Total scheduled workouts:', scheduledWorkouts.length);
+        console.log('Exercises for viewing date:', viewingDateExercises.length);
+
+        viewingDateExercises.forEach((exercise, index) => {
+            console.log(`Exercise ${index + 1}:`, {
+                id: exercise.id,
+                exerciseId: exercise.exerciseId,
+                exerciseName: exercise.exercise?.name || exercise.exercise?.exerciseName || 'MISSING NAME',
+                hasExerciseObject: !!exercise.exercise,
+                exerciseType: exercise.exercise?.exerciseType || 'UNKNOWN',
+                isCardio: exercise.exercise?.isCardio,
+                isIsometric: exercise.exercise?.isIsometric,
+                targetSets: exercise.targetSets,
+                targetReps: exercise.targetReps,
+                targetWeight: exercise.targetWeight,
+                targetWeightUnit: exercise.targetWeightUnit,
+                restSeconds: exercise.restSeconds,
+                holdDurationSeconds: exercise.holdDurationSeconds,
+                scheduledDate: exercise.scheduledDate,
+                completed: exercise.completed
+            });
+        });
+
+        console.log('===================================');
+    };
+
+    if (typeof window !== 'undefined') {
+        (window as any).debugWorkoutData = debugWorkoutData;
+    }
 
     const handleDeleteWorkout = async (workoutId: string) => {
         console.log('🗑️ DELETE CLICKED - Workout ID:', workoutId);
@@ -734,8 +1209,51 @@ const CalendarPage: React.FC = () => {
     };
 
     const startWorkoutMode = () => {
-        toast.success('Starting workout mode!');
-        // You can integrate with your WorkoutModeOverlay here
+        if (viewingDateExercises.length === 0) {
+            toast.error('No exercises scheduled for today');
+            return;
+        }
+
+        handleStartFullWorkout();
+    };
+
+    const getWorkoutResultsForExercise = (exerciseId: string): WorkoutResults | undefined => {
+        return workoutResults[exerciseId];
+    };
+
+    const handleViewWorkoutDetails = (exerciseId: string) => {
+        // Find the exercise and its results
+        const exercise = viewingDateExercises.find(ex => ex.id === exerciseId);
+        const results = workoutResults[exerciseId];
+
+        if (exercise && results) {
+            setSelectedExerciseForDetails(exercise);
+            setSelectedWorkoutResults(results);
+            setShowWorkoutDetailsModal(true);
+        } else {
+            // Fallback: try to fetch results if not already loaded
+            const fetchResults = async () => {
+                try {
+                    const fetchedResults = await calendarApi.getWorkoutResults(exerciseId);
+                    if (fetchedResults && exercise) {
+                        setSelectedExerciseForDetails(exercise);
+                        setSelectedWorkoutResults(fetchedResults);
+                        setShowWorkoutDetailsModal(true);
+                    } else {
+                        toast.error('Workout details not available yet. Results may still be processing.');
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch workout details:', error);
+                    toast.error('Unable to load workout details');
+                }
+            };
+
+            if (exercise) {
+                fetchResults();
+            } else {
+                toast.error('Exercise not found');
+            }
+        }
     };
 
     // ==================== DATE INFORMATION HELPERS ====================
@@ -765,7 +1283,7 @@ const CalendarPage: React.FC = () => {
         if (viewingDate.toDateString() === today.toDateString()) {
             return {
                 title: 'Today',
-                subtitle: viewingDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+                subtitle: viewingDate.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric'}),
                 emoji: '🎯',
                 bgColor: 'from-blue-500 to-green-500',
                 textColor: 'text-white'
@@ -773,7 +1291,7 @@ const CalendarPage: React.FC = () => {
         } else if (viewingDate.toDateString() === yesterday.toDateString()) {
             return {
                 title: 'Yesterday',
-                subtitle: viewingDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+                subtitle: viewingDate.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric'}),
                 emoji: '📅',
                 bgColor: 'from-gray-400 to-gray-500',
                 textColor: 'text-white'
@@ -781,15 +1299,15 @@ const CalendarPage: React.FC = () => {
         } else if (viewingDate.toDateString() === tomorrow.toDateString()) {
             return {
                 title: 'Tomorrow',
-                subtitle: viewingDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+                subtitle: viewingDate.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric'}),
                 emoji: '✨',
                 bgColor: 'from-purple-500 to-pink-500',
                 textColor: 'text-white'
             };
         } else {
             return {
-                title: viewingDate.toLocaleDateString('en-US', { weekday: 'long' }),
-                subtitle: viewingDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+                title: viewingDate.toLocaleDateString('en-US', {weekday: 'long'}),
+                subtitle: viewingDate.toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'}),
                 emoji: '📆',
                 bgColor: 'from-gray-600 to-gray-700',
                 textColor: 'text-white'
@@ -827,6 +1345,35 @@ const CalendarPage: React.FC = () => {
     // ==================== UTILITY FUNCTIONS ====================
 
     const getConfigurationDisplay = (exercise: ScheduledExercise) => {
+        console.log('🔍 RAW EXERCISE CONFIG DEBUG:', {
+            exerciseId: exercise.id,
+            exerciseName: exercise.exercise.name,
+            exerciseType: exercise.exercise.exerciseType,
+            isCardio: exercise.exercise.isCardio,
+            isIsometric: exercise.exercise.isIsometric,
+
+            // Strength fields
+            targetSets: exercise.targetSets,
+            targetReps: exercise.targetReps,
+            targetWeight: exercise.targetWeight,
+            targetWeightUnit: exercise.targetWeightUnit,
+            restSeconds: exercise.restSeconds,
+            targetRpe: exercise.targetRpe,
+            tempo: exercise.tempo,
+
+            // Cardio fields
+            targetDurationMinutes: exercise.targetDurationMinutes,
+            targetDistance: exercise.targetDistance,
+            targetDistanceKm: exercise.targetDistanceKm,
+            targetDistanceUnit: exercise.targetDistanceUnit,
+            targetPace: exercise.targetPace,
+
+            // Isometric fields
+            holdDurationSeconds: exercise.holdDurationSeconds,
+
+            // Notes
+            notes: exercise.notes
+        });
         const exerciseType = exercise.exercise;
 
         if (exerciseType.isCardio) {
@@ -911,19 +1458,66 @@ const CalendarPage: React.FC = () => {
 
     const getStatusIcon = (exercise: ScheduledExercise) => {
         if (exercise.completed) {
-            return <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />;
+            return <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500"/>;
         }
-        return <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />;
+        return <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500"/>;
     };
 
     // ==================== RENDER ====================
+
+    const renderDayCompletionSummary = () => {
+        const completedExercises = viewingDateExercises.filter(ex => ex.completed);
+        if (completedExercises.length === 0 || completedExercises.length !== viewingDateExercises.length) {
+            return null;
+        }
+
+        const totalDuration = Object.values(workoutResults).reduce(
+            (sum, result) => sum + result.totalDurationMinutes, 0
+        );
+
+        const totalCalories = Object.values(workoutResults).reduce(
+            (sum, result) => sum + (result.caloriesBurned || 0), 0
+        );
+
+        return (
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl">
+                        🏆
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold">Workout Complete!</h3>
+                        <p className="text-green-100">Great job finishing today's exercises</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold">{completedExercises.length}</div>
+                        <div className="text-sm text-green-100">Exercises</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-2xl font-bold">{totalDuration}m</div>
+                        <div className="text-sm text-green-100">Total Time</div>
+                    </div>
+                    {totalCalories > 0 && (
+                        <div className="text-center">
+                            <div className="text-2xl font-bold">{totalCalories}</div>
+                            <div className="text-sm text-green-100">Calories</div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="w-full min-h-screen bg-gray-50 pb-20">
             <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto">
 
                 {/* Today-Focused Hero Header - Mobile Optimized */}
-                <div className={`bg-gradient-to-r ${dateInfo.bgColor} rounded-xl sm:rounded-2xl lg:rounded-3xl p-4 sm:p-6 lg:p-8 ${dateInfo.textColor} shadow-lg`}>
+                <div
+                    className={`bg-gradient-to-r ${dateInfo.bgColor} rounded-xl sm:rounded-2xl lg:rounded-3xl p-4 sm:p-6 lg:p-8 ${dateInfo.textColor} shadow-lg`}>
                     <div className="text-center space-y-2 sm:space-y-3">
                         <div className="text-3xl sm:text-4xl lg:text-6xl">{dateInfo.emoji}</div>
                         <div>
@@ -939,7 +1533,7 @@ const CalendarPage: React.FC = () => {
                                 onClick={() => navigateDay('prev')}
                                 className="bg-white/20 hover:bg-white/30 text-white border-white/20 px-2 sm:px-3 lg:px-4"
                             >
-                                <ChevronLeft className="w-4 h-4" />
+                                <ChevronLeft className="w-4 h-4"/>
                                 <span className="hidden sm:inline ml-1">Yesterday</span>
                             </Button>
 
@@ -954,6 +1548,26 @@ const CalendarPage: React.FC = () => {
                                 </Button>
                             )}
 
+                            {/* Manual Refresh Button */}
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleManualRefresh}
+                                disabled={loading}
+                                className="bg-white/20 hover:bg-white/30 text-white border-white/20 px-2 sm:px-3 lg:px-4"
+                                title="Refresh calendar data"
+                            >
+                                {loading ? (
+                                    <div
+                                        className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent"/>
+                                ) : (
+                                    <>
+                                        <RefreshCw className="w-4 h-4"/>
+                                        <span className="hidden sm:inline ml-1">Refresh</span>
+                                    </>
+                                )}
+                            </Button>
+
                             <Button
                                 variant="secondary"
                                 size="sm"
@@ -961,18 +1575,20 @@ const CalendarPage: React.FC = () => {
                                 className="bg-white/20 hover:bg-white/30 text-white border-white/20 px-2 sm:px-3 lg:px-4"
                             >
                                 <span className="hidden sm:inline mr-1">Tomorrow</span>
-                                <ChevronRight className="w-4 h-4" />
+                                <ChevronRight className="w-4 h-4"/>
                             </Button>
                         </div>
 
                         {/* Exercise Count Summary - Mobile Grid */}
                         <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mt-4 sm:mt-6 max-w-sm mx-auto">
                             <div className="text-center">
-                                <div className="text-lg sm:text-xl lg:text-2xl font-bold">{viewingDateExercises.length}</div>
+                                <div
+                                    className="text-lg sm:text-xl lg:text-2xl font-bold">{viewingDateExercises.length}</div>
                                 <div className="text-xs sm:text-sm opacity-80">Planned</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-lg sm:text-xl lg:text-2xl font-bold">{viewingDateExercises.filter(ex => ex.completed).length}</div>
+                                <div
+                                    className="text-lg sm:text-xl lg:text-2xl font-bold">{viewingDateExercises.filter(ex => ex.completed).length}</div>
                                 <div className="text-xs sm:text-sm opacity-80">Done</div>
                             </div>
                             <div className="text-center">
@@ -989,10 +1605,14 @@ const CalendarPage: React.FC = () => {
                 {isToday() && viewingDateExercises.length > 0 && (
                     <Button
                         className="w-full bg-green-600 hover:bg-green-700 text-white py-3 sm:py-4 lg:py-6 text-base sm:text-lg lg:text-xl font-bold flex items-center justify-center gap-2 sm:gap-3 shadow-lg rounded-xl sm:rounded-2xl"
-                        onClick={startWorkoutMode}
+                        onClick={() => {
+                            console.log('🎯 Start Today\'s Workout button clicked');
+                            debugWorkoutData(); // Debug the data first
+                            startWorkoutMode(); // Then start the workout
+                        }}
                     >
-                        <Play className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8" />
-                        Start Today's Workout
+                        <Play className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8"/>
+                        Start Today's Workout ({viewingDateExercises.length} exercises)
                     </Button>
                 )}
 
@@ -1000,14 +1620,15 @@ const CalendarPage: React.FC = () => {
                 <Card className="shadow-sm">
                     <CardHeader className="pb-2 sm:pb-3">
                         <CardTitle className="text-sm sm:text-base text-gray-600 flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
+                            <Calendar className="w-4 h-4"/>
                             Week Overview
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
                         <div className="grid grid-cols-7 gap-1 sm:gap-2">
                             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                                <div key={day + index} className="text-center text-xs sm:text-sm font-medium text-gray-500 pb-2">
+                                <div key={day + index}
+                                     className="text-center text-xs sm:text-sm font-medium text-gray-500 pb-2">
                                     <span className="sm:hidden">{day}</span>
                                     <span className="hidden sm:inline">
                                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index]}
@@ -1024,12 +1645,13 @@ const CalendarPage: React.FC = () => {
                                     `}
                                     onClick={() => setViewingDate(day.date)}
                                 >
-                                    <div className={`text-sm sm:text-base font-bold ${day.isViewing ? 'text-white' : day.isToday ? 'text-blue-600' : 'text-gray-900'}`}>
+                                    <div
+                                        className={`text-sm sm:text-base font-bold ${day.isViewing ? 'text-white' : day.isToday ? 'text-blue-600' : 'text-gray-900'}`}>
                                         {day.date.getDate()}
                                     </div>
                                     {day.exerciseCount > 0 && (
                                         <div className="flex justify-center gap-0.5 mt-1">
-                                            {Array.from({ length: Math.min(day.exerciseCount, 4) }).map((_, idx) => (
+                                            {Array.from({length: Math.min(day.exerciseCount, 4)}).map((_, idx) => (
                                                 <div
                                                     key={idx}
                                                     className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${
@@ -1055,140 +1677,260 @@ const CalendarPage: React.FC = () => {
                         <CardHeader className="pb-3 sm:pb-4">
                             <CardTitle className="text-base sm:text-lg lg:text-xl flex items-center justify-between">
                                 <span>Scheduled Exercises</span>
-                                <Badge className={`text-xs sm:text-sm ${isToday() ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                <Badge
+                                    className={`text-xs sm:text-sm ${isToday() ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
                                     {viewingDateExercises.filter(ex => ex.completed).length} / {viewingDateExercises.length} Complete
                                 </Badge>
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-0">
                             <div className="space-y-3 sm:space-y-4">
-                                {viewingDateExercises.map((exercise, index) => (
-                                    <div
-                                        key={exercise.id}
-                                        className={`
-                                            border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 transition-all duration-200
-                                            ${exercise.completed
-                                            ? 'border-green-200 bg-green-50 hover:bg-green-100'
-                                            : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-blue-300'
-                                        }
-                                        `}
-                                    >
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex items-start gap-3 min-w-0 flex-1">
-                                                <div className="flex-shrink-0 mt-0.5">
-                                                    <div className={`
-                                                        w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm lg:text-base
-                                                        ${exercise.completed ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}
-                                                    `}>
-                                                        {index + 1}
+                                {viewingDateExercises.map((exercise, index) => {
+                                    // Check if this exercise has been completed and has workout results
+                                    const exerciseWorkoutResults = getWorkoutResultsForExercise(exercise.id);
+
+                                    if (exercise.completed && exerciseWorkoutResults) {
+                                        // Show completed workout display with beautiful results
+                                        return (
+                                            <CompletedWorkoutDisplay
+                                                key={exercise.id}
+                                                exercise={exercise}
+                                                workoutResults={exerciseWorkoutResults}
+                                                onViewDetails={() => handleViewWorkoutDetails(exercise.id)}
+                                            />
+                                        );
+                                    } else if (exercise.completed && !exerciseWorkoutResults) {
+                                        // Show completed but no results available
+                                        return (
+                                            <div
+                                                key={exercise.id}
+                                                className="border-2 border-yellow-200 bg-yellow-50 rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 transition-all duration-200"
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <div className="flex-shrink-0 mt-0.5">
+                                                        <div
+                                                            className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm lg:text-base bg-yellow-500 text-white">
+                                                            ⚠️
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <CheckCircle
+                                                                className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500"/>
+                                                            <h3 className="font-bold text-sm sm:text-base lg:text-lg text-gray-900 truncate">
+                                                                {exercise.exercise.name || exercise.exercise.exerciseName}
+                                                            </h3>
+                                                        </div>
+                                                        <p className="text-sm text-yellow-700 mb-3">
+                                                            Workout completed but detailed results are not available
+                                                            yet.
+                                                        </p>
+                                                        <div
+                                                            className="flex items-center text-yellow-600 text-sm font-medium">
+                                                            <CheckCircle className="w-4 h-4 mr-1"/>
+                                                            <span>Completed</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        {getStatusIcon(exercise)}
-                                                        <h3 className="font-bold text-sm sm:text-base lg:text-lg text-gray-900 truncate">
-                                                            {exercise.exercise.name || exercise.exercise.exerciseName}
-                                                        </h3>
+                                            </div>
+                                        );
+                                    } else {
+                                        // Show regular scheduled exercise card (your existing code)
+                                        return (
+                                            <div
+                                                key={exercise.id}
+                                                className={`
+                            border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 lg:p-6 transition-all duration-200
+                            ${exercise.completed
+                                                    ? 'border-green-200 bg-green-50 hover:bg-green-100'
+                                                    : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-blue-300'
+                                                }
+                        `}
+                                            >
+                                                {/* ✅ NEW: Mobile-First Layout */}
+                                                <div className="flex items-start gap-3">
+                                                    <div className="flex-shrink-0 mt-0.5">
+                                                        <div className={`
+                                    w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm lg:text-base
+                                    ${exercise.completed ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'}
+                                `}>
+                                                            {index + 1}
+                                                        </div>
                                                     </div>
 
-                                                    {/* Enhanced Configuration Details */}
-                                                    <div className={`${getConfigurationDisplay(exercise).bgColor} rounded-lg p-3 mb-3 border ${getConfigurationDisplay(exercise).borderColor}`}>
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <Weight className={`w-4 h-4 ${getConfigurationDisplay(exercise).iconColor}`} />
-                                                            <span className={`text-sm font-medium ${getConfigurationDisplay(exercise).textColor}`}>
-                                                                Configuration
-                                                            </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        {/* ✅ NEW: Header with Exercise Title and Favorite Star */}
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                                {getStatusIcon(exercise)}
+                                                                <h3 className="font-bold text-sm sm:text-base lg:text-lg text-gray-900 truncate">
+                                                                    {exercise.exercise.name || exercise.exercise.exerciseName}
+                                                                </h3>
+                                                            </div>
+
+                                                            {/* ✅ MOVED: Favorite star to header - clean and accessible */}
+                                                            <button
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    try {
+                                                                        const result = await exerciseApi.toggleFavorite(exercise.exercise.id);
+                                                                        exercise.exercise.isFavorite = result.isFavorite;
+                                                                        setScheduledWorkouts(prev => prev.map(w =>
+                                                                            w.id === exercise.id
+                                                                                ? {
+                                                                                    ...w,
+                                                                                    exercise: {
+                                                                                        ...w.exercise,
+                                                                                        isFavorite: result.isFavorite
+                                                                                    }
+                                                                                }
+                                                                                : w
+                                                                        ));
+                                                                        toast.success(result.isFavorite ? 'Added to favorites' : 'Removed from favorites');
+                                                                    } catch (error) {
+                                                                        toast.error('Failed to update favorites');
+                                                                    }
+                                                                }}
+                                                                className={`
+                                            ml-2 p-1.5 rounded-full transition-all duration-200 flex-shrink-0
+                                            active:scale-95 shadow-sm hover:shadow-md border
+                                            ${exercise.exercise.isFavorite
+                                                                    ? 'text-yellow-500 bg-yellow-100 hover:bg-yellow-200 border-yellow-300'
+                                                                    : 'text-gray-400 bg-gray-50 hover:bg-yellow-100 border-gray-200'
+                                                                }
+                                        `}
+                                                                title={exercise.exercise.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                                            >
+                                                                {/* ✅ FIXED: Use solid star when favorited, outline when not */}
+                                                                {exercise.exercise.isFavorite ? (
+                                                                    <StarIconSolid className="w-4 h-4 text-yellow-500"/>
+                                                                ) : (
+                                                                    <StarIcon className="w-4 h-4"/>
+                                                                )}
+                                                            </button>
                                                         </div>
-                                                        <p className={`text-sm ${getConfigurationDisplay(exercise).textColor} font-medium`}>
-                                                            {getConfigurationDisplay(exercise).text}
-                                                        </p>
-                                                        {exercise.notes && (
-                                                            <p className={`text-xs ${getConfigurationDisplay(exercise).textColor} mt-1 italic opacity-80`}>
-                                                                "{exercise.notes}"
+
+                                                        {/* Enhanced Configuration Details */}
+                                                        <div
+                                                            className={`${getConfigurationDisplay(exercise).bgColor} rounded-lg p-3 mb-3 border ${getConfigurationDisplay(exercise).borderColor}`}>
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <Weight
+                                                                    className={`w-4 h-4 ${getConfigurationDisplay(exercise).iconColor}`}/>
+                                                                <span
+                                                                    className={`text-sm font-medium ${getConfigurationDisplay(exercise).textColor}`}>
+                                            Configuration
+                                        </span>
+                                                            </div>
+                                                            <p className={`text-sm ${getConfigurationDisplay(exercise).textColor} font-medium`}>
+                                                                {getConfigurationDisplay(exercise).text}
+                                                            </p>
+                                                            {exercise.notes && (
+                                                                <p className={`text-xs ${getConfigurationDisplay(exercise).textColor} mt-1 italic opacity-80`}>
+                                                                    "{exercise.notes}"
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        {exercise.exercise.description && (
+                                                            <p className="text-xs sm:text-sm text-gray-600 mb-3 line-clamp-2">
+                                                                {exercise.exercise.description}
                                                             </p>
                                                         )}
-                                                    </div>
 
-                                                    {exercise.exercise.description && (
-                                                        <p className="text-xs sm:text-sm text-gray-600 mb-3 line-clamp-2">
-                                                            {exercise.exercise.description}
-                                                        </p>
-                                                    )}
-
-                                                    <div className="flex flex-wrap gap-1 sm:gap-2 mb-3">
-                                                        <Badge variant="secondary" className="text-xs">
-                                                            {exercise.exercise.exerciseType}
-                                                        </Badge>
-                                                        <Badge variant="outline" className="text-xs">
-                                                            {exercise.exercise.difficultyLevel}
-                                                        </Badge>
-                                                        {exercise.exercise.isCardio && (
-                                                            <Badge variant="outline" className="text-xs text-red-700 bg-red-50">
-                                                                ❤️ Cardio
+                                                        <div className="flex flex-wrap gap-1 sm:gap-2 mb-3">
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                {exercise.exercise.exerciseType}
                                                             </Badge>
-                                                        )}
-                                                        {exercise.exercise.isIsometric && (
-                                                            <Badge variant="outline" className="text-xs text-purple-700 bg-purple-50">
-                                                                🛡️ Hold
+                                                            <Badge variant="outline" className="text-xs">
+                                                                {exercise.exercise.difficultyLevel}
                                                             </Badge>
-                                                        )}
-                                                    </div>
+                                                            {exercise.exercise.isCardio && (
+                                                                <Badge variant="outline"
+                                                                       className="text-xs text-red-700 bg-red-50">
+                                                                    ❤️ Cardio
+                                                                </Badge>
+                                                            )}
+                                                            {exercise.exercise.isIsometric && (
+                                                                <Badge variant="outline"
+                                                                       className="text-xs text-purple-700 bg-purple-50">
+                                                                    🛡️ Hold
+                                                                </Badge>
+                                                            )}
+                                                        </div>
 
-                                                    <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
-                                                        <div className="flex items-center gap-1">
-                                                            <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                                                            <span>{exercise.exercise.estimatedDurationMinutes} min</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <Target className="w-3 h-3 sm:w-4 sm:h-4" />
-                                                            <span>{exercise.exercise.estimatedCalories} cal</span>
-                                                        </div>
-                                                        {exercise.exercise.averageRating > 0 && (
+                                                        <div
+                                                            className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
                                                             <div className="flex items-center gap-1">
-                                                                <span>⭐</span>
-                                                                <span>{exercise.exercise.averageRating.toFixed(1)}</span>
+                                                                <Clock className="w-3 h-3 sm:w-4 sm:h-4"/>
+                                                                <span>{exercise.exercise.estimatedDurationMinutes} min</span>
                                                             </div>
-                                                        )}
+                                                            <div className="flex items-center gap-1">
+                                                                <Target className="w-3 h-3 sm:w-4 sm:h-4"/>
+                                                                <span>{exercise.exercise.estimatedCalories} cal</span>
+                                                            </div>
+                                                            {exercise.exercise.averageRating > 0 && (
+                                                                <div className="flex items-center gap-1">
+                                                                    <span>⭐</span>
+                                                                    <span>{exercise.exercise.averageRating.toFixed(1)}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* ✅ IMPROVED: Action Buttons with Natural Spacing */}
+                                                        <div
+                                                            className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                                                            {exercise.completed ? (
+                                                                <div
+                                                                    className="flex items-center text-green-600 text-sm font-medium">
+                                                                    <CheckCircle className="w-4 h-4 mr-1"/>
+                                                                    <span className="hidden sm:inline">Completed</span>
+                                                                    <span className="sm:hidden">✓ Done</span>
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    {/* 🎯 PRIMARY ACTION: Start Workout */}
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() => handleStartWorkout(exercise.id)}
+                                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 text-xs sm:text-sm font-medium"
+                                                                    >
+                                                                        <Play className="w-4 h-4 mr-1"/>
+                                                                        <span
+                                                                            className="hidden sm:inline">Start Workout</span>
+                                                                        <span className="sm:hidden">▶️</span>
+                                                                    </Button>
+
+                                                                    {/* 🛠️ SECONDARY: Edit Configuration */}
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => handleEditExercise(exercise)}
+                                                                        className="text-blue-600 hover:bg-blue-50 border-blue-200 px-3 py-2 text-xs sm:text-sm"
+                                                                    >
+                                                                        <Settings className="w-4 h-4 mr-1"/>
+                                                                        <span className="hidden sm:inline">Edit</span>
+                                                                        <span className="sm:hidden">⚙️</span>
+                                                                    </Button>
+                                                                </>
+                                                            )}
+
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => handleDeleteWorkout(exercise.id)}
+                                                                className="text-red-600 hover:bg-red-50 border-red-200 px-3 py-2 text-xs sm:text-sm"
+                                                            >
+                                                                <span className="hidden sm:inline mr-1">🗑️</span>
+                                                                <span className="hidden sm:inline">Delete</span>
+                                                                <span className="sm:hidden">✗</span>
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            {/* Action Buttons - Mobile Stacked */}
-                                            <div className="flex flex-col gap-2 flex-shrink-0 ml-2 sm:ml-3">
-                                                {!exercise.completed && (
-                                                    <>
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => handleCompleteWorkout(exercise.id)}
-                                                            className="bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm"
-                                                        >
-                                                            <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
-                                                            <span className="hidden sm:inline">Complete</span>
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => handleEditExercise(exercise)}
-                                                            className="text-blue-600 hover:bg-blue-50 border-blue-200 px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm"
-                                                        >
-                                                            <span className="sm:hidden">✏️</span>
-                                                            <span className="hidden sm:inline">Edit</span>
-                                                        </Button>
-                                                    </>
-                                                )}
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => handleDeleteWorkout(exercise.id)}
-                                                    className="text-red-600 hover:bg-red-50 border-red-200 px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm"
-                                                >
-                                                    <span className="sm:hidden">✗</span>
-                                                    <span className="hidden sm:inline">Delete</span>
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                        );
+                                    }
+                                })}
                             </div>
                         </CardContent>
                     </Card>
@@ -1217,7 +1959,7 @@ const CalendarPage: React.FC = () => {
                                     }}
                                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold rounded-lg sm:rounded-xl flex items-center justify-center"
                                 >
-                                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2"/>
                                     💪 Add Exercise
                                 </Button>
                                 <Button
@@ -1227,7 +1969,7 @@ const CalendarPage: React.FC = () => {
                                     }}
                                     className="bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold rounded-lg sm:rounded-xl flex items-center justify-center"
                                 >
-                                    <Settings className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                                    <Settings className="w-4 h-4 sm:w-5 sm:h-5 mr-2"/>
                                     📋 Add Workout Plan
                                 </Button>
                             </div>
@@ -1240,25 +1982,30 @@ const CalendarPage: React.FC = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                         <Card className="shadow-sm">
                             <CardContent className="p-3 sm:p-4 text-center">
-                                <div className="text-base sm:text-lg lg:text-xl font-bold text-blue-600">{stats.currentStreak}</div>
+                                <div
+                                    className="text-base sm:text-lg lg:text-xl font-bold text-blue-600">{stats.currentStreak}</div>
                                 <div className="text-xs sm:text-sm text-gray-500">Day Streak</div>
                             </CardContent>
                         </Card>
                         <Card className="shadow-sm">
                             <CardContent className="p-3 sm:p-4 text-center">
-                                <div className="text-base sm:text-lg lg:text-xl font-bold text-green-600">{stats.completedWorkouts}</div>
+                                <div
+                                    className="text-base sm:text-lg lg:text-xl font-bold text-green-600">{stats.completedWorkouts}</div>
                                 <div className="text-xs sm:text-sm text-gray-500">This Month</div>
                             </CardContent>
                         </Card>
                         <Card className="shadow-sm">
                             <CardContent className="p-3 sm:p-4 text-center">
-                                <div className="text-base sm:text-lg lg:text-xl font-bold text-purple-600">{Math.round(stats.completionRate || 0)}%</div>
+                                <div
+                                    className="text-base sm:text-lg lg:text-xl font-bold text-purple-600">{Math.round(stats.completionRate || 0)}%
+                                </div>
                                 <div className="text-xs sm:text-sm text-gray-500">Success</div>
                             </CardContent>
                         </Card>
                         <Card className="shadow-sm">
                             <CardContent className="p-3 sm:p-4 text-center">
-                                <div className="text-base sm:text-lg lg:text-xl font-bold text-orange-600">{stats.averageWorkoutDuration}</div>
+                                <div
+                                    className="text-base sm:text-lg lg:text-xl font-bold text-orange-600">{stats.averageWorkoutDuration}</div>
                                 <div className="text-xs sm:text-sm text-gray-500">Avg Min</div>
                             </CardContent>
                         </Card>
@@ -1324,6 +2071,7 @@ const CalendarPage: React.FC = () => {
                     selectedWorkoutPlan={selectedWorkoutPlan}
                     isEditMode={isEditMode}
                     editingExercise={editingExercise}
+                    onFavoriteToggle={handleFavoriteToggle}
                 />
             )}
 
@@ -1339,6 +2087,20 @@ const CalendarPage: React.FC = () => {
                     selectedDate={viewingDate}
                     onSchedule={handleWorkoutPlanConfigSave}
                     loading={loading}
+                />
+            )}
+
+            {/* Workout Details Modal */}
+            {showWorkoutDetailsModal && selectedExerciseForDetails && selectedWorkoutResults && (
+                <WorkoutDetailsModal
+                    isOpen={showWorkoutDetailsModal}
+                    onClose={() => {
+                        setShowWorkoutDetailsModal(false);
+                        setSelectedExerciseForDetails(null);
+                        setSelectedWorkoutResults(null);
+                    }}
+                    exercise={selectedExerciseForDetails}
+                    workoutResults={selectedWorkoutResults}
                 />
             )}
         </div>

@@ -1,872 +1,1146 @@
-// src/pages/WorkoutModePage.tsx - Complete with Exercise Completion UX
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useWorkout } from '../contexts/WorkoutContext';
-import InWorkoutExerciseSelector from '../components/CalendarPage/InWorkoutExerciseSelector';
+import React, {useState, useEffect, useRef} from 'react';
+import {useNavigate} from 'react-router-dom';
+import {useWorkout} from '../contexts/WorkoutContext';
 import {
-    XMarkIcon,
-    PlayIcon,
-    PauseIcon,
-    CheckIcon,
-    ClockIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    PlusIcon,
-    MinusIcon,
-    ForwardIcon,
-    BackwardIcon,
-    FireIcon,
-    BoltIcon,
-    HeartIcon,
-    EyeSlashIcon,
-    HomeIcon,
-    CalendarDaysIcon,
-    InformationCircleIcon,
-    SparklesIcon,
-    TrophyIcon
-} from '@heroicons/react/24/outline';
+    Play,
+    Pause,
+    SkipForward,
+    SkipBack,
+    CheckCircle,
+    Clock,
+    Plus,
+    Minus,
+    Target,
+    Weight,
+    Timer,
+    Heart,
+    RotateCcw,
+    Home,
+    Trophy,
+    Activity,
+    Zap,
+    ArrowRight
+} from 'lucide-react';
+import {Button} from '../components/ui/button';
+import {Card, CardContent, CardHeader, CardTitle} from '../components/ui/card';
+import {Badge} from '../components/ui/badge';
+import {Input} from '../components/ui/input';
+import {toast} from 'react-hot-toast';
+
+// Enhanced interface for set tracking that handles all exercise types
+interface EnhancedSetData {
+    // Common fields
+    actualReps?: number;
+    notes?: string;
+
+    // Strength-specific
+    actualWeight?: number;
+    actualRpe?: number;
+
+    // Cardio-specific
+    actualDurationMinutes?: number;
+    actualDistance?: number;
+    actualPace?: number;
+    averageHeartRate?: number;
+    caloriesBurned?: number;
+
+    // Isometric-specific
+    actualHoldSeconds?: number;
+}
+
+// Confetti component for workout completion
+const ConfettiEffect: React.FC<{ show: boolean; onComplete: () => void }> = ({show, onComplete}) => {
+    useEffect(() => {
+        if (show) {
+            const timer = setTimeout(() => {
+                onComplete();
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [show, onComplete]);
+
+    if (!show) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-8xl animate-bounce">🎉</div>
+            </div>
+            {/* Animated confetti pieces */}
+            {Array.from({length: 50}).map((_, i) => (
+                <div
+                    key={i}
+                    className="absolute animate-pulse"
+                    style={{
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`,
+                        animationDelay: `${Math.random() * 3}s`,
+                        fontSize: `${Math.random() * 20 + 10}px`,
+                    }}
+                >
+                    {['🎊', '✨', '🌟', '💪', '🏆', '🎉'][Math.floor(Math.random() * 6)]}
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// Set completion dialog component
+const SetCompletionDialog: React.FC<{
+    show: boolean;
+    isLastSet: boolean;
+    isLastExercise: boolean;
+    exerciseName: string;
+    onNextExercise: () => void;
+    onAddSet: () => void;
+    onCompleteWorkout: () => void;
+    onClose: () => void;
+}> = ({
+          show,
+          isLastSet,
+          isLastExercise,
+          exerciseName,
+          onNextExercise,
+          onAddSet,
+          onCompleteWorkout,
+          onClose
+      }) => {
+    if (!show) return null;
+
+    return (
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <Card className="w-full max-w-md bg-gray-800 border-gray-700 text-white">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-center">
+                        {isLastSet ? (
+                            <div className="space-y-2">
+                                <div className="text-2xl">🎯</div>
+                                <div>Set Complete!</div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <div className="text-2xl">✅</div>
+                                <div>Great job!</div>
+                            </div>
+                        )}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {isLastSet ? (
+                        <div className="space-y-4">
+                            <p className="text-center text-gray-300">
+                                You've completed all sets for <span
+                                className="font-bold text-white">{exerciseName}</span>
+                            </p>
+
+                            <div className="space-y-3">
+                                <Button
+                                    onClick={onAddSet}
+                                    variant="outline"
+                                    className="w-full bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
+                                >
+                                    <Plus className="w-4 h-4 mr-2"/>
+                                    Add Another Set
+                                </Button>
+
+                                {isLastExercise ? (
+                                    <Button
+                                        onClick={onCompleteWorkout}
+                                        className="w-full bg-green-600 hover:bg-green-700"
+                                    >
+                                        <Trophy className="w-4 h-4 mr-2"/>
+                                        Complete Workout!
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        onClick={onNextExercise}
+                                        className="w-full bg-blue-600 hover:bg-blue-700"
+                                    >
+                                        <ArrowRight className="w-4 h-4 mr-2"/>
+                                        Next Exercise
+                                    </Button>
+                                )}
+
+                                <Button
+                                    onClick={onClose}
+                                    variant="outline"
+                                    className="w-full bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
+                                >
+                                    Continue Here
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center">
+                            <p className="text-gray-300 mb-4">Set completed successfully!</p>
+                            <Button
+                                onClick={onClose}
+                                className="w-full bg-blue-600 hover:bg-blue-700"
+                            >
+                                Continue
+                            </Button>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
 
 const WorkoutModePage: React.FC = () => {
     const navigate = useNavigate();
     const {
         currentWorkout,
-        pauseWorkout,
-        resumeWorkout,
-        completeWorkout,
-        cancelWorkout,
+        getCurrentExercise,
+        getCurrentSet,
         goToNextExercise,
         goToPreviousExercise,
-        goToExercise,
         completeSet,
         skipSet,
         addSet,
         removeSet,
-        skipExercise,
-        getCurrentExercise,
-        getCurrentSet,
-        getCompletionPercentage,
+        completeWorkout,
+        pauseWorkout,
+        resumeWorkout,
+        cancelWorkout,
         getTotalDuration,
+        getCompletionPercentage,
         isWorkoutActive,
         isPaused,
         canGoNext,
-        canGoPrevious,
+        canGoPrevious
     } = useWorkout();
 
-    // Local component state
-    const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-    const [showCancelDialog, setShowCancelDialog] = useState(false);
-    const [currentSetInputs, setCurrentSetInputs] = useState<{
-        reps: string;
-        weight: string;
-        rpe: string;
-    }>({
-        reps: '',
-        weight: '',
-        rpe: '',
-    });
-    const [restTimer, setRestTimer] = useState<number>(0);
-    const [isResting, setIsResting] = useState(false);
-    const [showExerciseOverview, setShowExerciseOverview] = useState(false);
-    const [showRpeInfo, setShowRpeInfo] = useState(false);
-    const [showInWorkoutSelector, setShowInWorkoutSelector] = useState(false);
+    // Current exercise and set tracking
+    const currentExercise = getCurrentExercise();
+    const currentSet = getCurrentSet();
 
-    // Auto-fill inputs when current set changes
-    useEffect(() => {
-        const currentSet = getCurrentSet();
-        if (currentSet) {
-            setCurrentSetInputs({
-                reps: currentSet.actualReps?.toString() || '',
-                weight: currentSet.actualWeight?.toString() || currentSet.targetWeight?.toString() || '',
-                rpe: currentSet.actualRpe?.toString() || currentSet.targetRpe?.toString() || '',
-            });
-        }
-    }, [getCurrentSet]);
+    // Set input tracking for different exercise types
+    const [setData, setSetData] = useState<EnhancedSetData>({});
 
-    // Rest timer effect
-    useEffect(() => {
-        if (!isResting || restTimer <= 0) return;
+    // Timer states for different exercise types
+    const [isTimerRunning, setIsTimerRunning] = useState(false);
+    const [timerSeconds, setTimerSeconds] = useState(0);
+    const [isRestTimer, setIsRestTimer] = useState(false);
+    const [restTimeRemaining, setRestTimeRemaining] = useState(0);
 
-        const interval = setInterval(() => {
-            setRestTimer(prev => {
-                if (prev <= 1) {
-                    setIsResting(false);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+    // UI states
+    const [showSetDialog, setShowSetDialog] = useState(false);
+    const [showConfetti, setShowConfetti] = useState(false);
 
-        return () => clearInterval(interval);
-    }, [isResting, restTimer]);
+    // Refs for timer management
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const restTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Redirect if no active workout
+    // Redirect if no workout is active
     useEffect(() => {
         if (!isWorkoutActive) {
             navigate('/calendar');
+            return;
         }
     }, [isWorkoutActive, navigate]);
 
-    if (!currentWorkout) {
+    // Initialize set data when current set changes
+    useEffect(() => {
+        if (currentSet && currentExercise) {
+            const exercise = currentExercise.scheduledExercise.exercise;
+
+            // Initialize with appropriate defaults based on exercise type
+            const initialData: EnhancedSetData = {};
+
+            if (exercise.isCardio) {
+                initialData.actualDurationMinutes = currentExercise.scheduledExercise.targetDurationMinutes || 20;
+                initialData.actualDistance = currentExercise.scheduledExercise.targetDistance || currentExercise.scheduledExercise.targetDistanceKm;
+                initialData.actualPace = currentExercise.scheduledExercise.targetPace;
+            } else if (exercise.isIsometric) {
+                initialData.actualHoldSeconds = currentExercise.scheduledExercise.holdDurationSeconds || 30;
+            } else {
+                // Strength exercise
+                initialData.actualReps = currentSet.targetReps;
+                initialData.actualWeight = currentSet.targetWeight;
+                initialData.actualRpe = currentSet.targetRpe;
+            }
+
+            setSetData(initialData);
+
+            // Reset timers when switching sets
+            setTimerSeconds(0);
+            setIsTimerRunning(false);
+            setIsRestTimer(false);
+
+            // Auto-start timer for isometric exercises
+            if (exercise.isIsometric && !currentSet.completed) {
+                setTimerSeconds(0);
+            }
+        }
+    }, [currentSet?.id, currentExercise?.id]);
+
+    // Timer effect for exercise and rest
+    useEffect(() => {
+        if (isTimerRunning && timerRef.current === null) {
+            timerRef.current = setInterval(() => {
+                setTimerSeconds(prev => prev + 1);
+            }, 1000);
+        } else if (!isTimerRunning && timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        };
+    }, [isTimerRunning]);
+
+    // Rest timer effect
+    useEffect(() => {
+        if (isRestTimer && restTimeRemaining > 0 && restTimerRef.current === null) {
+            restTimerRef.current = setInterval(() => {
+                setRestTimeRemaining(prev => {
+                    if (prev <= 1) {
+                        setIsRestTimer(false);
+                        toast.success('Rest period complete! Ready for next set.');
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else if ((!isRestTimer || restTimeRemaining <= 0) && restTimerRef.current) {
+            clearInterval(restTimerRef.current);
+            restTimerRef.current = null;
+        }
+
+        return () => {
+            if (restTimerRef.current) {
+                clearInterval(restTimerRef.current);
+                restTimerRef.current = null;
+            }
+        };
+    }, [isRestTimer, restTimeRemaining]);
+
+    // Cleanup timers on unmount
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (restTimerRef.current) clearInterval(restTimerRef.current);
+        };
+    }, []);
+
+    if (!currentWorkout || !currentExercise || !currentSet) {
         return (
-            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-                <div className="text-center text-white">
-                    <p className="text-lg mb-4">No active workout</p>
-                    <button
-                        onClick={() => navigate('/calendar')}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                        Back to Calendar
-                    </button>
-                </div>
+            <div className="flex items-center justify-center min-h-screen bg-gray-900">
+                <Card className="w-full max-w-md mx-4 bg-gray-800 border-gray-700">
+                    <CardContent className="p-8 text-center">
+                        <div className="text-6xl mb-4">🏋️‍♂️</div>
+                        <h2 className="text-xl font-bold text-white mb-2">No Active Workout</h2>
+                        <p className="text-gray-400 mb-6">Start a workout from your calendar to begin tracking.</p>
+                        <Button
+                            onClick={() => navigate('/calendar')}
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                        >
+                            <Home className="w-4 h-4 mr-2"/>
+                            Go to Calendar
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
 
-    const currentExercise = getCurrentExercise();
-    const currentSet = getCurrentSet();
-    const completionPercentage = getCompletionPercentage();
-    const totalDuration = getTotalDuration();
+    const exercise = currentExercise.scheduledExercise.exercise;
+    const isCardio = exercise.isCardio;
+    const isIsometric = exercise.isIsometric;
+    const isStrength = !isCardio && !isIsometric;
 
-    // NEW: Check if current exercise is completed
-    const isCurrentExerciseCompleted = currentExercise && currentExercise.completed;
+    // Check if this is the last set of the current exercise
+    const isLastSetOfExercise = currentSet.setNumber === currentExercise.sets.length;
 
-    // NEW: Check if there's a next exercise available
-    const hasNextExercise = currentWorkout.currentExerciseIndex < currentWorkout.exercises.length - 1;
+    // Check if this is the last exercise of the workout
+    const isLastExerciseOfWorkout = currentWorkout.currentExerciseIndex === currentWorkout.exercises.length - 1;
 
-    // Check if workout is complete
-    const isWorkoutComplete = currentWorkout.exercises.every(ex => ex.completed || ex.skipped);
+    // Timer utilities
+    const formatTime = (seconds: number): string => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
 
-    // Event handlers
+    const startTimer = () => {
+        setIsTimerRunning(true);
+        if (isIsometric && timerSeconds === 0) {
+            toast.success('Hold timer started!');
+        }
+    };
+
+    const stopTimer = () => {
+        setIsTimerRunning(false);
+        if (isIsometric) {
+            setSetData(prev => ({...prev, actualHoldSeconds: timerSeconds}));
+        } else if (isCardio) {
+            setSetData(prev => ({...prev, actualDurationMinutes: Math.round(timerSeconds / 60 * 10) / 10}));
+        }
+    };
+
+    const resetTimer = () => {
+        setIsTimerRunning(false);
+        setTimerSeconds(0);
+        if (isIsometric) {
+            setSetData(prev => ({...prev, actualHoldSeconds: undefined}));
+        }
+    };
+
+    const startRestTimer = () => {
+        const restSeconds = currentSet.restSeconds || 90;
+        setRestTimeRemaining(restSeconds);
+        setIsRestTimer(true);
+        toast.success(`Rest timer started: ${formatTime(restSeconds)}`);
+    };
+
+    // Set completion handlers
     const handleCompleteSet = () => {
         if (!currentSet) return;
 
-        const actualData = {
-            actualReps: parseInt(currentSetInputs.reps) || 0,
-            actualWeight: parseFloat(currentSetInputs.weight) || undefined,
-            actualRpe: parseInt(currentSetInputs.rpe) || undefined,
-        };
+        // Validate required fields based on exercise type
+        let isValid = true;
+        let errorMessage = '';
 
-        completeSet(currentSet.id, actualData);
-
-        // Start rest timer if configured
-        if (currentSet.restSeconds && currentSet.restSeconds > 0) {
-            setRestTimer(currentSet.restSeconds);
-            setIsResting(true);
+        if (isCardio) {
+            if (!setData.actualDurationMinutes || setData.actualDurationMinutes <= 0) {
+                isValid = false;
+                errorMessage = 'Please enter a valid duration';
+            }
+        } else if (isIsometric) {
+            if (!setData.actualHoldSeconds || setData.actualHoldSeconds <= 0) {
+                isValid = false;
+                errorMessage = 'Please enter a valid hold time';
+            }
+        } else if (isStrength) {
+            if (!setData.actualReps || setData.actualReps <= 0) {
+                isValid = false;
+                errorMessage = 'Please enter valid reps';
+            }
         }
 
-        // Clear inputs for next set
-        setCurrentSetInputs({ reps: '', weight: '', rpe: '' });
+        if (!isValid) {
+            toast.error(errorMessage);
+            return;
+        }
+
+        // Prepare completion data based on exercise type
+        const completionData: any = {...setData};
+
+        // For cardio, convert duration to reps (since the backend expects actualReps)
+        if (isCardio) {
+            completionData.actualReps = setData.actualDurationMinutes;
+        }
+        // For isometric, convert hold time to reps
+        else if (isIsometric) {
+            completionData.actualReps = setData.actualHoldSeconds;
+        }
+
+        completeSet(currentSet.id, completionData);
+
+        // Stop any running timers
+        setIsTimerRunning(false);
+        setTimerSeconds(0);
+
+        // Check if this was the last set and show appropriate dialog
+        if (isLastSetOfExercise) {
+            setShowSetDialog(true);
+        } else {
+            // Auto-start rest timer if there are more sets and rest time is configured
+            if (currentSet.restSeconds && currentSet.restSeconds > 0) {
+                setTimeout(() => startRestTimer(), 500);
+            }
+        }
+
+        // Reset set data for next set
+        setSetData({});
+
+        toast.success(`Set ${currentSet.setNumber} completed!`);
     };
 
     const handleSkipSet = () => {
         if (!currentSet) return;
+
         skipSet(currentSet.id);
-        setCurrentSetInputs({ reps: '', weight: '', rpe: '' });
+        setIsTimerRunning(false);
+        setTimerSeconds(0);
+        setSetData({});
+
+        // Check if this was the last set
+        if (isLastSetOfExercise) {
+            setShowSetDialog(true);
+        }
+
+        toast.success(`Set ${currentSet.setNumber} skipped`);
     };
 
-    const handleWorkoutComplete = () => {
-        completeWorkout();
-        setShowCompleteDialog(false);
-        navigate('/calendar', {
-            state: {
-                workoutCompleted: true,
-                completionData: {
-                    duration: totalDuration,
-                    exerciseCount: currentWorkout.exercises.length,
-                    date: currentWorkout.date
-                }
-            }
-        });
+    const handleAddSet = () => {
+        if (!currentExercise) return;
+        addSet(currentExercise.id);
+        setShowSetDialog(false);
+        toast.success('Added new set');
     };
 
-    const handleWorkoutCancel = () => {
-        cancelWorkout();
-        setShowCancelDialog(false);
-        navigate('/calendar');
+    const handleRemoveSet = () => {
+        if (!currentSet || currentExercise.sets.length <= 1) return;
+        removeSet(currentSet.id);
+        toast.success('Removed set');
     };
 
-    const handleAddExercise = () => {
-        console.log('🎯 Opening InWorkout Exercise Selector');
-        setShowInWorkoutSelector(true);
+    // Navigation handlers
+    const handlePreviousExercise = () => {
+        if (canGoPrevious) {
+            goToPreviousExercise();
+            setIsTimerRunning(false);
+            setTimerSeconds(0);
+            setIsRestTimer(false);
+            setShowSetDialog(false);
+        }
     };
 
-    // NEW: Handler for proceeding to next exercise
-    const handleProceedToNext = () => {
-        if (hasNextExercise) {
+    const handleNextExercise = () => {
+        if (canGoNext) {
             goToNextExercise();
-        } else if (isWorkoutComplete) {
-            setShowCompleteDialog(true);
+            setIsTimerRunning(false);
+            setTimerSeconds(0);
+            setIsRestTimer(false);
+            setShowSetDialog(false);
         }
     };
 
-    const formatTime = (seconds: number): string => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const formatDuration = (minutes: number): string => {
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        if (hours > 0) {
-            return `${hours}h ${mins}m`;
+    const handleCompleteWorkout = () => {
+        if (isLastExerciseOfWorkout && isLastSetOfExercise) {
+            setShowConfetti(true);
+            setTimeout(() => {
+                completeWorkout();
+                toast.success('Workout completed! Great job! 🎉');
+                navigate('/calendar');
+            }, 3000);
+        } else {
+            if (window.confirm('Are you sure you want to complete this workout?')) {
+                completeWorkout();
+                toast.success('Workout completed! Great job! 🎉');
+                navigate('/calendar');
+            }
         }
-        return `${mins}m`;
+        setShowSetDialog(false);
     };
 
-    const getRpeDescription = (rpe: number): string => {
-        const descriptions: Record<number, string> = {
-            1: 'Very easy',
-            2: 'Easy',
-            3: 'Moderate',
-            4: 'Somewhat hard',
-            5: 'Hard',
-            6: 'Hard+',
-            7: 'Very hard',
-            8: 'Very hard+',
-            9: 'Extremely hard',
-            10: 'Maximum effort'
-        };
-        return descriptions[rpe] || 'Unknown';
-    };
-
-    const getRpeColorClass = (rpe: number): string => {
-        if (rpe >= 1 && rpe <= 3) {
-            return 'bg-green-900 bg-opacity-30 border border-green-600 text-green-300';
-        } else if (rpe >= 4 && rpe <= 6) {
-            return 'bg-yellow-900 bg-opacity-30 border border-yellow-600 text-yellow-300';
-        } else if (rpe >= 7 && rpe <= 8) {
-            return 'bg-orange-900 bg-opacity-30 border border-orange-600 text-orange-300';
-        } else if (rpe >= 9 && rpe <= 10) {
-            return 'bg-red-900 bg-opacity-30 border border-red-600 text-red-300';
+    const handleCancelWorkout = () => {
+        if (window.confirm('Are you sure you want to cancel this workout? All progress will be lost.')) {
+            cancelWorkout();
+            toast.error('Workout cancelled');
+            navigate('/calendar');
         }
-        return 'bg-gray-700 text-gray-300';
     };
+
+    // Get exercise type styling
+    const getExerciseTypeStyle = () => {
+        if (isCardio) {
+            return {
+                bg: 'bg-red-900/20',
+                border: 'border-red-700',
+                text: 'text-red-300',
+                icon: '❤️',
+                gradient: 'from-red-600 to-pink-600'
+            };
+        } else if (isIsometric) {
+            return {
+                bg: 'bg-purple-900/20',
+                border: 'border-purple-700',
+                text: 'text-purple-300',
+                icon: '🛡️',
+                gradient: 'from-purple-600 to-indigo-600'
+            };
+        } else {
+            return {
+                bg: 'bg-blue-900/20',
+                border: 'border-blue-700',
+                text: 'text-blue-300',
+                icon: '💪',
+                gradient: 'from-blue-600 to-cyan-600'
+            };
+        }
+    };
+
+    const typeStyle = getExerciseTypeStyle();
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden">
-            {/* Header */}
-            <div className="bg-gray-800 border-b border-gray-700">
-                <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4">
-                    <div className="flex items-center justify-between">
-                        {/* Left: Back/Cancel */}
-                        <button
-                            onClick={() => setShowCancelDialog(true)}
-                            className="p-2 hover:bg-gray-700 rounded-lg transition-colors active:scale-95"
-                        >
-                            <XMarkIcon className="w-6 h-6" />
-                        </button>
-
-                        {/* Center: Progress */}
-                        <div className="flex-1 mx-4">
-                            <div className="text-center">
-                                <p className="text-sm text-gray-400">Workout Progress</p>
-                                <p className="text-lg font-bold">{completionPercentage}%</p>
-                            </div>
-                            <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
-                                <div
-                                    className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                                    style={{ width: `${completionPercentage}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Right: Timer and Controls */}
-                        <div className="flex items-center space-x-3">
-                            {/* Pause/Resume Button */}
-                            <button
-                                onClick={isPaused ? resumeWorkout : pauseWorkout}
-                                className={`p-2 rounded-lg transition-all active:scale-95 ${
-                                    isPaused
-                                        ? 'bg-green-600 hover:bg-green-700 text-white'
-                                        : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                }`}
-                                title={isPaused ? "Resume Workout" : "Pause Workout"}
-                            >
-                                {isPaused ? (
-                                    <PlayIcon className="w-5 h-5" />
-                                ) : (
-                                    <PauseIcon className="w-5 h-5" />
-                                )}
-                            </button>
-
-                            {/* Complete Workout Button */}
-                            {isWorkoutComplete && (
-                                <button
-                                    onClick={() => setShowCompleteDialog(true)}
-                                    className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-all active:scale-95 text-white"
-                                    title="Complete Workout"
-                                >
-                                    <CheckIcon className="w-5 h-5" />
-                                </button>
-                            )}
-
-                            {/* Timer Display */}
-                            <div className="text-right">
-                                <div className="flex items-center text-sm text-gray-400">
-                                    <ClockIcon className="w-4 h-4 mr-1" />
-                                    <span>{formatDuration(totalDuration)}</span>
-                                </div>
-                                {isPaused && (
-                                    <span className="text-xs text-yellow-400">PAUSED</span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Rest Timer Overlay */}
-            {isResting && (
-                <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-                    <div className="bg-gray-800 rounded-xl p-8 text-center max-w-sm mx-4">
-                        <div className="text-6xl font-bold text-blue-400 mb-4">
-                            {formatTime(restTimer)}
-                        </div>
-                        <p className="text-gray-300 mb-6">Rest Time</p>
-                        <div className="space-y-3">
-                            <button
-                                onClick={() => setIsResting(false)}
-                                className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                                Skip Rest
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setRestTimer(restTimer + 30);
-                                }}
-                                className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                            >
-                                +30 seconds
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Main Content */}
-            <div className="flex-1 overflow-y-auto pb-64">
-                {/* Exercise Header */}
-                {currentExercise && (
-                    <div className="bg-gray-800 border-b border-gray-700">
-                        <div className="max-w-4xl mx-auto px-4 py-4 sm:py-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center">
-                                    <span className="text-3xl mr-3">
-                                        {currentExercise.scheduledExercise.exercise.emoji || '💪'}
-                                    </span>
-                                    <div>
-                                        <h1 className="text-xl sm:text-2xl font-bold">
-                                            {currentExercise.scheduledExercise.exercise.exerciseName ||
-                                                currentExercise.scheduledExercise.exercise.name}
-                                        </h1>
-                                        <p className="text-gray-400 text-sm">
-                                            Exercise {currentWorkout.currentExerciseIndex + 1} of {currentWorkout.exercises.length}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Exercise Navigation */}
-                                <div className="flex items-center space-x-2">
-                                    <button
-                                        onClick={goToPreviousExercise}
-                                        disabled={!canGoPrevious}
-                                        className={`p-2 rounded-lg transition-colors ${
-                                            canGoPrevious
-                                                ? 'hover:bg-gray-700 text-white'
-                                                : 'text-gray-500 cursor-not-allowed'
-                                        }`}
-                                    >
-                                        <ChevronLeftIcon className="w-6 h-6" />
-                                    </button>
-                                    <button
-                                        onClick={goToNextExercise}
-                                        disabled={!canGoNext}
-                                        className={`p-2 rounded-lg transition-colors ${
-                                            canGoNext
-                                                ? 'hover:bg-gray-700 text-white'
-                                                : 'text-gray-500 cursor-not-allowed'
-                                        }`}
-                                    >
-                                        <ChevronRightIcon className="w-6 h-6" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Exercise Info */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                                <div className="bg-gray-700 rounded-lg p-3">
-                                    <div className="text-2xl font-bold text-blue-400">
-                                        {currentExercise.sets.length}
-                                    </div>
-                                    <div className="text-xs text-gray-300">Sets</div>
-                                </div>
-                                <div className="bg-gray-700 rounded-lg p-3">
-                                    <div className="text-2xl font-bold text-green-400">
-                                        {currentExercise.scheduledExercise.targetReps} {/* ✅ FIXED: Use targetReps */}
-                                    </div>
-                                    <div className="text-xs text-gray-300">Target Reps</div>
-                                </div>
-                                {currentExercise.scheduledExercise.targetWeight && ( /* ✅ FIXED: Use targetWeight */
-                                    <div className="bg-gray-700 rounded-lg p-3">
-                                        <div className="text-2xl font-bold text-purple-400">
-                                            {currentExercise.scheduledExercise.targetWeight} {/* ✅ FIXED: Use targetWeight */}
-                                        </div>
-                                        <div className="text-xs text-gray-300">
-                                            Weight ({currentExercise.scheduledExercise.targetWeightUnit || 'lbs'}) {/* ✅ FIXED: Show weight unit */}
-                                        </div>
-                                    </div>
-                                )}
-                                {currentExercise.scheduledExercise.targetRpe && (
-                                    <div className="bg-gray-700 rounded-lg p-3">
-                                        <div className="text-2xl font-bold text-orange-400">
-                                            {currentExercise.scheduledExercise.targetRpe}
-                                        </div>
-                                        <div className="text-xs text-gray-300">Target RPE</div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Sets List */}
-                {currentExercise && (
-                    <div className="max-w-4xl mx-auto px-4 py-6">
-                        <h2 className="text-lg font-semibold mb-4 flex items-center">
-                            <BoltIcon className="w-5 h-5 mr-2" />
-                            Sets
-                        </h2>
-
-                        <div className="space-y-3">
-                            {currentExercise.sets.map((set, index) => (
-                                <div
-                                    key={set.id}
-                                    className={`border rounded-lg p-4 transition-all duration-200 ${
-                                        index === currentWorkout.currentSetIndex
-                                            ? 'border-blue-500 bg-blue-900 bg-opacity-20'
-                                            : set.completed
-                                                ? 'border-green-500 bg-green-900 bg-opacity-20'
-                                                : 'border-gray-600 bg-gray-800'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center">
-                                            <span className="text-lg font-bold mr-3">
-                                                Set {set.setNumber}
-                                            </span>
-                                            {set.completed && (
-                                                <CheckIcon className="w-5 h-5 text-green-400" />
-                                            )}
-                                            {index === currentWorkout.currentSetIndex && !set.completed && (
-                                                <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded-full">
-                                                    Current
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* Set Controls */}
-                                        {index === currentWorkout.currentSetIndex && !set.completed && (
-                                            <div className="flex items-center space-x-2">
-                                                <button
-                                                    onClick={() => addSet(currentExercise.id)}
-                                                    className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
-                                                    title="Add set"
-                                                >
-                                                    <PlusIcon className="w-4 h-4" />
-                                                </button>
-                                                {currentExercise.sets.length > 1 && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const lastSet = currentExercise.sets[currentExercise.sets.length - 1];
-                                                            removeSet(lastSet.id);
-                                                        }}
-                                                        className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
-                                                        title="Remove last set"
-                                                    >
-                                                        <MinusIcon className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Set Data */}
-                                    <div className="grid grid-cols-3 gap-4 text-sm">
-                                        <div>
-                                            <label className="block text-gray-400 mb-1">Target</label>
-                                            <div className="text-white">
-                                                {set.targetReps} reps
-                                                {set.targetWeight && ` @ ${set.targetWeight}${set.targetWeightUnit || 'lbs'}`} {/* ✅ FIXED: Show weight unit */}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-gray-400 mb-1">Actual</label>
-                                            <div className="text-white">
-                                                {set.completed ? (
-                                                    <>
-                                                        {set.actualReps} reps
-                                                        {set.actualWeight && ` @ ${set.actualWeight}${set.targetWeightUnit || 'lbs'}`} {/* ✅ FIXED: Show weight unit */}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-gray-500">-</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-gray-400 mb-1">RPE</label>
-                                            <div className="text-white">
-                                                {set.completed && set.actualRpe ? (
-                                                    <span className="text-orange-400">{set.actualRpe}</span>
-                                                ) : set.targetRpe ? (
-                                                    <span className="text-gray-400">Target: {set.targetRpe}</span>
-                                                ) : (
-                                                    <span className="text-gray-500">-</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Exercise Overview */}
-                <div className="max-w-4xl mx-auto px-4 py-6">
-                    <button
-                        onClick={() => setShowExerciseOverview(!showExerciseOverview)}
-                        className="w-full flex items-center justify-between mb-4 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                        <h2 className="text-lg font-semibold flex items-center">
-                            <FireIcon className="w-5 h-5 mr-2" />
-                            All Exercises ({currentWorkout.exercises.length})
-                        </h2>
-                        <ChevronRightIcon
-                            className={`w-5 h-5 transition-transform ${showExerciseOverview ? 'rotate-90' : ''}`}
-                        />
-                    </button>
-
-                    {showExerciseOverview && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {currentWorkout.exercises.map((exercise, index) => (
-                                <button
-                                    key={exercise.id}
-                                    onClick={() => goToExercise(index)}
-                                    className={`text-left p-4 rounded-lg border transition-all duration-200 ${
-                                        index === currentWorkout.currentExerciseIndex
-                                            ? 'border-blue-500 bg-blue-900 bg-opacity-20'
-                                            : exercise.completed
-                                                ? 'border-green-500 bg-green-900 bg-opacity-20'
-                                                : exercise.skipped
-                                                    ? 'border-yellow-500 bg-yellow-900 bg-opacity-20'
-                                                    : 'border-gray-600 bg-gray-800 hover:bg-gray-700'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center">
-                                            <span className="text-lg mr-2">
-                                                {exercise.scheduledExercise.exercise.emoji || '💪'}
-                                            </span>
-                                            <span className="font-medium truncate">
-                                                {exercise.scheduledExercise.exercise.exerciseName ||
-                                                    exercise.scheduledExercise.exercise.name}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center space-x-1">
-                                            {exercise.completed && (
-                                                <CheckIcon className="w-4 h-4 text-green-400" />
-                                            )}
-                                            {exercise.skipped && (
-                                                <EyeSlashIcon className="w-4 h-4 text-yellow-400" />
-                                            )}
-                                            {index === currentWorkout.currentExerciseIndex && (
-                                                <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="text-sm text-gray-400">
-                                        {exercise.sets.length} sets × {exercise.scheduledExercise.targetReps} {/* ✅ FIXED: Use targetReps */}
-                                        {' • '}
-                                        {exercise.sets.filter(set => set.completed).length}/{exercise.sets.length} completed
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Quick Add Exercise Button */}
-                    <button
-                        onClick={handleAddExercise}
-                        className="w-full mt-4 p-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-lg hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center"
-                    >
-                        <PlusIcon className="w-5 h-5 mr-2" />
-                        Add Exercise to Workout
-                    </button>
-                </div>
-            </div>
-
-            {/* NEW: Exercise Completion Panel */}
-            {isCurrentExerciseCompleted && (
-                <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-green-800 to-green-600 border-t border-green-500 p-4 safe-area-bottom z-40">
-                    <div className="max-w-4xl mx-auto">
-                        <div className="text-center mb-4">
-                            <div className="flex items-center justify-center mb-2">
-                                <SparklesIcon className="w-6 h-6 text-yellow-300 mr-2" />
-                                <h3 className="text-xl font-bold text-white">Exercise Complete!</h3>
-                                <SparklesIcon className="w-6 h-6 text-yellow-300 ml-2" />
-                            </div>
-                            <p className="text-green-100 text-sm">
-                                Great work on {currentExercise?.scheduledExercise.exercise.exerciseName || currentExercise?.scheduledExercise.exercise.name}!
-                            </p>
-                        </div>
-
-                        <div className="flex space-x-3">
-                            {hasNextExercise ? (
-                                <button
-                                    onClick={handleProceedToNext}
-                                    className="flex-1 px-6 py-4 bg-white text-green-700 rounded-lg font-bold hover:bg-green-50 transition-all active:scale-[0.98] flex items-center justify-center text-lg shadow-lg"
-                                >
-                                    <ForwardIcon className="w-5 h-5 mr-2" />
-                                    Next Exercise
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => setShowCompleteDialog(true)}
-                                    className="flex-1 px-6 py-4 bg-yellow-500 text-yellow-900 rounded-lg font-bold hover:bg-yellow-400 transition-all active:scale-[0.98] flex items-center justify-center text-lg shadow-lg"
-                                >
-                                    <TrophyIcon className="w-5 h-5 mr-2" />
-                                    Complete Workout
-                                </button>
-                            )}
-
-                            <button
-                                onClick={handleAddExercise}
-                                className="px-4 py-4 bg-green-700 text-white rounded-lg font-medium hover:bg-green-800 transition-all active:scale-[0.98] flex items-center justify-center shadow-lg"
-                                title="Add Another Exercise"
-                            >
-                                <PlusIcon className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Current Set Input Panel */}
-            {currentSet && !currentSet.completed && !isCurrentExerciseCompleted && (
-                <div className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-4 safe-area-bottom z-40">
-                    <div className="max-w-4xl mx-auto">
-                        <div className="mb-4">
-                            <h3 className="text-lg font-semibold mb-2">
-                                Set {currentSet.setNumber} - Enter Your Results
-                            </h3>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 mb-3">
-                            {/* Reps Input */}
-                            <div>
-                                <label className="block text-xs text-gray-400 mb-1 h-4">Reps</label>
-                                <input
-                                    type="number"
-                                    value={currentSetInputs.reps}
-                                    onChange={(e) => setCurrentSetInputs(prev => ({ ...prev, reps: e.target.value }))}
-                                    placeholder={currentSet.targetReps.toString()}
-                                    className="w-full px-1 py-1 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none text-center text-xs"
-                                />
-                            </div>
-
-                            {/* Weight Input */}
-                            <div>
-                                <label className="block text-xs text-gray-400 mb-1 h-4">Weight</label>
-                                <input
-                                    type="number"
-                                    step="0.5"
-                                    value={currentSetInputs.weight}
-                                    onChange={(e) => setCurrentSetInputs(prev => ({ ...prev, weight: e.target.value }))}
-                                    placeholder={currentSet.targetWeight?.toString() || '0'}
-                                    className="w-full px-1 py-1 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none text-center text-xs"
-                                />
-                            </div>
-
-                            {/* RPE Input */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1 h-4">
-                                    <label className="block text-xs text-gray-400">RPE</label>
-                                    <button
-                                        onClick={() => setShowRpeInfo(!showRpeInfo)}
-                                        className="bg-transparent border-none outline-none text-blue-400 hover:text-blue-300 transition-colors"
-                                        title="What is RPE?"
-                                    >
-                                        <InformationCircleIcon className="w-3 h-3" />
-                                    </button>
-                                </div>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="10"
-                                    value={currentSetInputs.rpe}
-                                    onChange={(e) => setCurrentSetInputs(prev => ({ ...prev, rpe: e.target.value }))}
-                                    placeholder={currentSet.targetRpe?.toString() || '7'}
-                                    className="w-full px-1 py-1 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none text-center text-xs"
-                                />
-                            </div>
-                        </div>
-
-                        {/* RPE Info Tooltip */}
-                        {showRpeInfo && (
-                            <div className="mb-3 p-3 border border-blue-500 rounded-lg bg-gray-800">
-                                <div className="flex items-start">
-                                    <InformationCircleIcon className="w-4 h-4 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <h4 className="text-sm font-medium text-blue-400 mb-1">Rate of Perceived Exertion (RPE)</h4>
-                                        <p className="text-xs text-gray-300 mb-2">
-                                            How hard did this set feel on a scale of 1-10?
-                                        </p>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                            <div className="space-y-1">
-                                                <div><span className="text-green-400">1-3:</span> Easy</div>
-                                                <div><span className="text-yellow-400">4-6:</span> Moderate</div>
-                                                <div><span className="text-orange-400">7-8:</span> Hard</div>
-                                                <div><span className="text-red-400">9-10:</span> Maximum</div>
-                                            </div>
-                                            <div className="text-gray-300">
-                                                <div className="text-xs">• 7 = Could do 3 more reps</div>
-                                                <div className="text-xs">• 8 = Could do 2 more reps</div>
-                                                <div className="text-xs">• 10 = Couldn't do another rep</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Color-Coded RPE Description */}
-                        {currentSetInputs.rpe && parseInt(currentSetInputs.rpe) >= 1 && parseInt(currentSetInputs.rpe) <= 10 && (
-                            <div className={`text-xs mb-3 text-center rounded px-2 py-1 ${getRpeColorClass(parseInt(currentSetInputs.rpe))}`}>
-                                Difficulty: {getRpeDescription(parseInt(currentSetInputs.rpe))}
-                            </div>
-                        )}
-
-                        {/* Action Buttons */}
-                        <div className="flex space-x-2">
-                            <button
-                                onClick={handleCompleteSet}
-                                disabled={!currentSetInputs.reps}
-                                className="flex-1 px-3 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center text-sm"
-                            >
-                                <CheckIcon className="w-4 h-4 mr-1" />
-                                Complete
-                            </button>
-                            <button
-                                onClick={handleSkipSet}
-                                className="px-3 py-2.5 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors active:scale-[0.98] flex items-center justify-center text-sm"
-                            >
-                                <ForwardIcon className="w-4 h-4 mr-1" />
-                                Skip
-                            </button>
-
-                            {/* Add Exercise Button */}
-                            <button
-                                onClick={handleAddExercise}
-                                className="px-3 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors active:scale-[0.98] flex items-center justify-center text-sm"
-                                title="Add Exercise"
-                            >
-                                <PlusIcon className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* InWorkout Exercise Selector */}
-            <InWorkoutExerciseSelector
-                open={showInWorkoutSelector}
-                onClose={() => setShowInWorkoutSelector(false)}
+        <div className="min-h-screen bg-gray-900 text-white pb-6">
+            {/* Confetti Effect */}
+            <ConfettiEffect
+                show={showConfetti}
+                onComplete={() => setShowConfetti(false)}
             />
 
-            {/* Workout Complete Floating Button */}
-            {isWorkoutComplete && (!currentSet || currentSet.completed) && !isCurrentExerciseCompleted && (
-                <div className="fixed bottom-6 right-6">
-                    <button
-                        onClick={() => setShowCompleteDialog(true)}
-                        className="p-4 bg-green-600 hover:bg-green-700 rounded-full shadow-lg transition-all active:scale-95 text-white"
-                        title="Complete Workout"
-                    >
-                        <CheckIcon className="w-6 h-6" />
-                    </button>
-                </div>
-            )}
+            {/* Set Completion Dialog */}
+            <SetCompletionDialog
+                show={showSetDialog}
+                isLastSet={isLastSetOfExercise}
+                isLastExercise={isLastExerciseOfWorkout}
+                exerciseName={exercise.name || exercise.exerciseName || 'Exercise'}
+                onNextExercise={() => {
+                    setShowSetDialog(false);
+                    handleNextExercise();
+                }}
+                onAddSet={handleAddSet}
+                onCompleteWorkout={handleCompleteWorkout}
+                onClose={() => setShowSetDialog(false)}
+            />
 
-            {/* Complete Workout Dialog */}
-            {showCompleteDialog && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-800 rounded-xl max-w-md w-full p-6">
-                        <div className="text-center mb-6">
-                            <div className="text-6xl mb-4">🎉</div>
-                            <h2 className="text-2xl font-bold mb-2">Workout Complete!</h2>
-                            <p className="text-gray-400">
-                                Great job! You completed your workout in {formatDuration(totalDuration)}.
-                            </p>
+            {/* Header with workout progress */}
+            <div className={`bg-gradient-to-r ${typeStyle.gradient} text-white p-4 shadow-lg`}>
+                <div className="max-w-4xl mx-auto">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="text-2xl">{typeStyle.icon}</div>
+                            <div>
+                                <h1 className="text-xl font-bold">
+                                    {exercise.name || exercise.exerciseName}
+                                </h1>
+                                <p className="text-sm opacity-90">
+                                    Exercise {currentWorkout.currentExerciseIndex + 1} of {currentWorkout.exercises.length}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-lg font-bold">{getCompletionPercentage()}%</div>
+                            <div className="text-sm opacity-90">Complete</div>
+                        </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full bg-white/20 rounded-full h-3">
+                        <div
+                            className="bg-white rounded-full h-3 transition-all duration-300"
+                            style={{width: `${getCompletionPercentage()}%`}}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-4xl mx-auto p-4 space-y-6">
+                {/* Exercise Navigation */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <Button
+                                variant="outline"
+                                onClick={handlePreviousExercise}
+                                disabled={!canGoPrevious}
+                                className="flex-1 mr-2 bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
+                            >
+                                <SkipBack className="w-4 h-4 mr-2"/>
+                                Previous
+                            </Button>
+
+                            <div className="flex-1 text-center">
+                                <Badge variant="secondary" className="text-sm bg-gray-700 text-white">
+                                    Set {currentSet.setNumber} of {currentExercise.sets.length}
+                                </Badge>
+                            </div>
+
+                            <Button
+                                variant="outline"
+                                onClick={handleNextExercise}
+                                disabled={!canGoNext}
+                                className="flex-1 ml-2 bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
+                            >
+                                Next
+                                <SkipForward className="w-4 h-4 ml-2"/>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Rest Timer Display */}
+                {isRestTimer && (
+                    <Card className="border-orange-700 bg-orange-900/20">
+                        <CardContent className="p-4 text-center">
+                            <div className="text-2xl mb-2">⏰</div>
+                            <h3 className="text-lg font-bold text-orange-300 mb-2">Rest Time</h3>
+                            <div className="text-3xl font-bold text-orange-400 mb-2">
+                                {formatTime(restTimeRemaining)}
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setIsRestTimer(false);
+                                    setRestTimeRemaining(0);
+                                }}
+                                className="text-orange-400 border-orange-600 bg-gray-800 hover:bg-gray-700"
+                            >
+                                Skip Rest
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
+                
+                {/* Exercise-Specific Tracking */}
+                {isCardio ? (
+                    /* Cardio Tracking Interface */
+                    <Card className={`${typeStyle.bg} ${typeStyle.border} bg-gray-800`}>
+                        <CardHeader className="pb-3">
+                            <CardTitle className={`${typeStyle.text} flex items-center gap-2`}>
+                                <Heart className="w-5 h-5"/>
+                                Cardio Session
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Timer Display */}
+                            <div className="text-center py-6">
+                                <div className="text-4xl font-bold text-white mb-2">
+                                    {formatTime(timerSeconds)}
+                                </div>
+                                <div className="flex justify-center gap-2">
+                                    <Button
+                                        onClick={isTimerRunning ? stopTimer : startTimer}
+                                        className={isTimerRunning ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}
+                                    >
+                                        {isTimerRunning ? <Pause className="w-4 h-4 mr-2"/> :
+                                            <Play className="w-4 h-4 mr-2"/>}
+                                        {isTimerRunning ? 'Stop Timer' : 'Start Timer'}
+                                    </Button>
+                                    <Button variant="outline" onClick={resetTimer}
+                                            className="bg-gray-700 border-gray-600 hover:bg-gray-600 text-white">
+                                        <RotateCcw className="w-4 h-4 mr-2"/>
+                                        Reset
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Cardio Duration Input */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Duration (minutes) *
+                                </label>
+                                <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={setData.actualDurationMinutes || ''}
+                                    onChange={(e) => setSetData(prev => ({
+                                        ...prev,
+                                        actualDurationMinutes: parseFloat(e.target.value) || undefined
+                                    }))}
+                                    placeholder="Enter duration in minutes"
+                                    className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                />
+                            </div>
+
+                            {/* Optional Distance Input */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Distance (optional)
+                                </label>
+                                <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={setData.actualDistance || ''}
+                                    onChange={(e) => setSetData(prev => ({
+                                        ...prev,
+                                        actualDistance: parseFloat(e.target.value) || undefined
+                                    }))}
+                                    placeholder="Enter distance"
+                                    className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Notes
+                                </label>
+                                <Input
+                                    value={setData.notes || ''}
+                                    onChange={(e) => setSetData(prev => ({...prev, notes: e.target.value}))}
+                                    placeholder="How did the cardio session feel?"
+                                    className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : isIsometric ? (
+                    /* Isometric Tracking Interface */
+                    <Card className={`${typeStyle.bg} ${typeStyle.border} bg-gray-800`}>
+                        <CardHeader className="pb-3">
+                            <CardTitle className={`${typeStyle.text} flex items-center gap-2`}>
+                                <Timer className="w-5 h-5"/>
+                                Isometric Hold
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Timer Display */}
+                            <div className="text-center py-6">
+                                <div className="text-4xl font-bold text-white mb-2">
+                                    {formatTime(timerSeconds)}
+                                </div>
+                                <div className="flex justify-center gap-2">
+                                    <Button
+                                        onClick={isTimerRunning ? stopTimer : startTimer}
+                                        className={isTimerRunning ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}
+                                    >
+                                        {isTimerRunning ? <Pause className="w-4 h-4 mr-2"/> :
+                                            <Play className="w-4 h-4 mr-2"/>}
+                                        {isTimerRunning ? 'Stop Hold' : 'Start Hold'}
+                                    </Button>
+                                    <Button variant="outline" onClick={resetTimer}
+                                            className="bg-gray-700 border-gray-600 hover:bg-gray-600 text-white">
+                                        <RotateCcw className="w-4 h-4 mr-2"/>
+                                        Reset
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Hold Time Input */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Hold Time (seconds) *
+                                </label>
+                                <Input
+                                    type="number"
+                                    value={setData.actualHoldSeconds || timerSeconds || ''}
+                                    onChange={(e) => setSetData(prev => ({
+                                        ...prev,
+                                        actualHoldSeconds: parseInt(e.target.value) || undefined
+                                    }))}
+                                    placeholder="Enter hold time in seconds"
+                                    className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">
+                                    Notes
+                                </label>
+                                <Input
+                                    value={setData.notes || ''}
+                                    onChange={(e) => setSetData(prev => ({...prev, notes: e.target.value}))}
+                                    placeholder="How challenging was this hold?"
+                                    className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    /* Strength Training Interface */
+                    <Card className={`${typeStyle.bg} ${typeStyle.border} bg-gray-800`}>
+                        <CardHeader className="pb-3">
+                            <CardTitle className={`${typeStyle.text} flex items-center gap-2`}>
+                                <Weight className="w-5 h-5"/>
+                                Strength Set {currentSet.setNumber}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                                        Reps Completed *
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setSetData(prev => ({
+                                                ...prev,
+                                                actualReps: Math.max(0, (prev.actualReps || 0) - 1)
+                                            }))}
+                                            className="bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
+                                        >
+                                            <Minus className="w-4 h-4"/>
+                                        </Button>
+                                        <Input
+                                            type="number"
+                                            value={setData.actualReps || ''}
+                                            onChange={(e) => setSetData(prev => ({
+                                                ...prev,
+                                                actualReps: parseInt(e.target.value) || undefined
+                                            }))}
+                                            placeholder={`Target: ${currentSet.targetReps}`}
+                                            className="text-center font-bold bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setSetData(prev => ({
+                                                ...prev,
+                                                actualReps: (prev.actualReps || 0) + 1
+                                            }))}
+                                            className="bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
+                                        >
+                                            <Plus className="w-4 h-4"/>
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1">Target: {currentSet.targetReps} reps</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                                        Weight ({currentSet.targetWeightUnit || 'lbs'})
+                                    </label>
+                                    <Input
+                                        type="number"
+                                        step="0.1"
+                                        value={setData.actualWeight || ''}
+                                        onChange={(e) => setSetData(prev => ({
+                                            ...prev,
+                                            actualWeight: parseFloat(e.target.value) || undefined
+                                        }))}
+                                        placeholder={currentSet.targetWeight ? `Target: ${currentSet.targetWeight}` : 'Enter weight'}
+                                        className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                                        RPE (1-10)
+                                    </label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max="10"
+                                        value={setData.actualRpe || ''}
+                                        onChange={(e) => setSetData(prev => ({
+                                            ...prev,
+                                            actualRpe: parseInt(e.target.value) || undefined
+                                        }))}
+                                        placeholder={currentSet.targetRpe ? `Target: ${currentSet.targetRpe}` : 'Rate effort'}
+                                        className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                                        Notes
+                                    </label>
+                                    <Input
+                                        value={setData.notes || ''}
+                                        onChange={(e) => setSetData(prev => ({...prev, notes: e.target.value}))}
+                                        placeholder="Form notes, feeling, etc."
+                                        className="w-full bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Set Actions */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardContent className="p-4">
+                        <div className="flex gap-3">
+                            <Button
+                                onClick={handleCompleteSet}
+                                disabled={currentSet.completed}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                <CheckCircle className="w-4 h-4 mr-2"/>
+                                Complete Set
+                            </Button>
+
+                            <Button
+                                onClick={handleSkipSet}
+                                disabled={currentSet.completed}
+                                variant="outline"
+                                className="px-6 bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
+                            >
+                                Skip
+                            </Button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 mb-6 text-center">
-                            <div className="bg-gray-700 rounded-lg p-3">
-                                <div className="text-2xl font-bold text-green-400">
-                                    {currentWorkout.exercises.length}
-                                </div>
-                                <div className="text-xs text-gray-300">Exercises</div>
+                        {/* Set Management */}
+                        <div className="flex justify-center gap-2 mt-4">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleAddSet}
+                                className="text-blue-400 border-blue-600 bg-gray-800 hover:bg-gray-700"
+                            >
+                                <Plus className="w-4 h-4 mr-1"/>
+                                Add Set
+                            </Button>
+
+                            {currentExercise.sets.length > 1 && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleRemoveSet}
+                                    className="text-red-400 border-red-600 bg-gray-800 hover:bg-gray-700"
+                                >
+                                    <Minus className="w-4 h-4 mr-1"/>
+                                    Remove Set
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Workout Controls */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardContent className="p-4">
+                        <div className="flex gap-3">
+                            <Button
+                                onClick={isPaused ? resumeWorkout : pauseWorkout}
+                                variant="outline"
+                                className="flex-1 bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
+                            >
+                                {isPaused ? <Play className="w-4 h-4 mr-2"/> : <Pause className="w-4 h-4 mr-2"/>}
+                                {isPaused ? 'Resume' : 'Pause'} Workout
+                            </Button>
+
+                            <Button
+                                onClick={handleCompleteWorkout}
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                                <Trophy className="w-4 h-4 mr-2"/>
+                                Complete Workout
+                            </Button>
+
+                            <Button
+                                onClick={handleCancelWorkout}
+                                variant="outline"
+                                className="px-6 text-red-400 border-red-600 bg-gray-800 hover:bg-gray-700"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Exercise Overview */}
+                <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2 text-white">
+                            <Activity className="w-5 h-5"/>
+                            Exercise Overview
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {/* Exercise Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div className="text-center p-3 bg-gray-700 rounded-lg">
+                                <div className="font-bold text-white">{exercise.exerciseType}</div>
+                                <div className="text-gray-400">Type</div>
                             </div>
-                            <div className="bg-gray-700 rounded-lg p-3">
+                            <div className="text-center p-3 bg-gray-700 rounded-lg">
+                                <div className="font-bold text-white">{exercise.difficultyLevel}</div>
+                                <div className="text-gray-400">Difficulty</div>
+                            </div>
+                            <div className="text-center p-3 bg-gray-700 rounded-lg">
+                                <div className="font-bold text-white">{getTotalDuration()} min</div>
+                                <div className="text-gray-400">Duration</div>
+                            </div>
+                        </div>
+
+                        {/* Set Progress */}
+                        <div className="space-y-2">
+                            <h4 className="font-medium text-white">Set Progress</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                                {currentExercise.sets.map((set, index) => (
+                                    <div
+                                        key={set.id}
+                                        className={`
+                      p-3 rounded-lg text-center text-sm border-2 transition-all duration-200 cursor-pointer
+                      ${index === currentWorkout.currentSetIndex
+                                            ? 'border-blue-500 bg-blue-900/50 shadow-md scale-105'
+                                            : set.completed
+                                                ? 'border-green-600 bg-green-900/30'
+                                                : 'border-gray-600 bg-gray-800 hover:border-gray-500'
+                                        }
+                    `}
+                                    >
+                                        <div className="font-bold text-white">Set {set.setNumber}</div>
+                                        {set.completed ? (
+                                            <div className="text-green-400 text-xs">
+                                                {isCardio ? `${set.actualReps || 0}min` :
+                                                    isIsometric ? `${set.actualReps || 0}s` :
+                                                        `${set.actualReps || 0}/${set.targetReps}`}
+                                            </div>
+                                        ) : (
+                                            <div className="text-gray-400 text-xs">
+                                                {isCardio ? `${currentExercise.scheduledExercise.targetDurationMinutes || 20}min` :
+                                                    isIsometric ? `${currentExercise.scheduledExercise.holdDurationSeconds || 30}s` :
+                                                        `${set.targetReps} reps`}
+                                            </div>
+                                        )}
+                                        {index === currentWorkout.currentSetIndex && (
+                                            <div className="text-blue-400 text-xs font-medium mt-1">Current</div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Exercise Description */}
+                        {exercise.description && (
+                            <div className="p-3 bg-gray-700 rounded-lg">
+                                <h4 className="font-medium text-white mb-2">Exercise Description</h4>
+                                <p className="text-sm text-gray-300">{exercise.description}</p>
+                            </div>
+                        )}
+
+                        {/* Exercise Tips */}
+                        {exercise.tips && exercise.tips.length > 0 && (
+                            <div className="p-3 bg-blue-900/20 border border-blue-700 rounded-lg">
+                                <h4 className="font-medium text-blue-300 mb-2 flex items-center gap-2">
+                                    <Zap className="w-4 h-4"/>
+                                    Tips for Success
+                                </h4>
+                                <ul className="text-sm text-blue-200 space-y-1">
+                                    {exercise.tips.slice(0, 3).map((tip, index) => (
+                                        <li key={index} className="flex items-start gap-2">
+                                            <span className="text-blue-400 mt-0.5">•</span>
+                                            <span>{tip}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Workout Summary */}
+                <Card className="bg-gradient-to-r from-gray-800 to-gray-700 border-gray-600">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-lg text-white">Workout Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div>
                                 <div className="text-2xl font-bold text-blue-400">
-                                    {currentWorkout.exercises.reduce((total, ex) => total + ex.sets.length, 0)}
+                                    {currentWorkout.exercises.filter(ex => ex.completed).length}
                                 </div>
-                                <div className="text-xs text-gray-300">Total Sets</div>
+                                <div className="text-sm text-gray-400">Exercises Done</div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold text-green-400">
+                                    {currentWorkout.exercises.reduce((total, ex) =>
+                                        total + ex.sets.filter(set => set.completed).length, 0
+                                    )}
+                                </div>
+                                <div className="text-sm text-gray-400">Sets Completed</div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold text-purple-400">
+                                    {getTotalDuration()}
+                                </div>
+                                <div className="text-sm text-gray-400">Minutes Active</div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold text-orange-400">
+                                    {currentWorkout.exercises.reduce((total, ex) =>
+                                        total + (ex.scheduledExercise.exercise.estimatedCalories || 0), 0
+                                    )}
+                                </div>
+                                <div className="text-sm text-gray-400">Est. Calories</div>
                             </div>
                         </div>
-
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => setShowCompleteDialog(false)}
-                                className="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                            >
-                                Continue
-                            </button>
-                            <button
-                                onClick={handleWorkoutComplete}
-                                className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                                Finish
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Cancel Workout Dialog */}
-            {showCancelDialog && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-800 rounded-xl max-w-md w-full p-6">
-                        <h2 className="text-xl font-bold mb-4">Cancel Workout?</h2>
-                        <p className="text-gray-400 mb-6">
-                            Are you sure you want to cancel this workout? Your progress will not be saved.
-                        </p>
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => setShowCancelDialog(false)}
-                                className="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                            >
-                                Keep Going
-                            </button>
-                            <button
-                                onClick={handleWorkoutCancel}
-                                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                            >
-                                Cancel Workout
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 };

@@ -2,12 +2,23 @@ package com.chidituke.workout_tracker.model.workout;
 
 import jakarta.persistence.*;
 import lombok.Data;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Data
 @Entity
 @Table(name = "workout_plans")
 public class WorkoutPlan {
+
+    // =============================================================================
+    // ENTITY FIELDS
+    // =============================================================================
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "workout_plan_id")
@@ -48,7 +59,10 @@ public class WorkoutPlan {
     @Column(name = "subscription_tier_required")
     private String subscriptionTierRequired = "FREE";
 
-    // Creator and popularity tracking:
+    // =============================================================================
+    // CREATOR AND POPULARITY TRACKING
+    // =============================================================================
+
     @Column(name = "created_by_user_id")
     private Long createdByUserId;
 
@@ -61,19 +75,194 @@ public class WorkoutPlan {
     @Column(name = "average_rating")
     private Double averageRating = 0.0;
 
-    // Timestamps:
+    @Column(name = "created_by_professional")
+    private Boolean createdByProfessional = false;
+
+    // =============================================================================
+    // TIMESTAMPS
+    // =============================================================================
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    @Column(name = "created_by_professional")
-    private Boolean createdByProfessional = false;
+    // =============================================================================
+    // RELATIONSHIPS
+    // =============================================================================
 
-    // =======================
-    //  PROFESSIONAL CONTENT METHODS
-    // =======================
+    @OneToMany(mappedBy = "workoutPlan", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OrderBy("orderInWorkout ASC") // Maintain exercise order
+    private List<PlanExercise> planExercises = new ArrayList<>();
+
+    // =============================================================================
+    // ENUMS
+    // =============================================================================
+
+    public enum WorkoutType {
+        STRENGTH, CARDIO, FLEXIBILITY, MIXED, HIIT, POWERLIFTING
+    }
+
+    public enum DifficultyLevel {
+        BEGINNER, INTERMEDIATE, ADVANCED
+    }
+
+    // =============================================================================
+    // EXERCISE RELATIONSHIP METHODS
+    // =============================================================================
+
+    /**
+     * Get all PlanExercise entities for this workout plan
+     */
+    public List<PlanExercise> getPlanExercises() {
+        return planExercises != null ? planExercises : new ArrayList<>();
+    }
+
+    /**
+     * Set the plan exercises for this workout plan
+     */
+    public void setPlanExercises(List<PlanExercise> planExercises) {
+        this.planExercises = planExercises != null ? planExercises : new ArrayList<>();
+    }
+
+    /**
+     * Get all exercises in this workout plan (convenience method)
+     */
+    public List<Exercise> getExercises() {
+        return getPlanExercises().stream()
+                .map(PlanExercise::getExercise)
+                .filter(Objects::nonNull) // ✅ FIXED: Now Objects import is available
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get the first exercise in this workout plan
+     */
+    public Exercise getFirstExercise() {
+        List<Exercise> exercises = getExercises();
+        return exercises.isEmpty() ? null : exercises.get(0);
+    }
+
+    /**
+     * Get exercise by order in workout
+     */
+    public Exercise getExerciseByOrder(int order) {
+        return getPlanExercises().stream()
+                .filter(pe -> pe.getOrderInWorkout() != null && pe.getOrderInWorkout() == order)
+                .map(PlanExercise::getExercise)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Get the number of exercises in this workout plan
+     */
+    public int getExerciseCount() {
+        return getPlanExercises().size();
+    }
+
+    /**
+     * Check if this workout plan has any exercises
+     */
+    public boolean hasExercises() {
+        return !getPlanExercises().isEmpty();
+    }
+
+    /**
+     * Check if this is a single-exercise workout plan
+     */
+    public boolean isSingleExercise() {
+        return getExerciseCount() == 1;
+    }
+
+    /**
+     * Add an exercise to this workout plan
+     */
+    public PlanExercise addExercise(Exercise exercise, int order) {
+        PlanExercise planExercise = new PlanExercise();
+        planExercise.setWorkoutPlan(this);
+        planExercise.setExercise(exercise);
+        planExercise.setOrderInWorkout(order);
+
+        if (this.planExercises == null) {
+            this.planExercises = new ArrayList<>();
+        }
+        this.planExercises.add(planExercise);
+
+        return planExercise;
+    }
+
+    /**
+     * Remove an exercise from this workout plan
+     */
+    public void removeExercise(Exercise exercise) {
+        if (this.planExercises != null) {
+            this.planExercises.removeIf(pe ->
+                    pe.getExercise() != null && pe.getExercise().getId().equals(exercise.getId()));
+        }
+    }
+
+    // =============================================================================
+    // EXERCISE TYPE ANALYSIS METHODS
+    // =============================================================================
+
+    /**
+     * Get exercises by type (cardio, strength, etc.)
+     */
+    public List<Exercise> getExercisesByType(Exercise.ExerciseType type) {
+        return getExercises().stream()
+                .filter(exercise -> exercise.getExerciseType() == type)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Check if workout plan contains any cardio exercises
+     */
+    public boolean hasCardioExercises() {
+        return getExercises().stream()
+                .anyMatch(exercise -> exercise.getIsCardio() != null && exercise.getIsCardio());
+    }
+
+    /**
+     * Check if workout plan contains any isometric exercises
+     */
+    public boolean hasIsometricExercises() {
+        return getExercises().stream()
+                .anyMatch(exercise -> exercise.getIsIsometric() != null && exercise.getIsIsometric());
+    }
+
+    /**
+     * Check if workout plan contains any strength exercises
+     */
+    public boolean hasStrengthExercises() {
+        return getExercises().stream()
+                .anyMatch(exercise -> !exercise.getIsCardio() && !exercise.getIsIsometric());
+    }
+
+    /**
+     * Get the primary exercise type of this workout plan
+     */
+    public Exercise.ExerciseType getPrimaryExerciseType() {
+        List<Exercise> exercises = getExercises();
+        if (exercises.isEmpty()) {
+            return Exercise.ExerciseType.STRENGTH; // Default
+        }
+
+        // Count exercise types
+        Map<Exercise.ExerciseType, Long> typeCounts = exercises.stream()
+                .collect(Collectors.groupingBy(Exercise::getExerciseType, Collectors.counting()));
+
+        // Return the most common type
+        return typeCounts.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(Exercise.ExerciseType.STRENGTH);
+    }
+
+    // =============================================================================
+    // PROFESSIONAL CONTENT METHODS
+    // =============================================================================
 
     /**
      * Get the professional creation status with null safety
@@ -99,7 +288,7 @@ public class WorkoutPlan {
     /**
      * Mark this workout plan as created by a professional
      */
-    public void markAsProfeessionalContent() {
+    public void markAsProfessionalContent() { // ✅ FIXED: Typo in method name
         this.createdByProfessional = true;
     }
 
@@ -131,9 +320,9 @@ public class WorkoutPlan {
         return isCreatedByProfessional() ? "👨‍⚕️ PRO" : "👤 User";
     }
 
-    // =======================
-    // ENHANCED DOMAIN METHODS
-    // =======================
+    // =============================================================================
+    // ACCESSIBILITY AND FEATURES METHODS
+    // =============================================================================
 
     /**
      * Check if this workout plan is publicly accessible
@@ -164,6 +353,37 @@ public class WorkoutPlan {
                 !equipmentNeeded.trim().isEmpty() &&
                 !equipmentNeeded.equalsIgnoreCase("None");
     }
+
+    /**
+     * Check if this workout plan is accessible to a specific subscription tier
+     */
+    public boolean isAccessibleToTier(String userTier) {
+        if (subscriptionTierRequired == null || "FREE".equals(subscriptionTierRequired)) {
+            return true; // Free content accessible to everyone
+        }
+
+        if (userTier == null) {
+            return false; // Premium content not accessible to unsubscribed users
+        }
+
+        return switch (userTier.toUpperCase()) {
+            case "FREE" -> "FREE".equals(subscriptionTierRequired);
+            case "PLUS" -> "FREE".equals(subscriptionTierRequired) || "PLUS".equals(subscriptionTierRequired);
+            case "PRO" -> true; // Pro tier can access everything
+            default -> false;
+        };
+    }
+
+    /**
+     * Increment the usage count when workout plan is used
+     */
+    public void incrementUsage() {
+        this.timesUsed = (this.timesUsed == null ? 0 : this.timesUsed) + 1;
+    }
+
+    // =============================================================================
+    // DISPLAY AND FORMATTING METHODS
+    // =============================================================================
 
     /**
      * Get difficulty description for UI display
@@ -215,33 +435,6 @@ public class WorkoutPlan {
     }
 
     /**
-     * Check if this workout plan is accessible to a specific subscription tier
-     */
-    public boolean isAccessibleToTier(String userTier) {
-        if (subscriptionTierRequired == null || "FREE".equals(subscriptionTierRequired)) {
-            return true; // Free content accessible to everyone
-        }
-
-        if (userTier == null) {
-            return false; // Premium content not accessible to unsubscribed users
-        }
-
-        return switch (userTier.toUpperCase()) {
-            case "FREE" -> "FREE".equals(subscriptionTierRequired);
-            case "PLUS" -> "FREE".equals(subscriptionTierRequired) || "PLUS".equals(subscriptionTierRequired);
-            case "PRO" -> true; // Pro tier can access everything
-            default -> false;
-        };
-    }
-
-    /**
-     * Increment the usage count when workout plan is used
-     */
-    public void incrementUsage() {
-        this.timesUsed = (this.timesUsed == null ? 0 : this.timesUsed) + 1;
-    }
-
-    /**
      * Get formatted duration for UI display
      */
     public String getFormattedDuration() {
@@ -274,16 +467,10 @@ public class WorkoutPlan {
         }
     }
 
-    // Add enums:
-    public enum WorkoutType {
-        STRENGTH, CARDIO, FLEXIBILITY, MIXED, HIIT, POWERLIFTING
-    }
+    // =============================================================================
+    // JPA LIFECYCLE METHODS
+    // =============================================================================
 
-    public enum DifficultyLevel {
-        BEGINNER, INTERMEDIATE, ADVANCED
-    }
-
-    // ⏰ JPA LIFECYCLE METHODS
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();

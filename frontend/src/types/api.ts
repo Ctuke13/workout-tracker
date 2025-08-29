@@ -130,13 +130,16 @@ export interface ScheduledWorkoutResponse {
     scheduledDate: string; // ISO date string "2025-01-20"
     status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'SKIPPED' | 'RESCHEDULED';
 
+    exercise?: BackendExercise;
+
     // =============================================================================
     // EXERCISE CONFIGURATION FIELDS
     // =============================================================================
     // Strength exercise fields
-    sets?: number;
-    reps?: string;
-    weight?: number;
+    targetSets?: number;
+    targetReps?: string;
+    targetWeight?: number;
+    targetWeightUnit?: string;
     restSeconds?: number;
     tempo?: string;
     targetRpe?: number;
@@ -385,6 +388,24 @@ export interface WorkoutPlanSearchResponse {
 
 // ==================== PERFORMANCE RECORD TYPES ====================
 
+export interface PersonalRecord {
+    type: "MAX_WEIGHT" | "MAX_REPS" | "LONGEST_HOLD" | "FASTEST_PACE" | "LONGEST_DISTANCE";
+    exerciseId: number;
+    exerciseName: string;
+    previousValue?: number;
+    newValue: number;
+    unit: string;
+    achievedAt: string;
+}
+
+export interface PerformanceImprovement {
+    metric: string;
+    previousValue: number;
+    currentValue: number;
+    improvementPercentage: number;
+    comparisonPeriod: 'last_workout' | 'last_week' | 'last_month';
+}
+
 export interface PerformanceRequest {
     workoutLogId: number; // This maps to workoutSessionId in your backend
     exerciseId: number;
@@ -480,6 +501,7 @@ export interface WorkoutSet {
     targetReps: number;
     actualReps?: number;
     targetWeight?: number;
+    targetWeightUnit?: 'kg' | 'lbs';
     actualWeight?: number;
     targetRpe?: number;
     actualRpe?: number;
@@ -487,6 +509,8 @@ export interface WorkoutSet {
     completed: boolean;
     notes?: string;
     completedAt?: Date;
+    actualDurationMinutes?: number;
+    actualHoldSeconds?: number;
 }
 
 export interface WorkoutExercise {

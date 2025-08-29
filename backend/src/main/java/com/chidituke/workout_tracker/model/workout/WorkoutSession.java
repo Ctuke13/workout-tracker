@@ -4,8 +4,11 @@ import com.chidituke.workout_tracker.model.user.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +29,23 @@ public class WorkoutSession {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workout_plan_id", nullable = false)
     private WorkoutPlan workoutPlan;
+
+    @OneToMany(mappedBy = "workoutSession", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<PerformanceRecord> performanceRecords = new ArrayList<>();
+
+    @Column(name = "total_exercises_planned")
+    private Integer totalExercisesPlanned;
+
+    @Column(name = "total_exercises_completed")
+    private Integer totalExercisesCompleted;
+
+    @Column(name = "completion_percentage")
+    private Double completionPercentage; // Calculated field
+
+    @Column(name = "session_status")
+    @Enumerated(EnumType.STRING)
+    private SessionStatus sessionStatus = SessionStatus.IN_PROGRESS;
+
 
     @Column(name = "total_duration_minutes")
     private Integer totalDurationMinutes;
@@ -76,6 +96,12 @@ public class WorkoutSession {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "workout_feedback", columnDefinition = "TEXT")
+    private String workoutFeedback;
+
+    @Column(name = "performance_summary", columnDefinition = "TEXT")
+    private String performanceSummary;
+
     // Link to scheduled workout (if this session was from a scheduled workout)
     @OneToOne
     @JoinColumn(name = "scheduled_workout_id")
@@ -114,6 +140,106 @@ public class WorkoutSession {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    //===================== HELPER METHODS ============================
+
+    /**
+     * Add a performance record to this session
+     */
+    public void addPerformanceRecord(PerformanceRecord record) {
+        if (performanceRecords == null) {
+            performanceRecords = new ArrayList<>();
+        }
+        performanceRecords.add(record);
+        record.setWorkoutSession(this);
+    }
+
+    /**
+     * Calculate and update completion percentage
+     */
+    public void updateCompletionPercentage() {
+        if (totalExercisesPlanned == null || totalExercisesPlanned == 0) {
+            this.completionPercentage = 0.0;
+            return;
+        }
+
+        if (totalExercisesCompleted == null) {
+            this.totalExercisesCompleted = 0;
+        }
+
+        this.completionPercentage = (totalExercisesCompleted.doubleValue() / totalExercisesPlanned) * 100.0;
+
+        // Update session status based on completion
+        updateSessionStatus();
+    }
+
+    /**
+     * Update session status based on completion percentage
+     */
+    private void updateSessionStatus() {
+        if (completionPercentage == null) {
+            this.sessionStatus = SessionStatus.PLANNED;
+        } else if (completionPercentage >= 100.0) {
+            this.sessionStatus = SessionStatus.COMPLETED;
+        } else if (completionPercentage > 0.0) {
+            this.sessionStatus = SessionStatus.PARTIALLY_COMPLETED;
+        } else {
+            this.sessionStatus = SessionStatus.IN_PROGRESS;
+        }
+    }
+
+    /**
+     * Mark an exercise as completed
+     */
+    public void completeExercise() {
+        if (totalExercisesCompleted == null) {
+            totalExercisesCompleted = 0;
+        }
+        totalExercisesCompleted++;
+        updateCompletionPercentage();
+    }
+
+    /**
+     * Get completion status description
+     */
+    public String getCompletionStatusDescription() {
+        if (completionPercentage == null || completionPercentage == 0) {
+            return "Not started";
+        } else if (completionPercentage >= 100) {
+            return "Completed";
+        } else {
+            return String.format("%.0f%% complete (%d/%d exercises)",
+                    completionPercentage,
+                    totalExercisesCompleted,
+                    totalExercisesPlanned);
+        }
+    }
+
+    /**
+     * Check if workout is partially completed
+     */
+    public boolean isPartiallyCompleted() {
+        return sessionStatus == SessionStatus.PARTIALLY_COMPLETED;
+    }
+
+    /**
+     * Check if workout is fully completed
+     */
+    public boolean isFullyCompleted() {
+        return sessionStatus == SessionStatus.COMPLETED;
+    }
+
+    /**
+     * Get exercise completion summary
+     */
+    public Map<String, Integer> getCompletionSummary() {
+        Map<String, Integer> summary = new HashMap<>();
+        summary.put("planned", totalExercisesPlanned != null ? totalExercisesPlanned : 0);
+        summary.put("completed", totalExercisesCompleted != null ? totalExercisesCompleted : 0);
+        summary.put("remaining", (totalExercisesPlanned != null ? totalExercisesPlanned : 0) -
+                (totalExercisesCompleted != null ? totalExercisesCompleted : 0));
+        return summary;
     }
 
     // ==================== SOCIAL SHARING METHODS ====================
@@ -352,6 +478,24 @@ public class WorkoutSession {
             if (difficulty >= 7) return "Challenging (" + difficulty + "/10)";
             if (difficulty >= 5) return "Moderate (" + difficulty + "/10)";
             return "Easy (" + difficulty + "/10)";
+        }
+    }
+
+    public enum SessionStatus {
+        PLANNED("Planned but not started"),
+        IN_PROGRESS("Currently working out"),
+        COMPLETED("All exercises completed"),
+        PARTIALLY_COMPLETED("Some exercises completed"),
+        ABANDONED("Workout stopped early");
+
+        private final String description;
+
+        SessionStatus(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
         }
     }
 

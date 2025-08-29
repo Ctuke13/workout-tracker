@@ -24,8 +24,11 @@ import {
     ExerciseType,
     WorkoutStats,
     ScheduledExercise,
-    WorkoutSession
+    WorkoutSession,
+    WorkoutResults,
+    getWorkoutTrackingType
 } from '../types/exercise';
+
 
 // ==================== EXERCISE TRANSFORMATIONS ====================
 
@@ -88,10 +91,14 @@ export const transformBackendExerciseToFrontend = (backendExercise: BackendExerc
  */
 const transformDifficultyLevel = (difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'): string => {
     switch (difficulty) {
-        case 'BEGINNER': return 'Beginner';
-        case 'INTERMEDIATE': return 'Intermediate';
-        case 'ADVANCED': return 'Advanced';
-        default: return 'Beginner';
+        case 'BEGINNER':
+            return 'Beginner';
+        case 'INTERMEDIATE':
+            return 'Intermediate';
+        case 'ADVANCED':
+            return 'Advanced';
+        default:
+            return 'Beginner';
     }
 };
 
@@ -104,99 +111,60 @@ export const transformScheduledWorkoutToExercises = (
     scheduledWorkout: ScheduledWorkoutResponse
 ): ScheduledExercise[] => {
 
-    console.log('🔍 Transforming workout:', scheduledWorkout);
-
-    // ✅ SMART DETECTION: Determine exercise type from scheduled workout data
-    const isCardio = !!(
-        scheduledWorkout.targetDurationMinutes ||
-        scheduledWorkout.targetDistanceKm ||
-        scheduledWorkout.targetPace
-    );
-    const isIsometric = !!scheduledWorkout.holdDurationSeconds;
+    console.log('🔍 Transforming workout with REAL exercise data:', {
+        id: scheduledWorkout.id,
+        hasExercise: !!scheduledWorkout.exercise,
+        hasWorkoutPlan: !!scheduledWorkout.workoutPlan
+    });
 
     if (scheduledWorkout.workoutPlan) {
+        // Handle workout plan workouts
         const workoutPlan = scheduledWorkout.workoutPlan;
+        let exercise: Exercise;
 
-        const exercise: Exercise = {
-            id: workoutPlan.id,
-            name: workoutPlan.name || 'Unnamed Workout Plan',
-            exerciseName: workoutPlan.name,
-            emoji: workoutPlan.exerciseCount === 1 ? '💪' : '📋',
-            description: workoutPlan.description || 'Scheduled workout',
-            difficultyLevel: (workoutPlan.difficulty || 'INTERMEDIATE') as DifficultyLevel,
-            exerciseType: isCardio ? 'CARDIO' as ExerciseType : 'STRENGTH' as ExerciseType,
-
-            // ✅ FIXED: Auto-determine from scheduled workout data
-            isCardio: isCardio,
-            isIsometric: isIsometric,
-
-            exerciseTypeDisplay: workoutPlan.exerciseCount === 1 ? 'Exercise' : 'Workout Plan',
-            estimatedDurationMinutes: workoutPlan.estimatedDurationMinutes || 15,
-            estimatedCalories: Math.round((workoutPlan.estimatedDurationMinutes || 15) * 8),
-            targetMuscleGroups: [],
-            equipmentRequired: [],
-            benefits: [],
-            tips: [],
-            videoUrl: null,
-            averageRating: 0,
-            totalRatings: 0,
-            usageCount: 0,
-            isPopular: false,
-            isHighlyRated: false,
-            canDoAtHome: true,
-            requiresEquipment: false,
-            createdByProfessional: false,
-            createdBy: 'Platform',
-            published: true
-        };
+        if (scheduledWorkout.exercise) {
+            // ✅ USE REAL EXERCISE DATA from your database!
+            exercise = transformBackendExerciseToFrontend(scheduledWorkout.exercise);
+            console.log('✅ Using REAL exercise data from database:', {
+                name: exercise.name,
+                isCardio: exercise.isCardio,
+                isIsometric: exercise.isIsometric,
+                exerciseType: exercise.exerciseType
+            });
+        } else {
+            // Fallback placeholder (should rarely happen now with V013 migration)
+            console.warn('⚠️ No exercise data available, using placeholder');
+            exercise = createSafeExercisePlaceholder(workoutPlan.id, workoutPlan.name || 'Workout Plan');
+        }
 
         const scheduledExercise: ScheduledExercise = {
             id: scheduledWorkout.id.toString(),
-            exerciseId: workoutPlan.id,
-            exercise: exercise,
+            exerciseId: scheduledWorkout.exercise?.id || workoutPlan.id,
+            exercise: exercise, // ✅ Now has correct isCardio/isIsometric flags!
             scheduledDate: scheduledWorkout.scheduledDate,
 
-            // ✅ ENHANCED: Smart defaults based on exercise type
-            targetSets: (() => {
-                if (isCardio) {
-                    return scheduledWorkout.sets || 1; // Default to 1 for single-session cardio
-                }
-                return scheduledWorkout.sets || 3; // Default for strength/isometric
-            })(),
-
-            targetReps: (() => {
-                if (isCardio) {
-                    return scheduledWorkout.targetDurationMinutes || 20; // Show duration for cardio
-                }
-                return parseInt(scheduledWorkout.reps || '10'); // Convert string to number
-            })(),
-
-            targetWeight: scheduledWorkout.weight,
+            // ✅ SMART CONFIGURATION based on ACTUAL exercise type
+            targetSets: scheduledWorkout.targetSets || getDefaultSetsForExercise(exercise),
+            targetReps: scheduledWorkout.targetReps ? parseInt(scheduledWorkout.targetReps) : getDefaultRepsForExercise(exercise),
+            targetWeight: scheduledWorkout.targetWeight,
             targetWeightUnit: 'lbs', // Default to lbs for American users
-            restSeconds: scheduledWorkout.restSeconds || (isCardio ? 0 : 60),
+            restSeconds: scheduledWorkout.restSeconds || getDefaultRestForExercise(exercise),
             targetRpe: scheduledWorkout.targetRpe,
             tempo: scheduledWorkout.tempo,
 
-            // ✅ CARDIO FIELDS - Fixed field names
+            // ✅ CARDIO FIELDS
             targetDurationMinutes: scheduledWorkout.targetDurationMinutes,
-
-            // ✅ FIXED: Convert from targetDistanceKm to targetDistance in miles
-            targetDistance: (() => {
-                if (scheduledWorkout.targetDistanceKm) {
-                    // Backend sends km, convert to miles for American users
-                    return Math.round(scheduledWorkout.targetDistanceKm * 0.621371 * 100) / 100;
-                }
-                return undefined; // No distance set
-            })(),
-
-            targetDistanceUnit: 'miles', // Default to miles for American users
-            targetDistanceKm: scheduledWorkout.targetDistanceKm, // Keep for legacy support
+            targetDistance: scheduledWorkout.targetDistanceKm ?
+                Math.round(scheduledWorkout.targetDistanceKm * 0.621371 * 100) / 100 : // Convert km to miles
+                undefined,
+            targetDistanceUnit: 'miles',
+            targetDistanceKm: scheduledWorkout.targetDistanceKm,
             targetPace: scheduledWorkout.targetPace,
 
             // ✅ ISOMETRIC FIELDS
             holdDurationSeconds: scheduledWorkout.holdDurationSeconds,
 
-            // ✅ FIXED: Use customNotes, not notes
+            // Common fields
             notes: scheduledWorkout.customNotes,
             completed: scheduledWorkout.status === 'COMPLETED',
             status: scheduledWorkout.status,
@@ -204,116 +172,75 @@ export const transformScheduledWorkoutToExercises = (
             userId: scheduledWorkout.user?.id?.toString() || '1'
         };
 
-        console.log('✅ FIXED: Transformed exercise with proper flags:', {
+        console.log('✅ PERFECT: Exercise with correct type detection:', {
             exerciseName: exercise.name,
             isCardio: exercise.isCardio,
             isIsometric: exercise.isIsometric,
-            targetSets: scheduledExercise.targetSets,
-            targetReps: scheduledExercise.targetReps,
-            targetDurationMinutes: scheduledExercise.targetDurationMinutes,
-            targetDistance: scheduledExercise.targetDistance,
-            targetDistanceUnit: scheduledExercise.targetDistanceUnit,
-            notes: scheduledExercise.notes
+            exerciseType: exercise.exerciseType,
+            workoutTrackingMode: getWorkoutTrackingType(exercise) // From exercise.ts
         });
 
         return [scheduledExercise];
     }
 
-    // ✅ FALLBACK: Handle individual exercises (this might be your case)
-    console.warn('⚠️ ScheduledWorkout has no workoutPlan, using fallback:', scheduledWorkout.id);
+    // Handle individual exercises
+    console.log('🔍 Processing individual exercise:', scheduledWorkout.id);
 
-    const exercise: Exercise = {
-        id: 0,
-        name: 'Individual Exercise', // Will be overridden by backend
-        exerciseName: 'Individual Exercise',
-        emoji: '💪',
-        description: 'Individual scheduled exercise',
-        difficultyLevel: 'INTERMEDIATE' as DifficultyLevel,
-        exerciseType: isCardio ? 'CARDIO' as ExerciseType : 'STRENGTH' as ExerciseType,
+    let exercise: Exercise;
 
-        // ✅ FIXED: Smart detection from scheduled workout data
-        isCardio: isCardio,
-        isIsometric: isIsometric,
-
-        exerciseTypeDisplay: 'Individual Exercise',
-        estimatedDurationMinutes: scheduledWorkout.targetDurationMinutes || 15,
-        estimatedCalories: 100,
-        targetMuscleGroups: [],
-        equipmentRequired: [],
-        benefits: [],
-        tips: [],
-        videoUrl: null,
-        averageRating: 0,
-        totalRatings: 0,
-        usageCount: 0,
-        isPopular: false,
-        isHighlyRated: false,
-        canDoAtHome: true,
-        requiresEquipment: false,
-        createdByProfessional: false,
-        createdBy: 'Platform',
-        published: true
-    };
+    if (scheduledWorkout.exercise) {
+        // ✅ USE REAL EXERCISE DATA from your database!
+        exercise = transformBackendExerciseToFrontend(scheduledWorkout.exercise);
+        console.log('✅ Using REAL individual exercise data:', {
+            name: exercise.name,
+            isCardio: exercise.isCardio,
+            isIsometric: exercise.isIsometric,
+            exerciseType: exercise.exerciseType
+        });
+    } else {
+        // True fallback
+        console.warn('⚠️ No individual exercise data available');
+        exercise = createSafeExercisePlaceholder(0, 'Individual Exercise');
+    }
 
     const scheduledExercise: ScheduledExercise = {
         id: scheduledWorkout.id.toString(),
-        exerciseId: 0,
-        exercise: exercise,
+        exerciseId: scheduledWorkout.exercise?.id || 0,
+        exercise: exercise, // ✅ Now has correct exercise type flags!
         scheduledDate: scheduledWorkout.scheduledDate,
 
-        // ✅ SMART DEFAULTS based on detected exercise type
-        targetSets: (() => {
-            if (isCardio) {
-                return scheduledWorkout.sets || 1; // Cardio usually 1 set unless interval
-            }
-            return scheduledWorkout.sets || 3; // Strength/isometric default to 3
-        })(),
-
-        targetReps: (() => {
-            if (isCardio) {
-                return scheduledWorkout.targetDurationMinutes || 20; // Show duration for cardio
-            }
-            return parseInt(scheduledWorkout.reps || '10');
-        })(),
-
-        targetWeight: scheduledWorkout.weight,
+        // Smart defaults based on actual exercise type
+        targetSets: scheduledWorkout.targetSets || getDefaultSetsForExercise(exercise),
+        targetReps: scheduledWorkout.targetReps ? parseInt(scheduledWorkout.targetReps) : getDefaultRepsForExercise(exercise),
+        targetWeight: scheduledWorkout.targetWeight,
         targetWeightUnit: 'lbs',
-        restSeconds: scheduledWorkout.restSeconds || (isCardio ? 0 : 60),
+        restSeconds: scheduledWorkout.restSeconds || getDefaultRestForExercise(exercise),
         targetRpe: scheduledWorkout.targetRpe,
         tempo: scheduledWorkout.tempo,
 
-        // ✅ CARDIO FIELDS - Fixed field names
+        // Cardio fields
         targetDurationMinutes: scheduledWorkout.targetDurationMinutes,
-
-        // ✅ FIXED: Convert from targetDistanceKm to targetDistance in miles
         targetDistance: scheduledWorkout.targetDistanceKm ?
             Math.round(scheduledWorkout.targetDistanceKm * 0.621371 * 100) / 100 :
             undefined,
-
         targetDistanceUnit: 'miles',
         targetDistanceKm: scheduledWorkout.targetDistanceKm,
         targetPace: scheduledWorkout.targetPace,
 
-        // ✅ ISOMETRIC FIELDS
+        // Isometric fields
         holdDurationSeconds: scheduledWorkout.holdDurationSeconds,
 
-        // ✅ FIXED: Use customNotes, not notes
         notes: scheduledWorkout.customNotes,
         completed: scheduledWorkout.status === 'COMPLETED',
         createdAt: scheduledWorkout.createdAt,
         userId: scheduledWorkout.user?.id?.toString() || '1'
     };
 
-    console.log('✅ FIXED: Fallback exercise with smart detection:', {
+    console.log('✅ PERFECT: Individual exercise with correct type detection:', {
         exerciseName: exercise.name,
         isCardio: exercise.isCardio,
         isIsometric: exercise.isIsometric,
-        detectedFrom: {
-            hasDuration: !!scheduledWorkout.targetDurationMinutes,
-            hasDistance: !!scheduledWorkout.targetDistanceKm,
-            hasPace: !!scheduledWorkout.targetPace,
-            hasHold: !!scheduledWorkout.holdDurationSeconds
-        }
+        exerciseType: exercise.exerciseType
     });
 
     return [scheduledExercise];
@@ -391,6 +318,120 @@ export const transformWorkoutStatsResponse = (apiStats: WorkoutStatsResponse): W
 // ==================== WORKOUT SESSION TRANSFORMATIONS ====================
 
 /**
+ * Transforms WorkoutExercise data into WorkoutResults format for performance tracking
+ * This creates the performance data structure expected by the performance stats components
+ */
+export const transformToWorkoutResults = (
+    exercise: WorkoutExercise,
+    workoutSession: WorkoutSession
+): WorkoutResults => {
+    return {
+        exerciseId: exercise.scheduledExercise.exerciseId.toString(),
+        scheduledExerciseId: exercise.scheduledExercise.id,
+        workoutSessionId: workoutSession.id,
+        completedAt: (exercise.completedAt || workoutSession.completedAt || new Date()).toISOString(),
+        totalDurationMinutes: calculateExerciseDuration(exercise),
+        performanceRating: calculatePerformanceRating(exercise),
+
+        // ✅ Transform sets to WorkoutResults format with required arrays
+        sets: exercise.sets.map(set => ({
+            setNumber: set.setNumber,
+            targetReps: set.targetReps,
+            actualReps: set.actualReps || 0,
+            targetWeight: set.targetWeight,
+            actualWeight: set.actualWeight,
+            targetWeightUnit: set.targetWeightUnit || 'lbs',
+            rpe: set.actualRpe,
+            restSeconds: set.restSeconds,
+            completed: set.completed,
+            notes: set.notes,
+            completedAt: set.completedAt?.toISOString(),
+            performanceVsTarget: calculateSetPerformance(set),
+        })),
+
+        // ✅ ALWAYS provide empty arrays (backend will populate with actual data)
+        personalRecords: [],
+        improvements: [],
+
+        // Optional workout-level data
+        notes: exercise.notes,
+        workoutNotes: workoutSession.notes,
+        perceivedEffort: undefined, // Could be added to WorkoutSession later
+        mood: undefined,           // Could be added to WorkoutSession later
+        location: undefined,       // Could be added to WorkoutSession later
+    };
+};
+
+/**
+ * Creates a default WorkoutResults object with required arrays
+ * Used as fallback when performance data is not available
+ */
+export const createDefaultWorkoutResults = (
+    exerciseId: string,
+    scheduledExerciseId: string
+): WorkoutResults => {
+    return {
+        exerciseId,
+        scheduledExerciseId,
+        completedAt: new Date().toISOString(),
+        totalDurationMinutes: 0,
+        performanceRating: 'PARTIAL',
+
+        // ✅ ALWAYS provide empty arrays - never undefined
+        sets: [],
+        personalRecords: [],
+        improvements: [],
+
+        // Optional fields
+        notes: undefined,
+        workoutNotes: undefined,
+        mood: undefined,
+        location: undefined,
+        perceivedEffort: undefined,
+    };
+};
+
+/**
+ * Transforms backend performance data into frontend WorkoutResults format
+ * Used when fetching completed workout performance from the API
+ */
+export const transformBackendPerformanceToWorkoutResults = (
+    backendData: any
+): WorkoutResults => {
+    return {
+        exerciseId: backendData.exerciseId,
+        workoutSessionId: backendData.workoutSessionId,
+        scheduledExerciseId: backendData.scheduledExerciseId,
+        completedAt: backendData.completedAt,
+        totalDurationMinutes: backendData.totalDurationMinutes,
+        performanceRating: backendData.performanceRating,
+
+        // ✅ ENSURE arrays are never null/undefined
+        sets: backendData.sets || [],
+        personalRecords: backendData.personalRecords || [],
+        improvements: backendData.improvements || [],
+
+        // Optional fields remain optional
+        actualDurationMinutes: backendData.actualDurationMinutes,
+        actualDistanceKm: backendData.actualDistanceKm,
+        actualPace: backendData.actualPace,
+        averageHeartRate: backendData.averageHeartRate,
+        caloriesBurned: backendData.caloriesBurned,
+        actualHoldDurations: backendData.actualHoldDurations,
+        averageHoldTime: backendData.averageHoldTime,
+        longestHoldSeconds: backendData.longestHoldSeconds,
+        strengthMetrics: backendData.strengthMetrics,
+        cardioMetrics: backendData.cardioMetrics,
+        isometricMetrics: backendData.isometricMetrics,
+        notes: backendData.notes,
+        workoutNotes: backendData.workoutNotes,
+        mood: backendData.mood,
+        location: backendData.location,
+        perceivedEffort: backendData.perceivedEffort,
+    };
+};
+
+/**
  * Transforms backend workout session into frontend workout session format
  * This handles the complex mapping between backend's performance-focused model
  * and frontend's set-based progression model
@@ -444,6 +485,165 @@ export const transformWorkoutSessionResponse = (
         currentSetIndex: findCurrentSetIndex(exercises),
         notes: backendSession.notes
     };
+};
+
+
+// ==================== PERFORMANCE CALCULATION HELPERS ====================
+
+/**
+ * Helper function to calculate exercise duration for performance tracking
+ */
+export function calculateExerciseDuration(exercise: WorkoutExercise): number {
+    if (exercise.startedAt && exercise.completedAt) {
+        return Math.round((exercise.completedAt.getTime() - exercise.startedAt.getTime()) / 1000 / 60);
+    }
+
+    // Estimate based on exercise type and sets
+    const restTime = exercise.sets.reduce((total, set) => total + (set.restSeconds || 0), 0) / 60;
+    const exerciseTime = exercise.scheduledExercise.exercise.estimatedDurationMinutes ||
+        (exercise.scheduledExercise.exercise.isCardio ? 20 : exercise.sets.length * 2);
+
+    return Math.round(exerciseTime + restTime);
+}
+
+/**
+ * Helper function to calculate performance rating for an exercise
+ */
+export function calculatePerformanceRating(exercise: WorkoutExercise): 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL' {
+    const completedSets = exercise.sets.filter(set => set.completed);
+
+    if (completedSets.length === 0) return 'PARTIAL';
+    if (completedSets.length < exercise.sets.length) return 'PARTIAL';
+
+    // ✅ Enhanced performance calculation
+    let totalPerformanceScore = 0;
+    let scoreCount = 0;
+
+    completedSets.forEach(set => {
+        // Rep performance score (0-2 scale: 0=below, 1=met, 2=exceeded)
+        if (set.actualReps !== undefined && set.targetReps > 0) {
+            const repRatio = set.actualReps / set.targetReps;
+            if (repRatio >= 1.2) totalPerformanceScore += 2;      // Exceeded by 20%+
+            else if (repRatio >= 1.0) totalPerformanceScore += 1; // Met target
+            else if (repRatio >= 0.8) totalPerformanceScore += 0.5; // Close to target
+            else totalPerformanceScore += 0;                      // Below target
+            scoreCount++;
+        }
+
+        // Weight performance score (if applicable)
+        if (set.actualWeight !== undefined && set.targetWeight !== undefined && set.targetWeight > 0) {
+            const weightRatio = set.actualWeight / set.targetWeight;
+            if (weightRatio >= 1.1) totalPerformanceScore += 2;      // Exceeded by 10%+
+            else if (weightRatio >= 1.0) totalPerformanceScore += 1; // Met target
+            else if (weightRatio >= 0.9) totalPerformanceScore += 0.5; // Close to target
+            else totalPerformanceScore += 0;                         // Below target
+            scoreCount++;
+        }
+    });
+
+    if (scoreCount === 0) return 'MET'; // Default if no measurable metrics
+
+    const averageScore = totalPerformanceScore / scoreCount;
+
+    // Convert average score to rating
+    if (averageScore >= 1.5) return 'EXCEEDED';   // Average exceeded performance
+    if (averageScore >= 0.9) return 'MET';        // Average met performance
+    if (averageScore >= 0.5) return 'BELOW_TARGET'; // Below but partial
+    return 'PARTIAL';                              // Significantly below
+}
+
+/**
+ * Helper function to calculate set performance vs target
+ */
+export function calculateSetPerformance(set: WorkoutSet): 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL' {
+    if (!set.completed) return 'PARTIAL';
+
+    const repsMet = set.actualReps !== undefined && set.actualReps >= set.targetReps;
+    const repsExceeded = set.actualReps !== undefined && set.actualReps > set.targetReps * 1.1;
+
+    if (repsExceeded) return 'EXCEEDED';
+    if (repsMet) return 'MET';
+    if (set.actualReps !== undefined && set.actualReps >= set.targetReps * 0.8) return 'BELOW_TARGET';
+    return 'PARTIAL';
+}
+
+/**
+ * Calculate performance score (0-100) based on workout results
+ */
+export const calculateWorkoutPerformanceScore = (workoutResults: WorkoutResults): number => {
+    let score = 0;
+    let factors = 0;
+
+    // Factor 1: Completion rate (40% weight)
+    const completedSets = workoutResults.sets.filter(set => set.completed);
+    const completionRate = workoutResults.sets.length > 0 ?
+        (completedSets.length / workoutResults.sets.length) * 100 : 0;
+    score += completionRate * 0.4;
+    factors++;
+
+    // Factor 2: Target achievement (35% weight)
+    if (completedSets.length > 0) {
+        const targetAchievement = completedSets.reduce((avg, set) => {
+            const repsAchievement = set.targetReps > 0 ?
+                Math.min((set.actualReps || 0) / set.targetReps, 1.2) * 100 : 100;
+            return avg + repsAchievement;
+        }, 0) / completedSets.length;
+
+        score += targetAchievement * 0.35;
+    } else {
+        score += 50 * 0.35; // Partial credit if no sets completed
+    }
+
+    // Factor 3: Personal records bonus (15% weight)
+    const prBonus = workoutResults.personalRecords.length > 0 ? 100 : 0;
+    score += prBonus * 0.15;
+
+    // Factor 4: Consistency with effort (10% weight)
+    const effortScore = workoutResults.perceivedEffort ?
+        (workoutResults.perceivedEffort / 10) * 100 : 70;
+    score += effortScore * 0.1;
+
+    return Math.round(Math.max(0, Math.min(100, score)));
+};
+
+/**
+ * Format performance data for display
+ */
+export const formatPerformanceData = (workoutResults: WorkoutResults): {
+    score: number;
+    grade: string;
+    summary: string;
+    highlights: string[];
+} => {
+    const score = calculateWorkoutPerformanceScore(workoutResults);
+
+    let grade = 'F';
+    if (score >= 90) grade = 'A+';
+    else if (score >= 85) grade = 'A';
+    else if (score >= 80) grade = 'B+';
+    else if (score >= 75) grade = 'B';
+    else if (score >= 70) grade = 'C+';
+    else if (score >= 65) grade = 'C';
+    else if (score >= 60) grade = 'D';
+
+    const highlights: string[] = [];
+
+    if (workoutResults.personalRecords.length > 0) {
+        highlights.push(`🏆 ${workoutResults.personalRecords.length} Personal Record${workoutResults.personalRecords.length > 1 ? 's' : ''}`);
+    }
+
+    if (workoutResults.improvements.length > 0) {
+        highlights.push(`📈 ${workoutResults.improvements.length} Improvement${workoutResults.improvements.length > 1 ? 's' : ''}`);
+    }
+
+    const completedSets = workoutResults.sets.filter(set => set.completed);
+    if (completedSets.length === workoutResults.sets.length && workoutResults.sets.length > 0) {
+        highlights.push('✅ All sets completed');
+    }
+
+    const summary = `${grade} Performance (${score}/100)`;
+
+    return {score, grade, summary, highlights};
 };
 
 /**
@@ -567,6 +767,7 @@ const findCurrentSetIndex = (exercises: WorkoutExercise[]): number => {
     return inProgressSetIndex >= 0 ? inProgressSetIndex : currentExercise.sets.length - 1;
 };
 
+
 // ==================== REVERSE TRANSFORMATIONS (Frontend to Backend) ====================
 
 /**
@@ -660,6 +861,74 @@ export const formatWeight = (weight: number, unit: 'kg' | 'lbs'): string => {
 export const validateTransformationData = <T>(data: T, requiredFields: (keyof T)[]): boolean => {
     return requiredFields.every(field => data[field] !== undefined && data[field] !== null);
 };
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * ✅ NEW: Safe defaults based on exercise type
+ */
+const getDefaultSetsForExercise = (exercise: Exercise): number => {
+    if (exercise.isCardio) {
+        // Check if it's interval-style cardio
+        const name = exercise.name.toLowerCase();
+        const isInterval = name.includes('burpees') || name.includes('hiit') || name.includes('interval');
+        return isInterval ? 4 : 1;
+    }
+    if (exercise.isIsometric) return 3;
+    return 3; // Strength default
+};
+
+const getDefaultRepsForExercise = (exercise: Exercise): number => {
+    if (exercise.isCardio) {
+        return exercise.estimatedDurationMinutes || 20; // Duration for cardio
+    }
+    if (exercise.isIsometric) {
+        return 30; // Hold duration in seconds
+    }
+    return 10; // Standard reps for strength
+};
+
+const getDefaultRestForExercise = (exercise: Exercise): number => {
+    if (exercise.isCardio) return 0; // No rest for single cardio sessions
+    if (exercise.isIsometric) return 60; // Standard rest for holds
+    return 90; // Standard rest for strength
+};
+
+/**
+ * ✅ NEW: Create safe exercise placeholders without guessing types
+ */
+const createSafeExercisePlaceholder = (id: number, name: string): Exercise => ({
+    id: id,
+    name: name,
+    exerciseName: name,
+    emoji: '💪',
+    description: 'Exercise details to be loaded',
+    exerciseType: 'STRENGTH' as ExerciseType,
+
+    // ✅ SAFE DEFAULTS - Don't guess exercise types
+    isCardio: false,
+    isIsometric: false,
+
+    exerciseTypeDisplay: 'Strength Training',
+    difficultyLevel: 'INTERMEDIATE' as DifficultyLevel,
+    estimatedDurationMinutes: 15,
+    estimatedCalories: 100,
+    targetMuscleGroups: [],
+    equipmentRequired: [],
+    benefits: [],
+    tips: [],
+    videoUrl: null,
+    averageRating: 0,
+    totalRatings: 0,
+    usageCount: 0,
+    isPopular: false,
+    isHighlyRated: false,
+    canDoAtHome: true,
+    requiresEquipment: false,
+    createdByProfessional: false,
+    createdBy: 'Platform',
+    published: true
+});
 
 // ==================== DEBUGGING HELPERS ====================
 

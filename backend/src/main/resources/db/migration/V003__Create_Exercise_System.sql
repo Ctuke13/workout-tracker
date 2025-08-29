@@ -2,7 +2,8 @@
 -- V003__Create_Exercise_System.sql
 -- Creates exercises, workout_plans, plan_exercise tables + FITNESS GOALS SYSTEM
 -- EXACTLY MATCHES the JPA entity definitions with explicit column names
--- INCLUDES isIsometric support for complete workout tracking modalities
+-- INCLUDES workout_tracking_mode support for complete exercise type detection
+-- UPDATED: Fixed for exercise type detection system and ExerciseMapper support
 -- =============================================================================
 
 -- =====================================================
@@ -21,6 +22,9 @@ CREATE TABLE exercises (
                            is_isometric BOOLEAN NOT NULL DEFAULT FALSE,
                            difficulty_level VARCHAR(20) NOT NULL DEFAULT 'BEGINNER',
 
+    -- Explicit workout tracking mode support
+                           workout_tracking_mode VARCHAR(20),
+
     -- Duration and calories
                            estimated_duration_minutes INTEGER,
                            estimated_calories INTEGER,
@@ -37,6 +41,9 @@ CREATE TABLE exercises (
                            average_rating DOUBLE PRECISION DEFAULT 0.0,
                            total_ratings INTEGER DEFAULT 0,
 
+    -- NEW: Favorites support (matches Exercise.java)
+                           is_favorite BOOLEAN DEFAULT FALSE,
+
     -- Publication status
                            published BOOLEAN DEFAULT true,
 
@@ -52,6 +59,11 @@ ALTER TABLE exercises ADD CONSTRAINT chk_exercise_type
 ALTER TABLE exercises ADD CONSTRAINT chk_exercise_difficulty_level
     CHECK (difficulty_level IN ('BEGINNER', 'INTERMEDIATE', 'ADVANCED'));
 
+-- Workout tracking mode constraint (matches Exercise.WorkoutTrackingMode enum)
+ALTER TABLE exercises ADD CONSTRAINT chk_workout_tracking_mode
+    CHECK (workout_tracking_mode IS NULL OR
+           workout_tracking_mode IN ('TIME_BASED', 'HOLD_BASED', 'REP_BASED'));
+
 -- CRITICAL: Exercise modality consistency constraint
 ALTER TABLE exercises ADD CONSTRAINT chk_exercise_modality_consistency
     CHECK (
@@ -60,6 +72,7 @@ ALTER TABLE exercises ADD CONSTRAINT chk_exercise_modality_consistency
         (is_cardio = FALSE AND is_isometric = FALSE)     -- Regular strength exercises
         );
 
+-- Standard validation constraints
 ALTER TABLE exercises ADD CONSTRAINT chk_exercise_duration
     CHECK (estimated_duration_minutes IS NULL OR (estimated_duration_minutes >= 1 AND estimated_duration_minutes <= 480));
 
@@ -109,6 +122,10 @@ CREATE TABLE workout_plans (
                                times_used INTEGER DEFAULT 0,
                                average_rating DOUBLE PRECISION DEFAULT 0.0,
 
+    -- Professional content support (matches WorkoutPlan.java)
+                               created_by_professional BOOLEAN DEFAULT false,
+                               total_reviews INTEGER DEFAULT 0,
+
     -- Timestamps
                                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -129,6 +146,9 @@ ALTER TABLE workout_plans ADD CONSTRAINT chk_workout_times_used
 
 ALTER TABLE workout_plans ADD CONSTRAINT chk_workout_rating
     CHECK (average_rating >= 0.0 AND average_rating <= 5.0);
+
+ALTER TABLE workout_plans ADD CONSTRAINT chk_total_reviews
+    CHECK (total_reviews >= 0);
 
 -- =====================================================
 -- PLAN_EXERCISE TABLE (matches PlanExercise.java exactly)
@@ -262,7 +282,29 @@ CREATE TABLE exercise_goal_mapping (
 );
 
 -- =====================================================
--- INDEXES FOR PERFORMANCE (Based on Expected Queries)
+-- USER EXERCISE FAVORITES SYSTEM (matches V012 addition)
+-- =====================================================
+
+-- Create user_exercise_favorites table for many-to-many relationship
+CREATE TABLE user_exercise_favorites (
+                                         favorite_id BIGSERIAL PRIMARY KEY,
+                                         user_id BIGINT NOT NULL,
+                                         exercise_id BIGINT NOT NULL,
+                                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- Foreign key constraints
+                                         CONSTRAINT fk_user_exercise_favorites_user
+                                             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                                         CONSTRAINT fk_user_exercise_favorites_exercise
+                                             FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE,
+
+    -- Prevent duplicate favorites
+                                         CONSTRAINT uk_user_exercise_favorites_unique
+                                             UNIQUE (user_id, exercise_id)
+);
+
+-- =====================================================
+-- INDEXES FOR PERFORMANCE (Enhanced for ExerciseMapper)
 -- =====================================================
 
 -- Exercises table indexes (including workout tracking modality indexes)
@@ -270,10 +312,15 @@ CREATE INDEX idx_exercises_name ON exercises(exercise_name);
 CREATE INDEX idx_exercises_type ON exercises(exercise_type);
 CREATE INDEX idx_exercises_difficulty ON exercises(difficulty_level);
 
--- WORKOUT TRACKING MODALITY INDEXES (Critical for performance)
+-- Workout tracking modality indexes (Critical for ExerciseMapper performance)
 CREATE INDEX idx_exercises_is_cardio ON exercises(is_cardio);
 CREATE INDEX idx_exercises_is_isometric ON exercises(is_isometric);
-CREATE INDEX idx_exercises_modality_combined ON exercises(is_cardio, is_isometric);
+CREATE INDEX idx_exercises_workout_tracking_mode ON exercises(workout_tracking_mode);
+CREATE INDEX idx_exercises_modality_combined ON exercises(is_cardio, is_isometric, workout_tracking_mode);
+
+-- Exercise type detection performance indexes
+CREATE INDEX idx_exercises_type_detection ON exercises(is_cardio, is_isometric, workout_tracking_mode, published);
+CREATE INDEX idx_exercises_resolution_performance ON exercises(published, is_cardio, is_isometric, workout_tracking_mode, average_rating DESC);
 
 -- Additional optimized indexes for workout filtering
 CREATE INDEX idx_exercises_cardio_only ON exercises(is_cardio) WHERE is_cardio = TRUE;
@@ -288,6 +335,7 @@ CREATE INDEX idx_exercises_usage ON exercises(usage_count);
 CREATE INDEX idx_exercises_rating ON exercises(average_rating);
 CREATE INDEX idx_exercises_created_at ON exercises(created_at);
 CREATE INDEX idx_exercises_duration ON exercises(estimated_duration_minutes);
+CREATE INDEX idx_exercises_favorite ON exercises(is_favorite);
 
 -- Workout plans table indexes
 CREATE INDEX idx_workout_plans_name ON workout_plans(workout_name);
@@ -300,6 +348,7 @@ CREATE INDEX idx_workout_plans_tier ON workout_plans(subscription_tier_required)
 CREATE INDEX idx_workout_plans_times_used ON workout_plans(times_used);
 CREATE INDEX idx_workout_plans_rating ON workout_plans(average_rating);
 CREATE INDEX idx_workout_plans_created_at ON workout_plans(created_at);
+CREATE INDEX idx_workout_plans_professional ON workout_plans(created_by_professional);
 
 -- Plan exercise table indexes
 CREATE INDEX idx_plan_exercise_workout_plan ON plan_exercise(workout_plan_id);
@@ -328,6 +377,12 @@ CREATE INDEX idx_exercise_goal_mapping_goal ON exercise_goal_mapping(goal_id);
 CREATE INDEX idx_exercise_goal_mapping_relevance ON exercise_goal_mapping(goal_id, relevance_score DESC);
 CREATE INDEX idx_exercise_goal_mapping_primary ON exercise_goal_mapping(goal_id, is_primary, relevance_score DESC);
 
+-- User Exercise Favorites indexes
+CREATE INDEX idx_user_exercise_favorites_user_id ON user_exercise_favorites(user_id);
+CREATE INDEX idx_user_exercise_favorites_exercise_id ON user_exercise_favorites(exercise_id);
+CREATE INDEX idx_user_exercise_favorites_created_at ON user_exercise_favorites(created_at);
+CREATE INDEX idx_user_exercise_favorites_user_created ON user_exercise_favorites(user_id, created_at DESC);
+
 -- Compound index for goal filtering with relevance ordering (performance optimization)
 CREATE INDEX idx_exercise_goal_relevance_performance
     ON exercise_goal_mapping(goal_id, relevance_score DESC, exercise_id);
@@ -343,7 +398,9 @@ CREATE INDEX idx_exercises_popular ON exercises(usage_count, average_rating, pub
 CREATE INDEX idx_workout_plans_popular ON workout_plans(times_used, average_rating, is_public);
 
 -- Performance optimization for workout tracking interface queries
-CREATE INDEX idx_exercises_tracking_performance ON exercises(is_cardio, is_isometric, published, average_rating DESC);
+CREATE INDEX idx_exercises_tracking_performance ON exercises(is_cardio, is_isometric, workout_tracking_mode, published, average_rating DESC);
+CREATE INDEX idx_exercises_mapper_resolution
+    ON exercises(published, exercise_type, is_cardio, is_isometric, workout_tracking_mode);
 
 -- =====================================================
 -- INITIAL GOALS DATA
@@ -382,120 +439,23 @@ ALTER TABLE exercises ADD CONSTRAINT uk_exercise_name_unique UNIQUE (exercise_na
 -- Ensure exercises appear only once per workout in same order
 ALTER TABLE plan_exercise ADD CONSTRAINT uk_plan_exercise_workout_order UNIQUE (workout_plan_id, order_in_workout);
 
--- =============================================================================
--- USER EXERCISE RATING AND HISTORY SYSTEM
--- =============================================================================
-
 -- =====================================================
--- USER EXERCISE RATINGS TABLE
--- =====================================================
-
-CREATE TABLE user_exercise_ratings (
-                                       rating_id BIGSERIAL PRIMARY KEY,
-
-    -- Relationships
-                                       user_id BIGINT NOT NULL,
-                                       exercise_id BIGINT NOT NULL,
-
-    -- Rating data
-                                       rating DOUBLE PRECISION NOT NULL,
-                                       comment VARCHAR(500),
-
-    -- Timestamps
-                                       rated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    -- Foreign key constraints
-                                       CONSTRAINT fk_user_exercise_rating_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                                       CONSTRAINT fk_user_exercise_rating_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE,
-
-    -- Prevent duplicate ratings
-                                       CONSTRAINT uk_user_exercise_rating_unique UNIQUE (user_id, exercise_id)
-);
-
--- Add constraints for ratings
-ALTER TABLE user_exercise_ratings ADD CONSTRAINT chk_rating_range
-    CHECK (rating >= 0.0 AND rating <= 5.0);
-
--- =====================================================
--- USER RATING TAGS TABLE (ElementCollection)
--- =====================================================
-
-CREATE TABLE user_rating_tags (
-                                  rating_id BIGINT NOT NULL,
-                                  tag VARCHAR(50) NOT NULL,
-                                  CONSTRAINT fk_rating_tags_rating FOREIGN KEY (rating_id) REFERENCES user_exercise_ratings(rating_id) ON DELETE CASCADE
-);
-
--- =====================================================
--- USER EXERCISE HISTORY TABLE
--- =====================================================
-
-CREATE TABLE user_exercise_history (
-                                       history_id BIGSERIAL PRIMARY KEY,
-
-    -- Relationships
-                                       user_id BIGINT NOT NULL,
-                                       exercise_id BIGINT NOT NULL,
-
-    -- Usage data
-                                       used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                                       duration_minutes INTEGER,
-                                       context VARCHAR(20) NOT NULL DEFAULT 'view',
-                                       notes VARCHAR(200),
-                                       workout_plan_id BIGINT, -- For future workout plan integration
-
-    -- Foreign key constraints
-                                       CONSTRAINT fk_user_exercise_history_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                                       CONSTRAINT fk_user_exercise_history_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE
-);
-
--- Add constraints for history
-ALTER TABLE user_exercise_history ADD CONSTRAINT chk_history_context
-    CHECK (context IN ('view', 'workout', 'favorite', 'rate', 'share'));
-
-ALTER TABLE user_exercise_history ADD CONSTRAINT chk_history_duration
-    CHECK (duration_minutes IS NULL OR (duration_minutes >= 1 AND duration_minutes <= 480));
-
--- =====================================================
--- ADDITIONAL INDEXES FOR USER EXERCISE SYSTEM
--- =====================================================
-
--- User Exercise Ratings indexes
-CREATE INDEX idx_user_exercise_ratings_user ON user_exercise_ratings(user_id);
-CREATE INDEX idx_user_exercise_ratings_exercise ON user_exercise_ratings(exercise_id);
-CREATE INDEX idx_user_exercise_ratings_rating ON user_exercise_ratings(rating);
-CREATE INDEX idx_user_exercise_ratings_rated_at ON user_exercise_ratings(rated_at);
-
--- User Rating Tags indexes
-CREATE INDEX idx_user_rating_tags_rating ON user_rating_tags(rating_id);
-CREATE INDEX idx_user_rating_tags_tag ON user_rating_tags(tag);
-
--- User Exercise History indexes
-CREATE INDEX idx_user_exercise_history_user ON user_exercise_history(user_id);
-CREATE INDEX idx_user_exercise_history_exercise ON user_exercise_history(exercise_id);
-CREATE INDEX idx_user_exercise_history_used_at ON user_exercise_history(used_at);
-CREATE INDEX idx_user_exercise_history_context ON user_exercise_history(context);
-
--- Composite indexes for common queries
-CREATE INDEX idx_user_exercise_history_user_date ON user_exercise_history(user_id, used_at DESC);
-CREATE INDEX idx_user_exercise_history_user_context ON user_exercise_history(user_id, context);
-CREATE INDEX idx_user_exercise_ratings_exercise_rating ON user_exercise_ratings(exercise_id, rating DESC);
-
--- =============================================================================
 -- PERFORMANCE VERIFICATION AND LOGGING
--- =============================================================================
+-- =====================================================
 
 -- Log successful migration completion with modality tracking support
 DO $$
 BEGIN
     RAISE NOTICE '========================================';
-    RAISE NOTICE 'V003 Migration completed successfully!';
-    RAISE NOTICE 'Exercise system created with workout tracking modality support:';
-    RAISE NOTICE '  - TIME_BASED tracking (is_cardio = TRUE)';
-    RAISE NOTICE '  - HOLD_BASED tracking (is_isometric = TRUE)';
-    RAISE NOTICE '  - REP_BASED tracking (both FALSE)';
-    RAISE NOTICE 'Total indexes created: % (optimized for workout tracking)',
+    RAISE NOTICE '✅ V003 UPDATED Migration completed successfully!';
+    RAISE NOTICE 'Exercise system created with enhanced workout tracking support:';
+    RAISE NOTICE '  - TIME_BASED tracking (is_cardio = TRUE, workout_tracking_mode = TIME_BASED)';
+    RAISE NOTICE '  - HOLD_BASED tracking (is_isometric = TRUE, workout_tracking_mode = HOLD_BASED)';
+    RAISE NOTICE '  - REP_BASED tracking (both FALSE, workout_tracking_mode = REP_BASED)';
+    RAISE NOTICE '  - workout_tracking_mode column added for explicit storage';
+    RAISE NOTICE '  - is_favorite column added for user favorites';
+    RAISE NOTICE '  - created_by_professional columns added';
+    RAISE NOTICE 'Total indexes created: % (optimized for ExerciseMapper)',
                  (SELECT count(*) FROM pg_indexes WHERE tablename LIKE 'exercise%' OR tablename LIKE 'workout%');
     RAISE NOTICE '========================================';
 END $$;

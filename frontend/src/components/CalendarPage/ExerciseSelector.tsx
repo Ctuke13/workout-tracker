@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { Exercise } from '../../types/exercise';
-import { WorkoutPlanInfo } from '../../types/api';
+import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
+import {useAuth} from '../../contexts/AuthContext';
+import {Exercise} from '../../types/exercise';
+import {WorkoutPlanInfo} from '../../types/api';
 import {
     MagnifyingGlassIcon,
     XMarkIcon,
@@ -21,10 +21,11 @@ import {
     CalendarIcon,
     CogIcon,
     BoltIcon,
-    TrophyIcon
+    TrophyIcon,
+    StarIcon as StarIconSolid
 } from '@heroicons/react/24/outline';
-import { exerciseApi } from '../../services/exerciseApi';
-import { workoutPlanApi } from '../../services/workoutPlanApi';
+import {exerciseApi} from '../../services/exerciseApi';
+import {workoutPlanApi} from '../../services/workoutPlanApi';
 
 // ==================== INTERFACES ====================
 
@@ -68,20 +69,20 @@ interface EnhancedExerciseSelectorProps {
 // ==================== MAIN COMPONENT ====================
 
 const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
-                                                                               open,
-                                                                               onClose,
-                                                                               onExerciseSelect,
-                                                                               onWorkoutPlanSelect,
-                                                                               onWorkoutPlanConfigure,
-                                                                               onDragStart,
-                                                                               selectedDate,
-                                                                               canAddToSelectedDate = true,
-                                                                               title = "Choose Exercise or Workout Plan",
-                                                                               calendarDays = [],
-                                                                               onDateChange,
-                                                                               initialTab = 0
-                                                                           }) => {
-    const { user } = useAuth();
+                                                                       open,
+                                                                       onClose,
+                                                                       onExerciseSelect,
+                                                                       onWorkoutPlanSelect,
+                                                                       onWorkoutPlanConfigure,
+                                                                       onDragStart,
+                                                                       selectedDate,
+                                                                       canAddToSelectedDate = true,
+                                                                       title = "Choose Exercise or Workout Plan",
+                                                                       calendarDays = [],
+                                                                       onDateChange,
+                                                                       initialTab = 0
+                                                                   }) => {
+    const {user} = useAuth();
 
     // ==================== STATE MANAGEMENT ====================
 
@@ -105,6 +106,11 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
     const [hasInitialized, setHasInitialized] = useState(false);
     const [planView, setPlanView] = useState<'grid' | 'list'>('grid');
 
+    // Favorite state
+    const [favoriteExercises, setFavoriteExercises] = useState<Exercise[]>([]);
+    const [userFavoriteIds, setUserFavoriteIds] = useState<Set<number>>(new Set());
+    const [loadingFavorites, setLoadingFavorites] = useState(false);
+
     // Refs to prevent duplicate API calls
     const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
     const lastSearchTermRef = useRef<string>('');
@@ -118,20 +124,27 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
 
     // Enhanced tab definitions with workout plan focus
     const tabs = [
-        { id: 0, name: 'Exercises', icon: FireIcon, description: 'Individual exercises' },
-        { id: 1, name: 'Workout Plans', icon: UserGroupIcon, description: 'Complete routines', highlight: true },
-        { id: 2, name: 'Categories', icon: Bars3Icon, description: 'Browse by goal' },
-        { id: 3, name: 'Popular', icon: StarIcon, description: 'Trending choices' },
+        {id: 0, name: 'Exercises', icon: FireIcon, description: 'Individual exercises'},
+        {id: 1, name: 'Favorites', icon: StarIcon, description: 'Your saved exercises', highlight: true},
+        {id: 2, name: 'Workout Plans', icon: UserGroupIcon, description: 'Complete routines', highlight: true},
+        {id: 3, name: 'Categories', icon: Bars3Icon, description: 'Browse by goal'},
+        {id: 4, name: 'Popular', icon: TrophyIcon, description: 'Trending choices'},
     ];
 
     // Enhanced workout plan categories
     const enhancedWorkoutPlanCategories: WorkoutPlanCategory[] = [
-        { id: 'all', name: 'All Plans', emoji: '🎯', count: workoutPlans.length, description: 'All available workout plans' },
-        { id: 'strength', name: 'Strength', emoji: '💪', count: 0, description: 'Build muscle and power' },
-        { id: 'cardio', name: 'Cardio', emoji: '❤️', count: 0, description: 'Improve cardiovascular fitness' },
-        { id: 'hiit', name: 'HIIT', emoji: '⚡', count: 0, description: 'High-intensity interval training' },
-        { id: 'beginner', name: 'Beginner', emoji: '🌱', count: 0, description: 'Perfect for getting started' },
-        { id: 'advanced', name: 'Advanced', emoji: '🏆', count: 0, description: 'Challenge your limits' }
+        {
+            id: 'all',
+            name: 'All Plans',
+            emoji: '🎯',
+            count: workoutPlans.length,
+            description: 'All available workout plans'
+        },
+        {id: 'strength', name: 'Strength', emoji: '💪', count: 0, description: 'Build muscle and power'},
+        {id: 'cardio', name: 'Cardio', emoji: '❤️', count: 0, description: 'Improve cardiovascular fitness'},
+        {id: 'hiit', name: 'HIIT', emoji: '⚡', count: 0, description: 'High-intensity interval training'},
+        {id: 'beginner', name: 'Beginner', emoji: '🌱', count: 0, description: 'Perfect for getting started'},
+        {id: 'advanced', name: 'Advanced', emoji: '🏆', count: 0, description: 'Challenge your limits'}
     ];
 
     // ==================== DATE NAVIGATION FUNCTIONS ====================
@@ -175,8 +188,8 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
         if (!selectedDay) return null;
 
         return {
-            dayName: selectedDay.date.toLocaleDateString('en-US', { weekday: 'long' }),
-            date: selectedDay.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            dayName: selectedDay.date.toLocaleDateString('en-US', {weekday: 'long'}),
+            date: selectedDay.date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}),
             isToday: selectedDay.isToday,
             exerciseCount: selectedDay.exercises.length
         };
@@ -460,37 +473,178 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
         }
     }, [open]);
 
+    const fetchFavoriteExercises = useCallback(async () => {
+        if (!user || favoriteExercises.length > 0) return;
+
+        try {
+            setLoadingFavorites(true);
+            console.log('🌟 Loading user favorite exercises');
+
+            // 🔥 GET BOTH: Full Exercise objects AND favorite IDs
+            const [favorites, favoriteIds] = await Promise.all([
+                exerciseApi.getFavoriteExercises(),  // Full Exercise objects
+                exerciseApi.getFavoriteExerciseIds() // Set of IDs for quick lookup
+            ]);
+
+            // ✅ CRITICAL FIX: Ensure all favorite exercises have isFavorite = true
+            const favoritesWithCorrectFlag = favorites.map(exercise => ({
+                ...exercise,
+                isFavorite: true // 🌟 FORCE this to true since these ARE favorites
+            }));
+
+            setFavoriteExercises(favoritesWithCorrectFlag);
+            setUserFavoriteIds(favoriteIds);
+
+            console.log(`✅ Loaded ${favoritesWithCorrectFlag.length} favorite exercises with isFavorite flag set`);
+            console.log('🐛 DEBUG: First favorite exercise:', favoritesWithCorrectFlag[0]);
+        } catch (err) {
+            console.error('❌ Failed to fetch favorite exercises:', err);
+        } finally {
+            setLoadingFavorites(false);
+        }
+    }, [user, favoriteExercises.length]);
+
+
+    const handleToggleFavorite = async (exercise: Exercise, event?: React.MouseEvent) => {
+        if (event) {
+            event.stopPropagation(); // Prevent exercise selection when clicking star
+        }
+
+        if (!user) {
+            console.log('User not authenticated, cannot toggle favorite');
+            return;
+        }
+
+        try {
+            console.log(`🌟 Toggling favorite for exercise: ${exercise.name}`);
+
+            // Optimistic update
+            const wasFavorited = userFavoriteIds.has(exercise.id);
+            const newFavoriteIds = new Set(userFavoriteIds);
+
+            if (wasFavorited) {
+                newFavoriteIds.delete(exercise.id);
+                setFavoriteExercises(prev => prev.filter(fav => fav.id !== exercise.id));
+            } else {
+                newFavoriteIds.add(exercise.id);
+                setFavoriteExercises(prev => [...prev, exercise]);
+            }
+
+            setUserFavoriteIds(newFavoriteIds);
+
+            // Update exercise object
+            setExercises(prev => prev.map(ex =>
+                ex.id === exercise.id ? {...ex, isFavorite: !wasFavorited} : ex
+            ));
+            setPopularExercises(prev => prev.map(ex =>
+                ex.id === exercise.id ? {...ex, isFavorite: !wasFavorited} : ex
+            ));
+
+            // Make API call
+            const result = await exerciseApi.toggleFavorite(exercise.id);
+
+            // Show success feedback
+            console.log(`✅ ${result.isFavorite ? 'Added to' : 'Removed from'} favorites: ${exercise.name}`);
+
+            // Optional: Show toast notification
+            // toast.success(`${result.isFavorite ? 'Added to' : 'Removed from'} favorites`);
+
+        } catch (error) {
+            console.error('❌ Failed to toggle favorite:', error);
+
+            // Revert optimistic update on error
+            const originalFavoriteIds = new Set(userFavoriteIds);
+            if (originalFavoriteIds.has(exercise.id)) {
+                originalFavoriteIds.delete(exercise.id);
+                setFavoriteExercises(prev => prev.filter(fav => fav.id !== exercise.id));
+            } else {
+                originalFavoriteIds.add(exercise.id);
+                setFavoriteExercises(prev => [...prev, exercise]);
+            }
+            setUserFavoriteIds(originalFavoriteIds);
+            exercise.isFavorite = !exercise.isFavorite;
+
+            // Optional: Show error toast
+            // toast.error('Failed to update favorites');
+        }
+    };
+
+// Update your filteredExercises to include favorite status
+    const filteredExercisesWithFavorites = useMemo(() => {
+        return filteredExercises.map(exercise => ({
+            ...exercise,
+            isFavorite: userFavoriteIds.has(exercise.id)
+        }));
+    }, [filteredExercises, userFavoriteIds]);
+
+// Add filtered favorites
+    const filteredFavoriteExercises = useMemo(() => {
+        return favoriteExercises
+            .map(exercise => ({
+                ...exercise,
+                isFavorite: true // 🌟 ENSURE this is always true in favorites tab
+            }))
+            .filter(exercise => {
+                const matchesSearch = !searchTerm ||
+                    exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    exercise.description?.toLowerCase().includes(searchTerm.toLowerCase());
+                return matchesSearch;
+            });
+    }, [favoriteExercises, searchTerm]);
+
+// Update your useEffect for initialization to include favorites
+    useEffect(() => {
+        if (open && !hasInitialized) {
+            const initializeData = async () => {
+                console.log('🚀 Initializing Enhanced ExerciseSelector...');
+                await Promise.all([
+                    fetchExercises('', true),
+                    fetchCategories(),
+                    fetchPopularExercises(),
+                    fetchWorkoutPlans(),
+                    user ? fetchFavoriteExercises() : Promise.resolve() // Only fetch favorites if user is logged in
+                ]);
+                setHasInitialized(true);
+            };
+            initializeData();
+        }
+    }, [open, hasInitialized, fetchExercises, fetchCategories, fetchPopularExercises, fetchWorkoutPlans, fetchFavoriteExercises, user]);
+
     // ==================== RENDER FUNCTIONS ====================
 
     const renderTabContent = () => {
         switch (selectedTab) {
-            case 0: // Exercises (existing implementation)
+            case 0: // Exercises (updated with favorites)
                 return (
                     <div className="space-y-2">
                         {loading ? (
                             <div className="space-y-3">
                                 {[1, 2, 3, 4].map((i) => (
                                     <div key={i} className="animate-pulse">
-                                        <div className="bg-gradient-to-r from-gray-200 to-gray-300 h-24 rounded-2xl"></div>
+                                        <div
+                                            className="bg-gradient-to-r from-gray-200 to-gray-300 h-24 rounded-2xl"></div>
                                     </div>
                                 ))}
                             </div>
-                        ) : filteredExercises.length > 0 ? (
+                        ) : filteredExercisesWithFavorites.length > 0 ? (
                             <div className="space-y-2">
-                                {filteredExercises.map((exercise) => (
+                                {filteredExercisesWithFavorites.map((exercise) => (
                                     <ExerciseCard
                                         key={exercise.id}
                                         exercise={exercise}
                                         onSelect={() => handleExerciseSelect(exercise)}
                                         onDragStart={() => onDragStart?.(exercise)}
+                                        onToggleFavorite={handleToggleFavorite}
                                         disabled={!canAddToTargetDate()}
+                                        showFavoriteButton={user ? true : false}
                                     />
                                 ))}
                             </div>
                         ) : (
                             <div className="text-center py-12">
-                                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                                    <MagnifyingGlassIcon className="w-10 h-10 text-gray-400" />
+                                <div
+                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                                    <MagnifyingGlassIcon className="w-10 h-10 text-gray-400"/>
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-2">
                                     {searchTerm ? 'No exercises found' : 'No exercises available'}
@@ -503,7 +657,94 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                     </div>
                 );
 
-            case 1: // Enhanced Workout Plans
+            case 1: // Favorites Tab (NEW!)
+                return (
+                    <div className="space-y-2">
+                        {!user ? (
+                            <div className="text-center py-12">
+                                <div
+                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center">
+                                    <StarIcon className="w-10 h-10 text-yellow-500"/>
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Sign in to see favorites</h3>
+                                <p className="text-gray-500 max-w-sm mx-auto">
+                                    Create an account to save your favorite exercises
+                                </p>
+                            </div>
+                        ) : loadingFavorites ? (
+                            <div className="space-y-3">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <div key={i} className="animate-pulse">
+                                        <div
+                                            className="bg-gradient-to-r from-yellow-200 to-orange-300 h-24 rounded-2xl"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : filteredFavoriteExercises.length > 0 ? (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between mb-4 px-2">
+                                    <p className="text-sm text-gray-600">
+                                        ⭐ {filteredFavoriteExercises.length} favorite
+                                        exercise{filteredFavoriteExercises.length !== 1 ? 's' : ''}
+                                    </p>
+                                    <button
+                                        onClick={async () => {
+                                            if (window.confirm('Remove all favorites? This cannot be undone.')) {
+                                                try {
+                                                    await exerciseApi.clearAllFavorites();
+                                                    setFavoriteExercises([]);
+                                                    setUserFavoriteIds(new Set());
+                                                    // Optional: Show success toast
+                                                } catch (error) {
+                                                    console.error('Failed to clear favorites:', error);
+                                                }
+                                            }
+                                        }}
+                                        className="text-xs text-red-600 hover:text-red-700 underline"
+                                    >
+                                        Clear All
+                                    </button>
+                                </div>
+                                {filteredFavoriteExercises.map((exercise) => (
+                                    <ExerciseCard
+                                        key={exercise.id}
+                                        exercise={{
+                                            ...exercise,
+                                            isFavorite: true // 🌟 FORCE yellow star in favorites tab
+                                        }}
+                                        onSelect={() => handleExerciseSelect(exercise)}
+                                        onDragStart={() => onDragStart?.(exercise)}
+                                        onToggleFavorite={handleToggleFavorite}
+                                        disabled={!canAddToTargetDate()}
+                                        showFavoriteButton={true}
+                                        isFavoritesTab={true}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <div
+                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center">
+                                    <StarIcon className="w-10 h-10 text-yellow-500"/>
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                    {searchTerm ? 'No favorite exercises found' : 'No favorites yet'}
+                                </h3>
+                                <p className="text-gray-500 max-w-sm mx-auto">
+                                    {searchTerm ? 'Try a different search term' : 'Browse exercises and tap the ⭐ star to add favorites'}
+                                </p>
+                                <button
+                                    onClick={() => setSelectedTab(0)}
+                                    className="mt-4 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors"
+                                >
+                                    Browse Exercises
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                );
+
+            case 2: // Workout Plans (moved to index 2)
                 return (
                     <div className="space-y-4">
                         {/* Category Filter Pills */}
@@ -521,8 +762,8 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                     <span>{category.emoji}</span>
                                     <span>{category.name}</span>
                                     <span className="bg-white px-2 py-0.5 rounded-full text-xs">
-                                        {category.count}
-                                    </span>
+                                    {category.count}
+                                </span>
                                 </button>
                             ))}
                         </div>
@@ -558,15 +799,18 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
 
                         {/* Workout Plans Display */}
                         {loading ? (
-                            <div className={`grid gap-4 ${planView === 'grid' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                            <div
+                                className={`grid gap-4 ${planView === 'grid' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                                 {[1, 2, 3, 4].map((i) => (
                                     <div key={i} className="animate-pulse">
-                                        <div className="bg-gradient-to-r from-gray-200 to-gray-300 h-32 rounded-2xl"></div>
+                                        <div
+                                            className="bg-gradient-to-r from-gray-200 to-gray-300 h-32 rounded-2xl"></div>
                                     </div>
                                 ))}
                             </div>
                         ) : filteredWorkoutPlans.length > 0 ? (
-                            <div className={`grid gap-4 ${planView === 'grid' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                            <div
+                                className={`grid gap-4 ${planView === 'grid' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                                 {filteredWorkoutPlans.map((plan) => (
                                     <WorkoutPlanCard
                                         key={plan.id}
@@ -581,8 +825,9 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                             </div>
                         ) : (
                             <div className="text-center py-12">
-                                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center">
-                                    <UserGroupIcon className="w-10 h-10 text-gray-400" />
+                                <div
+                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center">
+                                    <UserGroupIcon className="w-10 h-10 text-gray-400"/>
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-2">
                                     {searchTerm ? 'No workout plans found' : 'No workout plans available'}
@@ -595,7 +840,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                     </div>
                 );
 
-            case 2: // Categories (existing implementation)
+            case 3: // Categories (moved to index 3)
                 return (
                     <div className="grid grid-cols-1 gap-3">
                         {categories.map((category) => (
@@ -605,7 +850,8 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                 onClick={() => handleCategorySelect(category.id)}
                             >
                                 <div className="flex items-center">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center text-2xl mr-4 group-hover:scale-110 transition-transform duration-300">
+                                    <div
+                                        className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center text-2xl mr-4 group-hover:scale-110 transition-transform duration-300">
                                         {category.emoji}
                                     </div>
                                     <div className="flex-1">
@@ -616,31 +862,38 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                             {category.count} exercises available
                                         </p>
                                     </div>
-                                    <ChevronRightIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-300" />
+                                    <ChevronRightIcon
+                                        className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-300"/>
                                 </div>
                             </div>
                         ))}
                     </div>
                 );
 
-            case 3: // Popular (existing implementation)
+            case 4: // Popular (moved to index 4, updated with favorites)
                 return (
                     <div className="space-y-2">
                         {popularExercises.length > 0 ? (
                             popularExercises.map((exercise) => (
                                 <ExerciseCard
                                     key={exercise.id}
-                                    exercise={exercise}
+                                    exercise={{
+                                        ...exercise,
+                                        isFavorite: userFavoriteIds.has(exercise.id)
+                                    }}
                                     onSelect={() => handleExerciseSelect(exercise)}
                                     onDragStart={() => onDragStart?.(exercise)}
+                                    onToggleFavorite={handleToggleFavorite}
                                     disabled={!canAddToTargetDate()}
                                     showPopularBadge
+                                    showFavoriteButton={user ? true : false}
                                 />
                             ))
                         ) : (
                             <div className="text-center py-12">
-                                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center">
-                                    <StarIcon className="w-10 h-10 text-yellow-500" />
+                                <div
+                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center">
+                                    <TrophyIcon className="w-10 h-10 text-yellow-500"/>
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-2">
                                     {loading ? 'Loading popular exercises...' : 'No popular exercises found'}
@@ -667,9 +920,11 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-            <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-gray-200">
+            <div
+                className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-gray-200">
                 {/* Enhanced Header */}
-                <div className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-t-3xl p-4 sm:p-6">
+                <div
+                    className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-t-3xl p-4 sm:p-6">
                     <div className="absolute inset-0 bg-white/10 rounded-t-3xl backdrop-blur-sm"></div>
                     <div className="relative z-10">
                         <div className="flex items-center justify-between mb-4">
@@ -678,7 +933,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                 onClick={onClose}
                                 className="p-2 hover:bg-white/20 rounded-xl transition-colors active:scale-95 text-white"
                             >
-                                <XMarkIcon className="w-6 h-6" />
+                                <XMarkIcon className="w-6 h-6"/>
                             </button>
                         </div>
 
@@ -694,22 +949,25 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                             : 'text-white/40 cursor-not-allowed'
                                     }`}
                                 >
-                                    <ChevronLeftIcon className="w-5 h-5" />
+                                    <ChevronLeftIcon className="w-5 h-5"/>
                                 </button>
 
-                                <div className="flex items-center space-x-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30">
-                                    <CalendarIcon className="w-4 h-4 text-white" />
+                                <div
+                                    className="flex items-center space-x-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30">
+                                    <CalendarIcon className="w-4 h-4 text-white"/>
                                     <span className="text-sm font-medium text-white">
                                         <span className="sm:hidden">{dateInfo.date}</span>
                                         <span className="hidden sm:inline">{dateInfo.dayName}, {dateInfo.date}</span>
                                     </span>
                                     {dateInfo.isToday && (
-                                        <span className="px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full">
+                                        <span
+                                            className="px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full">
                                             Today
                                         </span>
                                     )}
                                     {dateInfo.exerciseCount > 0 && (
-                                        <span className="px-2 py-1 bg-white/30 text-white text-xs font-medium rounded-full">
+                                        <span
+                                            className="px-2 py-1 bg-white/30 text-white text-xs font-medium rounded-full">
                                             {dateInfo.exerciseCount}
                                         </span>
                                     )}
@@ -724,7 +982,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                             : 'text-white/40 cursor-not-allowed'
                                     }`}
                                 >
-                                    <ChevronRightIcon className="w-5 h-5" />
+                                    <ChevronRightIcon className="w-5 h-5"/>
                                 </button>
                             </div>
                         )}
@@ -732,8 +990,9 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                         {/* Day Full Warning */}
                         {!canAddToDate && (
                             <div className="flex items-center justify-center">
-                                <div className="inline-flex items-center px-3 py-2 rounded-xl bg-yellow-400/20 backdrop-blur-sm border border-yellow-400/30">
-                                    <ExclamationTriangleIcon className="w-4 h-4 mr-2 text-yellow-200" />
+                                <div
+                                    className="inline-flex items-center px-3 py-2 rounded-xl bg-yellow-400/20 backdrop-blur-sm border border-yellow-400/30">
+                                    <ExclamationTriangleIcon className="w-4 h-4 mr-2 text-yellow-200"/>
                                     <span className="text-sm font-medium text-yellow-100">
                                         <span className="sm:hidden">Day Full</span>
                                         <span className="hidden sm:inline">Day Full (Free Limit: 4 exercises)</span>
@@ -744,7 +1003,8 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
 
                         {/* Subscription Info */}
                         <div className="flex items-center justify-center mt-2">
-                            <div className="inline-flex items-center px-3 py-1 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30">
+                            <div
+                                className="inline-flex items-center px-3 py-1 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30">
                                 <span className={`w-2 h-2 rounded-full mr-2 ${
                                     canAccessPaidPlans ? 'bg-green-400' : 'bg-yellow-400'
                                 }`}></span>
@@ -760,11 +1020,11 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                 <div className="px-3 sm:px-4 py-3 bg-gray-50 border-b border-gray-200">
                     <div className="relative w-full max-w-full">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-                            <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
+                            <MagnifyingGlassIcon className="h-4 w-4 text-gray-400"/>
                         </div>
                         <input
                             type="text"
-                            placeholder={`Search ${selectedTab === 1 ? 'workout plans' : 'exercises'}...`}
+                            placeholder={`Search ${selectedTab === 2 ? 'workout plans' : 'exercises'}...`}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm transition-all duration-200 min-w-0"
@@ -774,12 +1034,12 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                 onClick={handleClearSearch}
                                 className="absolute inset-y-0 right-0 pr-3 flex items-center active:scale-95 z-10"
                             >
-                                <XMarkIcon className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                <XMarkIcon className="h-4 w-4 text-gray-400 hover:text-gray-600"/>
                             </button>
                         )}
                     </div>
                     <p className="text-xs text-gray-500 mt-2 px-1">
-                        {selectedTab === 1 ? 'Try "HIIT", "strength", "beginner"' : 'Try "cardio", "isometric", "planks"'}
+                        {selectedTab === 2 ? 'Try "HIIT", "strength", "beginner"' : 'Try "cardio", "isometric", "planks"'}
                     </p>
                 </div>
 
@@ -787,13 +1047,13 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                 {error && (
                     <div className="mx-4 sm:mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-2xl">
                         <div className="flex items-center">
-                            <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mr-3 flex-shrink-0" />
+                            <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mr-3 flex-shrink-0"/>
                             <span className="text-red-700 flex-1">{error}</span>
                             <button
                                 onClick={() => setError(null)}
                                 className="ml-auto text-red-400 hover:text-red-600 flex-shrink-0 active:scale-95"
                             >
-                                <XMarkIcon className="w-5 h-5" />
+                                <XMarkIcon className="w-5 h-5"/>
                             </button>
                         </div>
                         <p className="text-sm text-red-600 mt-2 ml-8">
@@ -811,9 +1071,10 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
 
                             let count = 0;
                             if (tab.id === 0) count = filteredExercises.length;
-                            else if (tab.id === 1) count = filteredWorkoutPlans.length;
-                            else if (tab.id === 2) count = categories.length;
-                            else if (tab.id === 3) count = popularExercises.length;
+                            else if (tab.id === 1) count = filteredFavoriteExercises.length;
+                            else if (tab.id === 2) count = filteredWorkoutPlans.length;
+                            else if (tab.id === 3) count = categories.length;
+                            else if (tab.id === 4) count = popularExercises.length;
 
                             return (
                                 <button
@@ -827,10 +1088,11 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                                     }`}
                                 >
-                                    <IconComponent className="w-4 h-4 mr-1.5" />
+                                    <IconComponent className="w-4 h-4 mr-1.5"/>
                                     {tab.name} ({count})
                                     {tab.highlight && (
-                                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                                        <span
+                                            className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
                                     )}
                                 </button>
                             );
@@ -850,15 +1112,15 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                             {selectedTab === 0 && (
                                 <>
                                     <div className="flex items-center">
-                                        <HeartIcon className="w-3 h-3 mr-1 text-red-500" />
+                                        <HeartIcon className="w-3 h-3 mr-1 text-red-500"/>
                                         Cardio
                                     </div>
                                     <div className="flex items-center">
-                                        <SparklesIcon className="w-3 h-3 mr-1 text-purple-500" />
+                                        <SparklesIcon className="w-3 h-3 mr-1 text-purple-500"/>
                                         Isometric
                                     </div>
                                     <div className="flex items-center">
-                                        <FireIcon className="w-3 h-3 mr-1 text-blue-500" />
+                                        <FireIcon className="w-3 h-3 mr-1 text-blue-500"/>
                                         Strength
                                     </div>
                                 </>
@@ -866,15 +1128,23 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                             {selectedTab === 1 && (
                                 <>
                                     <div className="flex items-center">
-                                        <CheckCircleIcon className="w-3 h-3 mr-1 text-green-500" />
+                                        <StarIcon className="w-3 h-3 mr-1 text-yellow-500"/>
+                                        Your Favorites
+                                    </div>
+                                </>
+                            )}
+                            {selectedTab === 2 && (
+                                <>
+                                    <div className="flex items-center">
+                                        <CheckCircleIcon className="w-3 h-3 mr-1 text-green-500"/>
                                         Free Plans
                                     </div>
                                     <div className="flex items-center">
-                                        <StarIcon className="w-3 h-3 mr-1 text-yellow-500" />
+                                        <StarIcon className="w-3 h-3 mr-1 text-yellow-500"/>
                                         Premium
                                     </div>
                                     <div className="flex items-center">
-                                        <LockClosedIcon className="w-3 h-3 mr-1 text-gray-500" />
+                                        <LockClosedIcon className="w-3 h-3 mr-1 text-gray-500"/>
                                         {canAccessPaidPlans ? 'Unlocked' : 'Upgrade for More'}
                                     </div>
                                 </>
@@ -899,50 +1169,64 @@ interface ExerciseCardProps {
     exercise: Exercise;
     onSelect: () => void;
     onDragStart?: () => void;
+    onToggleFavorite?: (exercise: Exercise, event?: React.MouseEvent) => void;
     disabled?: boolean;
     showPopularBadge?: boolean;
+    showFavoriteButton?: boolean;
+    isFavoritesTab?: boolean;
 }
 
 const ExerciseCard: React.FC<ExerciseCardProps> = ({
                                                        exercise,
                                                        onSelect,
                                                        onDragStart,
+                                                       onToggleFavorite,
                                                        disabled = false,
-                                                       showPopularBadge = false
+                                                       showPopularBadge = false,
+                                                       showFavoriteButton = false,
+                                                       isFavoritesTab = false
                                                    }) => {
     const exerciseName = exercise.exerciseName || exercise.name || 'Unknown Exercise';
     const isMobile = window.innerWidth < 768;
+    const isFavorited = exercise.isFavorite || false;
 
     const getDifficultyColor = (difficulty: string | undefined) => {
         const difficultyLevel = (difficulty || 'INTERMEDIATE').toLowerCase();
         switch (difficultyLevel) {
-            case 'beginner': return 'bg-green-100 text-green-700 border-green-200';
-            case 'intermediate': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'advanced': return 'bg-red-100 text-red-700 border-red-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+            case 'beginner':
+                return 'bg-green-100 text-green-700 border-green-200';
+            case 'intermediate':
+                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'advanced':
+                return 'bg-red-100 text-red-700 border-red-200';
+            default:
+                return 'bg-gray-100 text-gray-700 border-gray-200';
         }
     };
 
     const getWorkoutTrackingBadge = () => {
         if (exercise.isCardio) {
             return (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                    <HeartIcon className="w-3 h-3 mr-1" />
+                <span
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                    <HeartIcon className="w-3 h-3 mr-1"/>
                     Cardio
                 </span>
             );
         }
         if (exercise.isIsometric) {
             return (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                    <SparklesIcon className="w-3 h-3 mr-1" />
+                <span
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                    <SparklesIcon className="w-3 h-3 mr-1"/>
                     Hold
                 </span>
             );
         }
         return (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
-                <FireIcon className="w-3 h-3 mr-1" />
+            <span
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                <FireIcon className="w-3 h-3 mr-1"/>
                 Reps
             </span>
         );
@@ -951,7 +1235,7 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
     return (
         <div
             className={`
-                group bg-white rounded-2xl border border-gray-200 p-4 transition-all duration-300
+                group bg-white rounded-2xl border border-gray-200 p-4 transition-all duration-300 relative
                 ${disabled
                 ? 'opacity-50 cursor-not-allowed'
                 : 'hover:shadow-lg hover:border-blue-300 cursor-pointer active:scale-[0.98] hover:-translate-y-1'
@@ -961,10 +1245,36 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
             onDragStart={disabled || isMobile ? undefined : onDragStart}
             onClick={disabled ? undefined : onSelect}
         >
+            {/* ✅ FIXED: Favorite Star Button - Always visible with correct colors */}
+            {showFavoriteButton && onToggleFavorite && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite(exercise, e);
+                    }}
+                    className={`
+            absolute top-3 right-3 z-10 p-2 rounded-full transition-all duration-200
+            active:scale-95 shadow-sm hover:shadow-md
+            ${isFavorited
+                        ? 'text-yellow-500 bg-yellow-100 hover:text-yellow-600 hover:bg-yellow-200 border border-yellow-300'
+                        : 'text-gray-400 bg-gray-100 hover:text-yellow-500 hover:bg-yellow-100 border border-gray-300'
+                    }
+        `}
+                    title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                    {/* ✅ FIXED: Use the correct star icon based on favorite status */}
+                    {isFavorited ? (
+                        <StarIconSolid className="w-5 h-5 text-yellow-500"/>
+                    ) : (
+                        <StarIcon className="w-5 h-5"/>
+                    )}
+                </button>
+            )}
+
             <div className="flex items-start">
                 {!isMobile && (
                     <div className="mr-3 text-gray-400 pt-1 group-hover:text-blue-500 transition-colors">
-                        <Bars3Icon className="w-5 h-5" />
+                        <Bars3Icon className="w-5 h-5"/>
                     </div>
                 )}
 
@@ -975,10 +1285,15 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
                                 {exercise.emoji || '💪'} {exerciseName}
                             </h3>
                             {showPopularBadge && (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-800 border border-yellow-200 flex-shrink-0">
-                                    <StarIcon className="w-3 h-3 mr-1" />
+                                <span
+                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-800 border border-yellow-200 flex-shrink-0">
+                                    <StarIcon className="w-3 h-3 mr-1"/>
                                     Popular
                                 </span>
+                            )}
+                            {/* Show small favorite indicator when not showing the button */}
+                            {isFavorited && !showFavoriteButton && (
+                                <StarIconSolid className="w-4 h-4 text-yellow-500 ml-2 flex-shrink-0"/>
                             )}
                         </div>
                     </div>
@@ -994,7 +1309,8 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
                     <div className="flex flex-wrap gap-2 mb-3">
                         {getWorkoutTrackingBadge()}
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(exercise.difficultyLevel)}`}>
+                        <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(exercise.difficultyLevel)}`}>
                             {exercise.difficultyLevel || 'INTERMEDIATE'}
                         </span>
                     </div>
@@ -1003,19 +1319,20 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
                         <div className="flex items-center space-x-3 text-xs text-gray-500">
                             {exercise.estimatedDurationMinutes && (
                                 <div className="flex items-center">
-                                    <ClockIcon className="w-3 h-3 mr-1" />
+                                    <ClockIcon className="w-3 h-3 mr-1"/>
                                     {exercise.estimatedDurationMinutes}min
                                 </div>
                             )}
                             {exercise.averageRating && exercise.averageRating > 0 && (
                                 <div className="flex items-center">
-                                    <StarIcon className="w-3 h-3 mr-1 text-yellow-500" />
+                                    <StarIcon className="w-3 h-3 mr-1 text-yellow-500"/>
                                     {exercise.averageRating.toFixed(1)}
                                 </div>
                             )}
                         </div>
                         <div className="text-right">
-                            <span className="text-xs font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                            <span
+                                className="text-xs font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
                                 Tap to add →
                             </span>
                         </div>
@@ -1051,20 +1368,28 @@ const WorkoutPlanCard: React.FC<WorkoutPlanCardProps> = ({
     const getDifficultyColor = (difficulty: string | undefined) => {
         const difficultyLevel = (difficulty || 'INTERMEDIATE').toLowerCase();
         switch (difficultyLevel) {
-            case 'beginner': return 'bg-green-100 text-green-700 border-green-200';
-            case 'intermediate': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'advanced': return 'bg-red-100 text-red-700 border-red-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+            case 'beginner':
+                return 'bg-green-100 text-green-700 border-green-200';
+            case 'intermediate':
+                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'advanced':
+                return 'bg-red-100 text-red-700 border-red-200';
+            default:
+                return 'bg-gray-100 text-gray-700 border-gray-200';
         }
     };
 
     const getTierColor = (tier: string | undefined) => {
         const tierLevel = tier || 'FREE';
         switch (tierLevel) {
-            case 'FREE': return 'bg-green-100 text-green-700 border-green-200';
-            case 'PLUS': return 'bg-blue-100 text-blue-700 border-blue-200';
-            case 'PRO': return 'bg-purple-100 text-purple-700 border-purple-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+            case 'FREE':
+                return 'bg-green-100 text-green-700 border-green-200';
+            case 'PLUS':
+                return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'PRO':
+                return 'bg-purple-100 text-purple-700 border-purple-200';
+            default:
+                return 'bg-gray-100 text-gray-700 border-gray-200';
         }
     };
 
@@ -1094,7 +1419,7 @@ const WorkoutPlanCard: React.FC<WorkoutPlanCardProps> = ({
                     ${viewMode === 'list' ? 'w-16 h-16' : 'w-20 h-20 mx-auto'}
                     ${isLocked ? 'bg-gray-200 text-gray-500' : 'bg-gradient-to-br from-purple-100 to-blue-100 text-purple-600'}
                 `}>
-                    {isLocked ? <LockClosedIcon className="w-8 h-8" /> : '📋'}
+                    {isLocked ? <LockClosedIcon className="w-8 h-8"/> : '📋'}
                 </div>
 
                 {/* Plan Content */}
@@ -1123,16 +1448,16 @@ const WorkoutPlanCard: React.FC<WorkoutPlanCardProps> = ({
                         {viewMode === 'list' && (
                             <div className="flex items-center space-x-4 text-sm text-gray-500 ml-4">
                                 <div className="flex items-center">
-                                    <ClockIcon className="w-4 h-4 mr-1" />
+                                    <ClockIcon className="w-4 h-4 mr-1"/>
                                     {plan.estimatedDurationMinutes || 0}min
                                 </div>
                                 <div className="flex items-center">
-                                    <UserGroupIcon className="w-4 h-4 mr-1" />
+                                    <UserGroupIcon className="w-4 h-4 mr-1"/>
                                     {plan.exerciseCount || 0}
                                 </div>
                                 {plan.averageRating > 0 && (
                                     <div className="flex items-center">
-                                        <StarIcon className="w-4 h-4 mr-1 text-yellow-500" />
+                                        <StarIcon className="w-4 h-4 mr-1 text-yellow-500"/>
                                         {plan.averageRating.toFixed(1)}
                                     </div>
                                 )}
@@ -1142,14 +1467,17 @@ const WorkoutPlanCard: React.FC<WorkoutPlanCardProps> = ({
 
                     {/* Plan Tags */}
                     <div className={`flex flex-wrap gap-2 ${viewMode === 'list' ? 'mt-2' : 'mb-4'}`}>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getTierColor(plan.subscriptionTierRequired)}`}>
+                        <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getTierColor(plan.subscriptionTierRequired)}`}>
                             {plan.subscriptionTierRequired || 'FREE'}
                         </span>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(plan.difficulty)}`}>
+                        <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(plan.difficulty)}`}>
                             {plan.difficulty || plan.difficultyLevel || 'INTERMEDIATE'}
                         </span>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
-                            <UserGroupIcon className="w-3 h-3 mr-1" />
+                        <span
+                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                            <UserGroupIcon className="w-3 h-3 mr-1"/>
                             {plan.exerciseCount || 0} exercises
                         </span>
                     </div>
@@ -1158,12 +1486,12 @@ const WorkoutPlanCard: React.FC<WorkoutPlanCardProps> = ({
                     {viewMode === 'grid' && (
                         <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
                             <div className="flex items-center">
-                                <ClockIcon className="w-4 h-4 mr-1" />
+                                <ClockIcon className="w-4 h-4 mr-1"/>
                                 {plan.estimatedDurationMinutes || 0}min
                             </div>
                             {plan.averageRating && plan.averageRating > 0 && (
                                 <div className="flex items-center">
-                                    <StarIcon className="w-4 h-4 mr-1 text-yellow-500" />
+                                    <StarIcon className="w-4 h-4 mr-1 text-yellow-500"/>
                                     {plan.averageRating.toFixed(1)}
                                 </div>
                             )}
@@ -1178,8 +1506,9 @@ const WorkoutPlanCard: React.FC<WorkoutPlanCardProps> = ({
                             </span>
                         ) : (
                             <div className="flex items-center justify-center gap-2">
-                                <CogIcon className="w-4 h-4 text-purple-600" />
-                                <span className="text-xs font-medium text-gray-900 group-hover:text-purple-600 transition-colors">
+                                <CogIcon className="w-4 h-4 text-purple-600"/>
+                                <span
+                                    className="text-xs font-medium text-gray-900 group-hover:text-purple-600 transition-colors">
                                     Configure & Schedule →
                                 </span>
                             </div>

@@ -1,10 +1,14 @@
 package com.chidituke.workout_tracker.controller.workout;
 
+import com.chidituke.workout_tracker.dto.request.performance.*;
 import com.chidituke.workout_tracker.dto.request.scheduled_workouts.*;
+import com.chidituke.workout_tracker.dto.response.performance.PerformanceResponse;
+import com.chidituke.workout_tracker.dto.response.performance.WorkoutExecutionSummary;
 import com.chidituke.workout_tracker.dto.response.scheduled_workouts.*;
 import com.chidituke.workout_tracker.dto.request.scheduled_workouts.ScheduledWorkoutRequest;
 import com.chidituke.workout_tracker.dto.request.workout_plan.ScheduleMultipleExercisesRequestDTO;
 import com.chidituke.workout_tracker.dto.response.scheduled_workouts.ScheduledWorkoutResponse;
+import com.chidituke.workout_tracker.dto.response.workout_session.WorkoutSessionResponse;
 import com.chidituke.workout_tracker.exceptions.scheduled_workout.ScheduledWorkoutNotFoundException;
 import com.chidituke.workout_tracker.exceptions.scheduled_workout.UnauthorizedScheduledWorkoutAccessException;
 import com.chidituke.workout_tracker.exceptions.scheduled_workout.WorkoutInProgressException;
@@ -38,9 +42,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Unified Calendar and Workout Scheduling Controller
@@ -293,6 +303,298 @@ public class ScheduledWorkoutController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (Exception e) {
             log.error("Error deleting scheduled exercise: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // =======================
+    // ✅ ENHANCED: WORKOUT EXECUTION ENDPOINTS
+    // =======================
+
+    /**
+     * Start workout execution (creates WorkoutSession)
+     */
+    @PostMapping("/{scheduledWorkoutId}/start-execution")
+    @Operation(summary = "Start workout execution",
+            description = "Start workout execution and create performance tracking session")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Workout execution started successfully"),
+            @ApiResponse(responseCode = "404", description = "Scheduled workout not found"),
+            @ApiResponse(responseCode = "409", description = "Another workout already in progress")
+    })
+    public ResponseEntity<WorkoutSessionResponse> startWorkoutExecution(
+            @Parameter(description = "Scheduled workout ID")
+            @PathVariable Long scheduledWorkoutId,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            log.info("🚀 Starting workout execution for scheduled workout {} by user {}",
+                    scheduledWorkoutId, username);
+
+            WorkoutSessionResponse session = scheduledWorkoutService
+                    .startWorkoutExecution(username, scheduledWorkoutId);
+
+            log.info("✅ Started workout execution session {} for user {}",
+                    session.getId(), username);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(session);
+
+        } catch (Exception e) {
+            log.error("❌ Error starting workout execution: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Complete a set with performance data
+     */
+    @PostMapping("/sessions/{workoutSessionId}/complete-set")
+    @Operation(summary = "Complete a set with performance data",
+            description = "Record performance data for a completed set")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Set completed and recorded successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid performance data"),
+            @ApiResponse(responseCode = "404", description = "Workout session not found")
+    })
+    public ResponseEntity<PerformanceResponse> completeSet(
+            @Parameter(description = "Workout session ID")
+            @PathVariable Long workoutSessionId,
+            @Parameter(description = "Set completion data")
+            @Valid @RequestBody CompleteSetRequest request,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            log.info("💪 Recording set completion for exercise {} set {} in session {}",
+                    request.getExerciseId(), request.getSetNumber(), workoutSessionId);
+
+            PerformanceResponse performance = scheduledWorkoutService
+                    .completeSet(username, workoutSessionId, request);
+
+            log.info("✅ Recorded performance for exercise {} set {} by user {}",
+                    request.getExerciseId(), request.getSetNumber(), username);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(performance);
+
+        } catch (Exception e) {
+            log.error("❌ Error recording set completion: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Complete an exercise (all sets done)
+     */
+    @PostMapping("/sessions/{workoutSessionId}/complete-exercise/{exerciseId}")
+    @Operation(summary = "Complete an exercise",
+            description = "Mark an exercise as completed (all sets finished)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Exercise completed successfully"),
+            @ApiResponse(responseCode = "404", description = "Workout session or exercise not found")
+    })
+    public ResponseEntity<WorkoutSessionResponse> completeExercise(
+            @Parameter(description = "Workout session ID")
+            @PathVariable Long workoutSessionId,
+            @Parameter(description = "Exercise ID")
+            @PathVariable Long exerciseId,
+            @Parameter(description = "Completion notes")
+            @RequestBody(required = false) Map<String, String> requestBody,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+            String completionNotes = requestBody != null ? requestBody.get("completionNotes") : null;
+
+            log.info("🎯 Completing exercise {} in session {} for user {}",
+                    exerciseId, workoutSessionId, username);
+
+            WorkoutSessionResponse session = scheduledWorkoutService
+                    .completeExercise(username, workoutSessionId, exerciseId, completionNotes);
+
+            log.info("✅ Completed exercise {} in session {} for user {}",
+                    exerciseId, workoutSessionId, username);
+
+            return ResponseEntity.ok(session);
+
+        } catch (Exception e) {
+            log.error("❌ Error completing exercise: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Complete entire workout session
+     */
+    @PostMapping("/sessions/{workoutSessionId}/complete")
+    @Operation(summary = "Complete workout session",
+            description = "Complete the entire workout session with summary data")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Workout session completed successfully"),
+            @ApiResponse(responseCode = "404", description = "Workout session not found")
+    })
+    public ResponseEntity<ScheduledWorkoutResponse> completeWorkoutSession(
+            @Parameter(description = "Workout session ID")
+            @PathVariable Long workoutSessionId,
+            @Parameter(description = "Workout completion data")
+            @Valid @RequestBody CompleteWorkoutRequest request,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            log.info("🏁 Completing workout session {} for user {}", workoutSessionId, username);
+
+            ScheduledWorkoutResponse scheduledWorkout = scheduledWorkoutService
+                    .completeWorkoutSession(username, workoutSessionId, request);
+
+            log.info("✅ Completed workout session {} for user {}", workoutSessionId, username);
+
+            return ResponseEntity.ok(scheduledWorkout);
+
+        } catch (Exception e) {
+            log.error("❌ Error completing workout session: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Get workout execution summary
+     */
+    @GetMapping("/sessions/{workoutSessionId}/summary")
+    @Operation(summary = "Get workout execution summary",
+            description = "Get detailed performance summary for a workout session")
+    public ResponseEntity<WorkoutExecutionSummary> getWorkoutExecutionSummary(
+            @Parameter(description = "Workout session ID")
+            @PathVariable Long workoutSessionId,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            log.info("📊 Getting execution summary for session {} for user {}",
+                    workoutSessionId, username);
+
+            WorkoutExecutionSummary summary = scheduledWorkoutService
+                    .getWorkoutExecutionSummary(username, workoutSessionId);
+
+            return ResponseEntity.ok(summary);
+
+        } catch (Exception e) {
+            log.error("❌ Error getting workout execution summary: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Get batch workout results for multiple exercises
+     */
+    @PostMapping("/results/batch")
+    @Operation(summary = "Get batch workout results",
+            description = "Get performance results for multiple exercises")
+    public ResponseEntity<Map<String, Object>> getBatchWorkoutResults(
+            @Parameter(description = "Exercise IDs to analyze")
+            @Valid @RequestBody List<String> exerciseIds,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            log.info("📈 Getting batch results for {} exercises for user {}",
+                    exerciseIds.size(), username);
+
+            Map<String, Object> results = scheduledWorkoutService
+                    .getBatchWorkoutResults(username, exerciseIds);
+
+            return ResponseEntity.ok(results);
+
+        } catch (Exception e) {
+            log.error("❌ Error getting batch workout results: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Enhanced completion with detailed data
+     */
+    @PutMapping("/exercises/{exerciseId}/complete-enhanced")
+    @Operation(summary = "Mark exercise as completed with detailed data",
+            description = "Mark exercise as completed with performance and duration data")
+    public ResponseEntity<ScheduledWorkoutResponse> markExerciseCompletedEnhanced(
+            @Parameter(description = "Exercise ID")
+            @PathVariable String exerciseId,
+            @Parameter(description = "Enhanced completion data")
+            @Valid @RequestBody CompletionRequest request,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            log.info("🎯 Marking exercise {} as completed with enhanced data for user {}",
+                    exerciseId, username);
+
+            ScheduledWorkoutResponse response = scheduledWorkoutService.markExerciseCompleted(
+                    exerciseId, username, request.getCompletedAt(), request.getTotalDurationMinutes(),
+                    request.getNotes(), request.getPerformanceRating());
+
+            log.info("✅ Marked exercise {} as completed with enhanced data for user {}",
+                    exerciseId, username);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("❌ Error marking exercise as completed with enhanced data: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Batch completion with enhanced data
+     */
+    @PutMapping("/exercises/complete-batch-enhanced")
+    @Operation(summary = "Batch complete exercises with enhanced data",
+            description = "Complete multiple exercises with detailed performance data")
+    public ResponseEntity<Map<String, Object>> batchCompleteExercisesEnhanced(
+            @Parameter(description = "Batch enhanced completion data")
+            @Valid @RequestBody BatchCompletionRequest request,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            log.info("🔥 Batch completing {} exercises with enhanced data for user {}",
+                    request.getCompletions().size(), username);
+
+            Map<String, Object> results = new HashMap<>();
+            List<ScheduledWorkoutResponse> completedExercises = new ArrayList<>();
+            List<String> errors = new ArrayList<>();
+
+            for (CompletionRequest completion : request.getCompletions()) {
+                try {
+                    ScheduledWorkoutResponse response = scheduledWorkoutService.markExerciseCompleted(
+                            completion.getExerciseId(), username, completion.getCompletedAt(),
+                            completion.getTotalDurationMinutes(), completion.getNotes(),
+                            completion.getPerformanceRating());
+                    completedExercises.add(response);
+                } catch (Exception e) {
+                    errors.add("Exercise " + completion.getExerciseId() + ": " + e.getMessage());
+                }
+            }
+
+            results.put("completed", completedExercises);
+            results.put("errors", errors);
+            results.put("totalRequested", request.getCompletions().size());
+            results.put("totalCompleted", completedExercises.size());
+
+            log.info("✅ Batch completed {}/{} exercises for user {}",
+                    completedExercises.size(), request.getCompletions().size(), username);
+
+            return ResponseEntity.ok(results);
+
+        } catch (Exception e) {
+            log.error("❌ Error in batch enhanced completion: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -603,6 +905,40 @@ public class ScheduledWorkoutController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (Exception e) {
             log.error("Error starting scheduled workout: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * ✅ NEW: Complete exercise with full performance tracking
+     */
+    @PostMapping("/exercises/{exerciseId}/complete-with-performance")
+    @Operation(summary = "Complete exercise with performance tracking",
+            description = "Mark exercise as completed and create full performance records")
+    public ResponseEntity<ScheduledWorkoutResponse> completeExerciseWithPerformance(
+            @Parameter(description = "Scheduled exercise ID")
+            @PathVariable String exerciseId,
+            @Parameter(description = "Complete workout completion data")
+            @Valid @RequestBody WorkoutCompletionRequest request,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            log.info("🏃‍♂️ Completing exercise {} with performance tracking for user {}",
+                    exerciseId, username);
+
+            // Convert request to completion data
+            ScheduledWorkoutService.WorkoutCompletionData completionData = mapToCompletionData(request);
+
+            ScheduledWorkoutResponse response = scheduledWorkoutService
+                    .markExerciseCompletedWithPerformance(username, exerciseId, completionData);
+
+            log.info("✅ Successfully completed exercise {} with performance tracking", exerciseId);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("❌ Error completing exercise with performance: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -957,6 +1293,71 @@ public class ScheduledWorkoutController {
                     "canAccessWorkoutPlans", false,
                     "upgradeSuggestion", "Upgrade to PLUS to access complete workout plans!"
             );
+        }
+    }
+
+    /**
+     * ✅ NEW: Convert request to completion data
+     */
+    private ScheduledWorkoutService.WorkoutCompletionData mapToCompletionData(WorkoutCompletionRequest request) {
+
+        // Map sets data
+        List<ScheduledWorkoutService.CompletedSetData> sets = new ArrayList<>();
+        if (request.getSets() != null) {
+            sets = request.getSets().stream()
+                    .map(setRequest -> ScheduledWorkoutService.CompletedSetData.builder()
+                            .setNumber(setRequest.getSetNumber())
+                            .targetReps(setRequest.getTargetReps())
+                            .actualReps(setRequest.getActualReps())
+                            .targetWeight(setRequest.getTargetWeight())
+                            .actualWeight(setRequest.getActualWeight())
+                            .targetWeightUnit(setRequest.getTargetWeightUnit())
+                            .rpe(setRequest.getRpe())
+                            .restSeconds(setRequest.getRestSeconds())
+                            .completed(setRequest.getCompleted())
+                            .actualDurationMinutes(setRequest.getActualDurationMinutes())
+                            .actualHoldSeconds(setRequest.getActualHoldSeconds())
+                            .notes(setRequest.getNotes())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
+        return ScheduledWorkoutService.WorkoutCompletionData.builder()
+                .exerciseId(request.getExerciseId())
+                .scheduledExerciseId(request.getScheduledExerciseId())
+                .completedAt(request.getCompletedAt() != null ?
+                        parseCompletedAt(request.getCompletedAt()) : LocalDateTime.now())
+                .totalDurationMinutes(request.getTotalDurationMinutes())
+                .sets(sets)
+                .notes(request.getNotes())
+                .performanceRating(request.getPerformanceRating())
+                .personalRecords(request.getPersonalRecords() != null ? request.getPersonalRecords() : new ArrayList<>())
+                .improvements(request.getImprovements() != null ? request.getImprovements() : new ArrayList<>())
+
+                // Optional workout session data
+                .difficultyRating(request.getDifficultyRating())
+                .overallEffort(request.getOverallEffort())
+                .mood(request.getMood())
+                .location(request.getLocation())
+                .workoutFeedback(request.getWorkoutFeedback())
+                .performanceSummary(request.getPerformanceSummary())
+
+                // Optional cardio data
+                .distanceKm(request.getDistanceKm())
+                .caloriesBurned(request.getCaloriesBurned())
+                .build();
+    }
+
+    /**
+     * Parse completedAt timestamp, handling both UTC (with Z) and local formats
+     */
+    private LocalDateTime parseCompletedAt(String completedAtStr) {
+        if (completedAtStr.endsWith("Z")) {
+            // Parse as UTC and convert to LocalDateTime
+            return Instant.parse(completedAtStr).atZone(ZoneId.systemDefault()).toLocalDateTime();
+        } else {
+            // Parse as LocalDateTime directly
+            return LocalDateTime.parse(completedAtStr);
         }
     }
 

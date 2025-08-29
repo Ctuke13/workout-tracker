@@ -95,7 +95,7 @@ public class PerformanceMapper {
         PerformanceResponse.PerformanceResponseBuilder builder = PerformanceResponse.builder()
                 // Core identification
                 .id(performanceRecord.getId())
-                .workoutLogId(performanceRecord.getWorkoutSession().getId())
+                .workoutSessionId(performanceRecord.getWorkoutSession().getId())
                 .setNumber(performanceRecord.getSetNumber())
 
                 // Basic performance metrics
@@ -139,9 +139,10 @@ public class PerformanceMapper {
         if (performanceRecord.getExercise() != null) {
             Exercise exercise = performanceRecord.getExercise();
             builder.exerciseId(exercise.getId())
-                    .exerciseName(exercise.getExerciseName()) // ✅ FIXED: Use getName() not getExerciseName()
-                    .exerciseCategory(exercise.getExerciseType().getDisplayName()) // ✅ FIXED: Use getExerciseType()
-                    .isCardioExercise(exercise.getExerciseType() == Exercise.ExerciseType.CARDIO); // ✅ FIXED: Check enum
+                    .exerciseName(exercise.getExerciseName()) // : Use getName() not getExerciseName()
+                    .exerciseCategory(exercise.getExerciseType() != null ? exercise.getExerciseType().name() : null)
+                    .isCardioExercise(exercise.getIsCardio() != null ? exercise.getIsCardio() : false)
+                    .isIsometricExercise(exercise.getIsIsometric() != null ? exercise.getIsIsometric() : false);
         }
 
         // ✅ ADDED: Map workout information
@@ -270,7 +271,7 @@ public class PerformanceMapper {
 
         PerformanceResponse.PerformanceResponseBuilder builder = PerformanceResponse.builder()
                 .id(performanceRecord.getId())
-                .workoutLogId(performanceRecord.getWorkoutSession().getId())
+                .workoutSessionId(performanceRecord.getWorkoutSession().getId())
                 .setNumber(performanceRecord.getSetNumber())
                 .reps(performanceRecord.getReps())
                 .weight(performanceRecord.getWeight())

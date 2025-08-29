@@ -4,8 +4,10 @@ import com.chidituke.workout_tracker.model.workout.Exercise;
 import com.chidituke.workout_tracker.model.workout.PerformanceRecord;
 import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,6 +17,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import jakarta.persistence.QueryHint;
+
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -92,6 +96,77 @@ public interface PerformanceRecordRepository extends JpaRepository<PerformanceRe
                                                    @Param("startDate") LocalDate startDate,
                                                    @Param("endDate") LocalDate endDate,
                                                    Pageable pageable);
+
+    /**
+     * Find all performance records for a workout session, ordered by exercise and set number
+     */
+    List<PerformanceRecord> findByWorkoutSessionOrderByExerciseIdAscSetNumberAsc(WorkoutSession workoutSession);
+
+    /**
+     * Find performance records for a specific exercise in a workout session
+     */
+    List<PerformanceRecord> findByWorkoutSessionAndExerciseOrderBySetNumber(WorkoutSession workoutSession, Exercise exercise);
+
+    /**
+     * Find recent performance records for an exercise by a user
+     */
+    @Query("SELECT pr FROM PerformanceRecord pr " +
+            "WHERE pr.exercise = :exercise AND pr.workoutSession.user = :user " +
+            "ORDER BY pr.createdAt DESC")
+    List<PerformanceRecord> findRecentPerformanceRecords(@Param("exercise") Exercise exercise,
+                                                         @Param("user") User user,
+                                                         Pageable pageable);
+
+    /**
+     * Helper method to get recent performance records with limit
+     */
+    default List<PerformanceRecord> findRecentPerformanceRecords(Exercise exercise, User user, int limit) {
+        return findRecentPerformanceRecords(exercise, user, PageRequest.of(0, limit));
+    }
+
+    /**
+     * Find performance records by exercise and date range for analytics
+     */
+    @Query("SELECT pr FROM PerformanceRecord pr " +
+            "WHERE pr.exercise = :exercise AND pr.workoutSession.user = :user " +
+            "AND pr.createdAt BETWEEN :startDate AND :endDate " +
+            "ORDER BY pr.createdAt DESC")
+    List<PerformanceRecord> findByExerciseAndUserAndDateRange(@Param("exercise") Exercise exercise,
+                                                              @Param("user") User user,
+                                                              @Param("startDate") LocalDateTime startDate,
+                                                              @Param("endDate") LocalDateTime endDate);
+
+    /**
+     * Get performance statistics for an exercise
+     */
+    @Query("SELECT " +
+            "AVG(pr.perceivedExertion) as avgRpe, " +
+            "AVG(pr.formRating) as avgForm, " +
+            "MAX(pr.weight) as maxWeight, " +
+            "MAX(pr.reps) as maxReps " +
+            "FROM PerformanceRecord pr " +
+            "WHERE pr.exercise = :exercise AND pr.workoutSession.user = :user")
+    Object[] getPerformanceStatistics(@Param("exercise") Exercise exercise, @Param("user") User user);
+
+    /**
+     * Count total sets completed for an exercise by user
+     */
+    @Query("SELECT COUNT(pr) FROM PerformanceRecord pr " +
+            "WHERE pr.exercise = :exercise AND pr.workoutSession.user = :user " +
+            "AND pr.isExerciseCompleted = true")
+    Long countCompletedSetsForExercise(@Param("exercise") Exercise exercise, @Param("user") User user);
+
+    /**
+     * Get best performance record for an exercise (highest weight or longest duration)
+     */
+    @Query("SELECT pr FROM PerformanceRecord pr " +
+            "WHERE pr.exercise = :exercise AND pr.workoutSession.user = :user " +
+            "AND (pr.weight IS NOT NULL OR pr.durationMinutes IS NOT NULL) " +
+            "ORDER BY COALESCE(pr.weight, 0) DESC, COALESCE(pr.durationMinutes, 0) DESC")
+    List<PerformanceRecord> findBestPerformanceForExercise(@Param("exercise") Exercise exercise,
+                                                           @Param("user") User user,
+                                                           Pageable pageable);
+
 
     // ==============================================
     // PERSONAL RECORDS AND PROGRESS TRACKING
@@ -220,16 +295,14 @@ public interface PerformanceRecordRepository extends JpaRepository<PerformanceRe
     /**
      * Get performance records for exercise progress chart (last N workouts)
      */
-    @Query(value = "SELECT pr.* FROM performance_records pr " +
-            "JOIN workout_sessions ws ON pr.workout_session_id = ws.id " +
-            "WHERE ws.user_id = :userId AND pr.exercise_id = :exerciseId " +
+    @Query("SELECT pr FROM PerformanceRecord pr " +
+            "JOIN pr.workoutSession ws " +
+            "WHERE ws.user = :user AND pr.exercise = :exercise " +
             "AND pr.weight IS NOT NULL AND pr.reps IS NOT NULL " +
-            "ORDER BY ws.date DESC, pr.set_number " +
-            "LIMIT :limit",
-            nativeQuery = true)
-    List<PerformanceRecord> findRecentProgressByUserAndExercise(@Param("userId") Long userId,
-                                                                @Param("exerciseId") Long exerciseId,
-                                                                @Param("limit") int limit);
+            "ORDER BY ws.date DESC, pr.setNumber")
+    List<PerformanceRecord> findRecentProgressByUserAndExercise(@Param("user") User user,
+                                                                @Param("exercise") Exercise exercise,
+                                                                Pageable pageable);
 
     /**
      * Get strength progression data (best set from each workout)
@@ -453,4 +526,13 @@ public interface PerformanceRecordRepository extends JpaRepository<PerformanceRe
             "ORDER BY pr.createdAt DESC")
     List<PerformanceRecord> findRecentActivityByUser(@Param("user") User user,
                                                      @Param("since") LocalDateTime since);
+
+    default List<PerformanceRecord> findRecentProgressByUserAndExercise(User user, Exercise exercise, int limit) {
+        return findRecentProgressByUserAndExercise(user, exercise, PageRequest.of(0, limit));
+    }
+
+    default Optional<PerformanceRecord> findBestPerformanceForExerciseAsOptional(Exercise exercise, User user) {
+        List<PerformanceRecord> results = findBestPerformanceForExercise(exercise, user, PageRequest.of(0, 1));
+        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+    }
 }

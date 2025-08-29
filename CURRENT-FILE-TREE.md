@@ -1,9 +1,9 @@
 # 🏋️‍♂️ Workout Tracker v2 - Complete Project File Tree
 
 ## 📊 Project Overview
-- **Total Java Files**: 264
-- **Total TypeScript/JavaScript Files** (excluding node_modules): 78
-- **Total SQL Migration Files**: 12
+- **Total Java Files**: 277
+- **Total TypeScript/JavaScript Files** (excluding node_modules): 83
+- **Total SQL Migration Files**: 13
 - **Total HTTP Test Files**: 5
 - **Backend Structure**: Spring Boot application with comprehensive modular architecture
 - **Frontend Structure**: TypeScript React application with modern component architecture
@@ -28,7 +28,7 @@ workout-tracker/
 │   ├── 💳 subscription-tests.http
 │   └── 🏋️ workout-tests.http
 │
-├── 🖥️ backend/ (Spring Boot - 264 Java files)
+├── 🖥️ backend/ (Spring Boot - 277 Java files)
 │   ├── 🐳 docker-compose.yml
 │   ├── 🛠️ mvnw
 │   ├── 🛠️ mvnw.cmd
@@ -49,7 +49,7 @@ workout-tracker/
 │   │   │   │   ├── ⚙️ config/ (1 file)
 │   │   │   │   │   └── ExerciseDataLoader.java
 │   │   │   │   │
-│   │   │   │   ├── 🎮 controller/ (16 files)
+│   │   │   │   ├── 🎮 controller/ (18 files)
 │   │   │   │   │   ├── 🔐 auth/ (1 file)
 │   │   │   │   │   │   └── AuthController.java
 │   │   │   │   │   ├── 💬 messaging/ (2 files)
@@ -65,8 +65,9 @@ workout-tracker/
 │   │   │   │   │   │   ├── ProfessionalProfileController.java
 │   │   │   │   │   │   ├── SubscriptionController.java
 │   │   │   │   │   │   └── UserController.java
-│   │   │   │   │   └── 🏋️ workout/ (8 files)
+│   │   │   │   │   └── 🏋️ workout/ (9 files)
 │   │   │   │   │       ├── ExerciseController.java
+│   │   │   │   │       ├── ExerciseFavoritesController.java
 │   │   │   │   │       ├── PerformanceController.java
 │   │   │   │   │       ├── PlanExerciseController.java
 │   │   │   │   │       ├── ProgramPlanController.java
@@ -75,8 +76,8 @@ workout-tracker/
 │   │   │   │   │       ├── WorkoutProgramController.java
 │   │   │   │   │       └── WorkoutSessionController.java
 │   │   │   │   │
-│   │   │   │   ├── 📤 dto/ (89 files)
-│   │   │   │   │   ├── 📥 request/ (38 files)
+│   │   │   │   ├── 📤 dto/ (95 files)
+│   │   │   │   │   ├── 📥 request/ (45 files)
 │   │   │   │   │   │   ├── 🔐 auth/ (2 files)
 │   │   │   │   │   │   │   ├── LoginRequest.java
 │   │   │   │   │   │   │   └── RegisterRequest.java
@@ -129,7 +130,7 @@ workout-tracker/
 │   │   │   │   │   │   │   └── WorkoutProgramRequest.java
 │   │   │   │   │   │   └── 📊 workout_session/ (1 file)
 │   │   │   │   │   │       └── WorkoutSessionRequest.java
-│   │   │   │   │   └── 📤 response/ (51 files)
+│   │   │   │   │   └── 📤 response/ (50 files)
 │   │   │   │   │       ├── 🔐 auth/ (1 file)
 │   │   │   │   │       │   └── JwtResponse.java
 │   │   │   │   │       ├── 🔧 common/ (2 files)
@@ -193,7 +194,7 @@ workout-tracker/
 │   │   │   │   │           ├── WorkoutSessionAnalyticsResponse.java
 │   │   │   │   │           └── WorkoutSessionResponse.java
 │   │   │   │   │
-│   │   │   │   ├── ❌ exceptions/ (76 files)
+│   │   │   │   ├── ❌ exceptions/ (50 files)
 │   │   │   │   │   ├── ErrorResponse.java
 │   │   │   │   │   ├── GlobalExceptionHandler.java
 │   │   │   │   │   ├── 🔐 auth/ (4 files)
@@ -275,7 +276,7 @@ workout-tracker/
 │   │   │   │   │       ├── WorkoutProgramMapper.java
 │   │   │   │   │       └── WorkoutSessionMapper.java
 │   │   │   │   │
-│   │   │   │   ├── 🏗️ model/ (30 files)
+│   │   │   │   ├── 🏗️ model/ (34 files)
 │   │   │   │   │   ├── 🔧 common/ (1 file)
 │   │   │   │   │   │   └── BaseEntity.java
 │   │   │   │   │   ├── 💬 messaging/ (7 files)
@@ -302,7 +303,7 @@ workout-tracker/
 │   │   │   │   │   │       ├── ActivityLevel.java
 │   │   │   │   │   │       ├── SubscriptionTier.java
 │   │   │   │   │   │       └── UserType.java
-│   │   │   │   │   └── 🏋️ workout/ (15 files)
+│   │   │   │   │   └── 🏋️ workout/ (14 files)
 │   │   │   │   │       ├── Exercise.java
 │   │   │   │   │       ├── ExerciseGoalMapping.java
 │   │   │   │   │       ├── ExerciseGoalMappingId.java
@@ -311,6 +312,7 @@ workout-tracker/
 │   │   │   │   │       ├── PlanExercise.java
 │   │   │   │   │       ├── ProgramPlan.java
 │   │   │   │   │       ├── ScheduledWorkout.java
+│   │   │   │   │       ├── UserExerciseFavorite.java
 │   │   │   │   │       ├── UserExerciseHistory.java
 │   │   │   │   │       ├── UserExerciseRating.java
 │   │   │   │   │       ├── WorkoutPlan.java
@@ -370,6 +372,7 @@ workout-tracker/
 │   │   │   │   │   │   ├── UserRelationshipService.java
 │   │   │   │   │   │   └── UserService.java
 │   │   │   │   │   └── 🏋️ workout/ (9 files)
+│   │   │   │   │       ├── ExerciseFavoritesService.java
 │   │   │   │   │       ├── ExerciseService.java
 │   │   │   │   │       ├── PerformanceService.java
 │   │   │   │   │       ├── PlanExerciseService.java
@@ -387,7 +390,7 @@ workout-tracker/
 │   │   │       ├── 🧪 api-test.http
 │   │   │       ├── ⚙️ application.properties
 │   │   │       ├── ⚙️ application-test.properties
-│   │   │       └── 🗄️ db/migration/ (12 SQL files)
+│   │   │       └── 🗄️ db/migration/ (13 SQL files)
 │   │   │           ├── V001__Create_Core_User_System.sql
 │   │   │           ├── V002__Create_Functions_And_Triggers.sql
 │   │   │           ├── V003__Create_Exercise_System.sql
@@ -399,7 +402,8 @@ workout-tracker/
 │   │   │           ├── V009__Create_Social_System.sql
 │   │   │           ├── V010__Social_System_Optimizations.sql
 │   │   │           ├── V011__Create_Messaging_System.sql
-│   │   │           └── V012__Add_Foundation_Exercises.sql
+│   │   │           ├── V012__Add_Foundation_Exercises.sql
+│   │   │           └── V013__Create_Scheduled_Workouts.sql
 │   │   │
 │   │   └── 🧪 test/
 │   │       ├── ☕ java/com/chidituke/workout_tracker/
@@ -429,7 +433,7 @@ workout-tracker/
 │   │
 │   └── 🎯 target/ (build directory)
 │
-├── 🌐 frontend/ (TypeScript React - 78 source files)
+├── 🌐 frontend/ (TypeScript React - 83 source files)
 │   ├── 📖 README.md
 │   ├── 📦 package.json
 │   ├── 🔒 package-lock.json
@@ -458,13 +462,15 @@ workout-tracker/
 │   │   ├── 🧪 setupTests.js
 │   │   ├── 🎨 theme.js
 │   │   │
-│   │   ├── 🧩 components/ (39 files)
+│   │   ├── 🧩 components/ (40 files)
 │   │   │   ├── 🧪 ApiTestPanel.tsx
 │   │   │   ├── 📋 index.ts
-│   │   │   ├── 📅 CalendarPage/ (4 files)
+│   │   │   ├── 📅 CalendarPage/ (6 files)
+│   │   │   │   ├── CompletedWorkoutDisplay.tsx
 │   │   │   │   ├── ExerciseConfigModal.tsx
 │   │   │   │   ├── ExerciseSelector.tsx
 │   │   │   │   ├── InWorkoutExerciseSelector.tsx
+│   │   │   │   ├── WorkoutPlanConfigModal.tsx
 │   │   │   │   └── index.ts
 │   │   │   ├── 💪 ExercisePage/ (4 files)
 │   │   │   │   ├── DesktopFilters.tsx
@@ -575,40 +581,43 @@ workout-tracker/
 ## 🚀 Recent Key Additions
 
 ### Backend Enhancements
+- **ExerciseFavoritesController.java** - Exercise favorites management endpoint
+- **ExerciseFavoritesService.java** - Exercise favorites business logic service
+- **V013__Create_Scheduled_Workouts.sql** - Scheduled workouts database schema
 - **HealthController.java** - System health monitoring endpoint
 - **ExerciseConfigurationRequestDTO.java** - Enhanced exercise configuration
 - **IndividualExerciseRequest.java** - New request DTO for individual exercises
 - **ScheduleMultipleExercisesRequestDTO.java** - Bulk exercise scheduling
-- **SubscriptionLimitExceededException.java** - Enhanced subscription error handling
 
 ### Frontend Enhancements
+- **CompletedWorkoutDisplay.tsx** - Completed workout display component
+- **WorkoutPlanConfigModal.tsx** - Workout plan configuration modal
 - **WorkoutTrackingInterface.tsx** - New workout tracking component
 - **UI Components** (7 files) - Complete shadcn/ui component library:
   - badge.tsx, button.tsx, card.tsx, input.tsx, label.tsx, select.tsx, textarea.tsx
 - **calendarApi.ts** - Calendar API integration
 - **workoutPlanApi.ts** - Workout plan API service
 - **utils.ts** - Utility functions library
-- **components.json** - Component configuration
 
 ### Infrastructure
-- **Enhanced TypeScript** - Full TypeScript conversion with proper typing
+- **Scheduled Workouts System** - Complete scheduled workout management
+- **Exercise Favorites System** - User exercise favorites tracking
+- **Enhanced Calendar Features** - Advanced calendar functionality with workout planning
 - **Modern UI Components** - Complete shadcn/ui integration
-- **Calendar Integration** - Full calendar functionality implementation
-- **Workout Tracking** - Advanced workout tracking interface
 
 ## 📈 Architecture Summary
 
 ### Backend (Spring Boot)
 - **🔐 Security Layer**: JWT authentication, role-based access control
-- **🎮 Controller Layer**: 16 REST controllers with comprehensive API endpoints
+- **🎮 Controller Layer**: 18 REST controllers with comprehensive API endpoints
 - **🔧 Service Layer**: 20 business logic services with modular architecture
 - **🗄️ Data Layer**: 23 repositories with complex entity relationships
-- **🏗️ Model Layer**: 30 entities with comprehensive workout tracking domain
-- **❌ Exception Handling**: 76 custom exceptions with global error handling
+- **🏗️ Model Layer**: 34 entities with comprehensive workout tracking domain
+- **❌ Exception Handling**: 50 custom exceptions with global error handling
 - **🗺️ Mapping Layer**: 13 mappers for DTO transformations
 
 ### Frontend (TypeScript React)
-- **🧩 Component Architecture**: 39 reusable components with modern patterns
+- **🧩 Component Architecture**: 40 reusable components with modern patterns
 - **📄 Page Structure**: 15 pages covering all user workflows
 - **🔄 State Management**: Context-based state with custom hooks
 - **🔌 API Integration**: Comprehensive service layer with type safety

@@ -1,10 +1,16 @@
 package com.chidituke.workout_tracker.service.workout;
 
+import com.chidituke.workout_tracker.dto.request.performance.CompleteSetRequest;
+import com.chidituke.workout_tracker.dto.request.performance.CompleteWorkoutRequest;
 import com.chidituke.workout_tracker.dto.request.scheduled_workouts.ScheduledWorkoutRequest;
 import com.chidituke.workout_tracker.dto.request.workout_plan.ScheduleMultipleExercisesRequestDTO;
 import com.chidituke.workout_tracker.dto.request.scheduled_workouts.IndividualExerciseRequest;
+import com.chidituke.workout_tracker.dto.response.performance.ExerciseExecutionSummary;
+import com.chidituke.workout_tracker.dto.response.performance.PerformanceResponse;
+import com.chidituke.workout_tracker.dto.response.performance.WorkoutExecutionSummary;
 import com.chidituke.workout_tracker.dto.response.scheduled_workouts.ScheduledWorkoutResponse;
 import com.chidituke.workout_tracker.dto.response.scheduled_workouts.CalendarViewResponse;
+import com.chidituke.workout_tracker.dto.response.workout_session.WorkoutSessionResponse;
 import com.chidituke.workout_tracker.exceptions.scheduled_workout.*;
 import com.chidituke.workout_tracker.exceptions.user.UserNotFoundException;
 import com.chidituke.workout_tracker.exceptions.workout_plan.WorkoutPlanNotFoundException;
@@ -18,6 +24,7 @@ import com.chidituke.workout_tracker.model.workout.WorkoutProgram;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession;
 import com.chidituke.workout_tracker.model.workout.PlanExercise;
 import com.chidituke.workout_tracker.model.workout.Exercise;
+import com.chidituke.workout_tracker.mapper.workout.ExerciseMapper;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan.DifficultyLevel;
 import com.chidituke.workout_tracker.repository.workout.PlanExerciseRepository;
 import com.chidituke.workout_tracker.repository.workout.ExerciseRepository;
@@ -26,9 +33,15 @@ import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutReposito
 import com.chidituke.workout_tracker.repository.workout.WorkoutPlanRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutProgramRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutSessionRepository;
+import com.chidituke.workout_tracker.model.workout.PerformanceRecord;
+import com.chidituke.workout_tracker.repository.workout.PerformanceRecordRepository;
 import com.chidituke.workout_tracker.controller.workout.ScheduledWorkoutController;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import lombok.Data;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +53,7 @@ import java.util.stream.Collectors;
 
 /**
  * ✅ FIXED: ScheduledWorkoutService aligned with existing codebase
- *
+ * <p>
  * Comprehensive service for managing scheduled workouts with:
  * - Individual workout scheduling ✅
  * - Complete workout plan scheduling with subscription limits ✅
@@ -66,11 +79,13 @@ public class ScheduledWorkoutService {
     private final WorkoutProgramRepository workoutProgramRepository;
     private final WorkoutSessionRepository workoutSessionRepository;
     private final PlanExerciseRepository planExerciseRepository;
+    private final PerformanceRecordRepository performanceRecordRepository;
     private final ExerciseRepository exerciseRepository;
     private final ScheduledWorkoutMapper scheduledWorkoutMapper;
+    private final ExerciseMapper exerciseMapper;
 
     // =======================
-    // ✅ FIXED: INDIVIDUAL EXERCISE SCHEDULING
+    // INDIVIDUAL EXERCISE SCHEDULING
     // =======================
 
     /**
@@ -89,6 +104,13 @@ public class ScheduledWorkoutService {
             User user = findUserByUsername(username);
             Exercise exercise = findExerciseById(request.getExerciseId());
 
+            exerciseMapper.autoCorrectExerciseModality(exercise);
+
+            if (!exerciseMapper.isExerciseDataComplete(exercise)) {
+                log.warn("⚠️ Exercise {} has incomplete data: {}",
+                        exercise.getId(), exerciseMapper.getExerciseSummary(exercise));
+            }
+
             // Check subscription limits before proceeding
             validateIndividualExerciseScheduling(user, request);
 
@@ -101,13 +123,18 @@ public class ScheduledWorkoutService {
             // Create the scheduled workout entry
             ScheduledWorkout scheduledWorkout = buildScheduledWorkout(user, savedPlan, request);
 
+            scheduledWorkout.setExercise(exercise);
+
             // Apply exercise-specific configuration based on exercise type
             applyExerciseConfiguration(scheduledWorkout, exercise, request);
 
             ScheduledWorkout saved = scheduledWorkoutRepository.save(scheduledWorkout);
 
+            validateAndPopulateExerciseData(saved);
+
             log.info("✅ Successfully scheduled individual exercise for user {}, ID: {}",
                     username, saved.getId());
+
             return scheduledWorkoutMapper.toResponse(saved);
 
         } catch (Exception e) {
@@ -187,19 +214,125 @@ public class ScheduledWorkoutService {
         }
     }
 
-    // =======================
-    // ✅ FIXED: EXERCISE COMPLETION TRACKING
-    // =======================
+    /**
+     * ✅ NEW: Get exercise information for scheduled workout response
+     * This method bridges the gap between ScheduledWorkout entities and frontend needs
+     */
+    private ScheduledWorkoutResponse.ExerciseInfo getExerciseInfoForResponse(ScheduledWorkout scheduledWorkout) {
+        try {
+            // Use ExerciseMapper to extract and map exercise data
+            Exercise exercise = exerciseMapper.extractExerciseFromScheduledWorkout(scheduledWorkout);
+
+            if (exercise != null) {
+                // Validate exercise data consistency
+                if (!exerciseMapper.validateExerciseTypeConsistency(exercise)) {
+                    log.warn("⚠️ Exercise {} has inconsistent type flags, auto-correcting", exercise.getId());
+                    exerciseMapper.autoCorrectExerciseModality(exercise);
+                }
+
+                // Map to response format
+                ScheduledWorkoutResponse.ExerciseInfo exerciseInfo = exerciseMapper.mapExerciseToResponseInfo(exercise);
+
+                log.debug("✅ Successfully mapped exercise info for scheduled workout {}: isCardio={}, isIsometric={}",
+                        scheduledWorkout.getId(),
+                        exerciseInfo.getIsCardio(),
+                        exerciseInfo.getIsIsometric());
+
+                return exerciseInfo;
+            } else {
+                log.warn("⚠️ No exercise found for scheduled workout {}", scheduledWorkout.getId());
+                return createFallbackExerciseInfo(scheduledWorkout);
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Failed to get exercise info for scheduled workout {}: {}",
+                    scheduledWorkout.getId(), e.getMessage(), e);
+            return createFallbackExerciseInfo(scheduledWorkout);
+        }
+    }
 
     /**
-     * Mark exercise as completed
+     * Create fallback exercise info when no exercise is found
+     */
+    private ScheduledWorkoutResponse.ExerciseInfo createFallbackExerciseInfo(ScheduledWorkout scheduledWorkout) {
+        String exerciseName = "Unknown Exercise";
+        String exerciseType = "STRENGTH";
+        boolean isCardio = false;
+        boolean isIsometric = false;
+
+        // Try to get info from workout plan
+        if (scheduledWorkout.getWorkoutPlan() != null) {
+            exerciseName = scheduledWorkout.getWorkoutPlan().getWorkoutName();
+
+            // Determine type from workout plan
+            if (scheduledWorkout.isCardioWorkout()) {
+                exerciseType = "CARDIO";
+                isCardio = true;
+            } else if (scheduledWorkout.isIsometricWorkout()) {
+                exerciseType = "BALANCE";
+                isIsometric = true;
+            }
+        }
+
+        return ScheduledWorkoutResponse.ExerciseInfo.builder()
+                .id(null)
+                .name(exerciseName)
+                .emoji("💪")
+                .description("Exercise from workout plan")
+                .exerciseType(exerciseType)
+                .difficultyLevel("INTERMEDIATE")
+                .isCardio(isCardio)
+                .isIsometric(isIsometric)
+                .workoutTrackingMode(isCardio ? "TIME_BASED" : isIsometric ? "HOLD_BASED" : "REP_BASED")
+                .isFromVerifiedSource(false)
+                .build();
+    }
+
+    /**
+     * Enhanced method to validate and populate exercise data
+     */
+    private void validateAndPopulateExerciseData(ScheduledWorkout scheduledWorkout) {
+        try {
+            Exercise exercise = exerciseMapper.extractExerciseFromScheduledWorkout(scheduledWorkout);
+
+            if (exercise != null) {
+                // Validate exercise data consistency
+                if (!exerciseMapper.isExerciseDataComplete(exercise)) {
+                    log.warn("⚠️ Incomplete exercise data for scheduled workout {}: {}",
+                            scheduledWorkout.getId(), exerciseMapper.getExerciseSummary(exercise));
+                }
+
+                // Auto-correct any inconsistencies
+                exerciseMapper.autoCorrectExerciseModality(exercise);
+
+                log.debug("✅ Validated exercise data for scheduled workout {}: {}",
+                        scheduledWorkout.getId(), exerciseMapper.getExerciseSummary(exercise));
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Failed to validate exercise data for scheduled workout {}: {}",
+                    scheduledWorkout.getId(), e.getMessage(), e);
+        }
+    }
+
+    // =======================
+    //  EXERCISE COMPLETION TRACKING
+    // =======================
+
+
+    /**
+     * Mark exercise as completed with detailed completion data
      */
     @Transactional
-    public ScheduledWorkoutResponse markExerciseCompleted(String username, Long exerciseId) {
+    public ScheduledWorkoutResponse markExerciseCompleted(Long exerciseId, String username,
+                                                          LocalDateTime completedAt,
+                                                          Integer totalDurationMinutes,
+                                                          String notes,
+                                                          String performanceRating) {
         ScheduledWorkout scheduledWorkout = findScheduledWorkoutById(exerciseId);
         validateOwnership(scheduledWorkout, username);
 
-        log.info("✅ Marking exercise {} as completed for user {}", exerciseId, username);
+        log.info("✅ Marking exercise {} as completed for user {} with detailed data", exerciseId, username);
 
         // Validate that the exercise can be completed
         if (scheduledWorkout.getStatus() == ScheduledWorkout.ScheduleStatus.COMPLETED) {
@@ -210,14 +343,425 @@ public class ScheduledWorkoutService {
             throw new IllegalStateException("Cannot complete a cancelled exercise");
         }
 
-        // Mark as completed
+        // Mark as completed with detailed data
         scheduledWorkout.setStatus(ScheduledWorkout.ScheduleStatus.COMPLETED);
-        scheduledWorkout.setCompletedAt(LocalDateTime.now());
+        scheduledWorkout.setCompletedAt(completedAt != null ? completedAt : LocalDateTime.now());
+
+        // Store completion details
+        if (totalDurationMinutes != null) {
+            scheduledWorkout.setActualDurationMinutes(totalDurationMinutes);
+        }
+
+        if (notes != null && !notes.trim().isEmpty()) {
+            String existingNotes = scheduledWorkout.getCustomNotes();
+            String combinedNotes = existingNotes != null ?
+                    existingNotes + " | Completion: " + notes :
+                    "Completion: " + notes;
+            scheduledWorkout.setCustomNotes(combinedNotes);
+        }
+
+        // Store performance rating (you might need to add this field to ScheduledWorkout entity)
+        // scheduledWorkout.setPerformanceRating(performanceRating);
 
         ScheduledWorkout saved = scheduledWorkoutRepository.save(scheduledWorkout);
 
-        log.info("✅ Successfully marked exercise {} as completed for user {}", exerciseId, username);
+        log.info("✅ Successfully marked exercise {} as completed for user {} with {} min duration",
+                exerciseId, username, totalDurationMinutes);
         return scheduledWorkoutMapper.toResponse(saved);
+    }
+
+    /**
+     * ✅ NEW: Enhanced mark exercise completed with full performance tracking
+     */
+    @Transactional
+    public ScheduledWorkoutResponse markExerciseCompletedWithPerformance(
+            String username,
+            String exerciseId,
+            WorkoutCompletionData completionData) {
+
+        try {
+            log.error("🔥 DEBUG: Enhanced completion called for exercise {} by user {} with data: {}",
+                    exerciseId, username, completionData);
+
+            // ... your existing method code here ...
+
+        } catch (Exception e) {
+            log.error("❌ ENHANCED COMPLETION FAILED: {}", e.getMessage(), e);
+            throw e;
+        }
+
+        ScheduledWorkout scheduledWorkout = findScheduledWorkoutById(Long.parseLong(exerciseId));
+        validateOwnership(scheduledWorkout, username);
+
+        log.info("🏃‍♂️ Creating complete workout flow for exercise {} by user {}", exerciseId, username);
+
+        try {
+            // Step 1: Create WorkoutSession (if not exists)
+            WorkoutSession workoutSession = getOrCreateWorkoutSession(scheduledWorkout, completionData);
+
+            // Step 2: Create PerformanceRecord entries for each completed set
+            List<PerformanceRecord> performanceRecords = createPerformanceRecords(
+                    workoutSession, scheduledWorkout, completionData);
+
+            // Step 3: Mark scheduled workout as completed
+            scheduledWorkout.setStatus(ScheduledWorkout.ScheduleStatus.COMPLETED);
+            scheduledWorkout.setCompletedAt(completionData.getCompletedAt());
+            scheduledWorkout.setActualDurationMinutes(completionData.getTotalDurationMinutes());
+            scheduledWorkout.setCompletedSession(workoutSession);
+
+            if (completionData.getNotes() != null) {
+                String existingNotes = scheduledWorkout.getCustomNotes();
+                String combinedNotes = existingNotes != null ?
+                        existingNotes + " | " + completionData.getNotes() :
+                        completionData.getNotes();
+                scheduledWorkout.setCustomNotes(combinedNotes);
+            }
+
+            // Step 4: Update workout session completion
+            updateWorkoutSessionCompletion(workoutSession, completionData);
+
+            // Save everything
+            workoutSessionRepository.save(workoutSession);
+            performanceRecordRepository.saveAll(performanceRecords);
+            ScheduledWorkout saved = scheduledWorkoutRepository.save(scheduledWorkout);
+
+            log.info("✅ Successfully completed exercise {} with {} performance records",
+                    exerciseId, performanceRecords.size());
+
+            return scheduledWorkoutMapper.toResponse(saved);
+
+        } catch (Exception e) {
+            log.error("❌ Failed to complete exercise with performance data: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to complete workout: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ✅ NEW: Get or create workout session for scheduled workout
+     */
+    private WorkoutSession getOrCreateWorkoutSession(ScheduledWorkout scheduledWorkout,
+                                                     WorkoutCompletionData completionData) {
+
+        // Check if workout session already exists
+        if (scheduledWorkout.getCompletedSession() != null) {
+            return scheduledWorkout.getCompletedSession();
+        }
+
+        // Create new workout session
+        WorkoutSession workoutSession = new WorkoutSession();
+        workoutSession.setUser(scheduledWorkout.getUser());
+        workoutSession.setWorkoutPlan(scheduledWorkout.getWorkoutPlan());
+        workoutSession.setScheduledWorkout(scheduledWorkout);
+        workoutSession.setDate(LocalDate.now());
+        workoutSession.setSessionStatus(WorkoutSession.SessionStatus.COMPLETED);
+
+        // Set basic session data
+        workoutSession.setTotalDurationMinutes(completionData.getTotalDurationMinutes());
+        workoutSession.setTotalExercisesPlanned(1); // Single exercise
+        workoutSession.setTotalExercisesCompleted(1);
+        workoutSession.setCompletionPercentage(100.0);
+
+        // Set optional fields from completion data
+        if (completionData.getDifficultyRating() != null) {
+            workoutSession.setDifficultyRating(completionData.getDifficultyRating());
+        }
+        if (completionData.getOverallEffort() != null) {
+            workoutSession.setOverallEffort(completionData.getOverallEffort());
+        }
+
+        // Set mood and location if provided
+        if (completionData.getMood() != null) {
+            try {
+                WorkoutSession.WorkoutMood mood = WorkoutSession.WorkoutMood.valueOf(
+                        completionData.getMood().toUpperCase());
+                workoutSession.setMood(mood);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid mood value: {}, using default", completionData.getMood());
+                workoutSession.setMood(WorkoutSession.WorkoutMood.FOCUSED);
+            }
+        }
+
+        if (completionData.getLocation() != null) {
+            try {
+                WorkoutSession.WorkoutLocation location = WorkoutSession.WorkoutLocation.valueOf(
+                        completionData.getLocation().toUpperCase());
+                workoutSession.setLocation(location);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid location value: {}, using default", completionData.getLocation());
+                workoutSession.setLocation(WorkoutSession.WorkoutLocation.HOME);
+            }
+        }
+
+        // Set notes
+        if (completionData.getNotes() != null || completionData.getWorkoutFeedback() != null) {
+            StringBuilder notes = new StringBuilder();
+            if (completionData.getNotes() != null) {
+                notes.append(completionData.getNotes());
+            }
+            if (completionData.getWorkoutFeedback() != null) {
+                if (notes.length() > 0) notes.append(" | ");
+                notes.append("Feedback: ").append(completionData.getWorkoutFeedback());
+            }
+            workoutSession.setNotes(notes.toString());
+        }
+
+        return workoutSession;
+    }
+
+    /**
+     * ✅ NEW: Create performance records from completion data
+     */
+    private List<PerformanceRecord> createPerformanceRecords(
+            WorkoutSession workoutSession,
+            ScheduledWorkout scheduledWorkout,
+            WorkoutCompletionData completionData) {
+
+        List<PerformanceRecord> performanceRecords = new ArrayList<>();
+        Exercise exercise = scheduledWorkout.getResolvedExercise();
+
+        if (exercise == null) {
+            log.warn("⚠️ No exercise resolved for scheduled workout {}, creating basic performance record",
+                    scheduledWorkout.getId());
+
+            // Create a basic performance record even without exercise details
+            PerformanceRecord basicRecord = createBasicPerformanceRecord(
+                    workoutSession, scheduledWorkout, completionData);
+            performanceRecords.add(basicRecord);
+            return performanceRecords;
+        }
+
+        // Create performance records for each completed set
+        List<CompletedSetData> sets = completionData.getSets();
+        if (sets == null || sets.isEmpty()) {
+            // No set data provided - create default performance records
+            performanceRecords.addAll(createDefaultPerformanceRecords(
+                    workoutSession, exercise, scheduledWorkout, completionData));
+        } else {
+            // Create performance records from actual set data
+            for (CompletedSetData setData : sets) {
+                PerformanceRecord record = createPerformanceRecordFromSetData(
+                        workoutSession, exercise, setData, completionData);
+                performanceRecords.add(record);
+            }
+        }
+
+        return performanceRecords;
+    }
+
+    /**
+     * ✅ NEW: Create performance record from set data
+     */
+    private PerformanceRecord createPerformanceRecordFromSetData(
+            WorkoutSession workoutSession,
+            Exercise exercise,
+            CompletedSetData setData,
+            WorkoutCompletionData completionData) {
+
+        PerformanceRecord record = PerformanceRecord.builder()
+                .workoutSession(workoutSession)
+                .exercise(exercise)
+                .setNumber(setData.getSetNumber())
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        // Set exercise type specific data
+        if (exercise.getIsCardio() != null && exercise.getIsCardio()) {
+            // Cardio exercise
+            record.setDurationMinutes(setData.getActualDurationMinutes());
+            record.setDistanceKm(completionData.getDistanceKm());
+            record.setCaloriesBurned(completionData.getCaloriesBurned());
+
+            // For cardio, "reps" represents duration target
+            record.setTargetRepsPlanned(setData.getTargetReps());
+            record.setReps(setData.getActualDurationMinutes());
+
+        } else if (exercise.getIsIsometric() != null && exercise.getIsIsometric()) {
+            // Isometric exercise
+            record.setHoldDurationSeconds(setData.getActualHoldSeconds());
+
+            // For isometric, "reps" represents hold duration target
+            record.setTargetRepsPlanned(setData.getTargetReps());
+            record.setReps(setData.getActualHoldSeconds());
+
+        } else {
+            // Strength exercise
+            record.setReps(setData.getActualReps());
+            record.setWeight(setData.getActualWeight());
+            record.setTargetRepsPlanned(setData.getTargetReps());
+            record.setTargetWeightPlanned(setData.getTargetWeight());
+        }
+
+        // Set common fields
+        record.setPerceivedExertion(setData.getRpe());
+        record.setRestTimeBeforeSetSeconds(setData.getRestSeconds());
+        record.setNotes(setData.getNotes());
+        record.setIsExerciseCompleted(setData.getCompleted());
+
+        // Calculate performance vs target
+        record.evaluatePerformanceVsTarget();
+
+        log.debug("✅ Created performance record for set {} of exercise {}",
+                setData.getSetNumber(), exercise.getExerciseName());
+
+        return record;
+    }
+
+    /**
+     * ✅ NEW: Create default performance records when no set data provided
+     */
+    private List<PerformanceRecord> createDefaultPerformanceRecords(
+            WorkoutSession workoutSession,
+            Exercise exercise,
+            ScheduledWorkout scheduledWorkout,
+            WorkoutCompletionData completionData) {
+
+        List<PerformanceRecord> records = new ArrayList<>();
+
+        // Determine number of sets from scheduled workout
+        int sets = scheduledWorkout.getTargetSets() != null ? scheduledWorkout.getTargetSets() :
+                (exercise.getIsCardio() != null && exercise.getIsCardio() ? 1 : 3);
+
+        for (int setNumber = 1; setNumber <= sets; setNumber++) {
+            PerformanceRecord record = PerformanceRecord.builder()
+                    .workoutSession(workoutSession)
+                    .exercise(exercise)
+                    .setNumber(setNumber)
+                    .isExerciseCompleted(true)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            // Set default values based on exercise type and scheduled workout
+            if (exercise.getIsCardio() != null && exercise.getIsCardio()) {
+                record.setDurationMinutes(scheduledWorkout.getTargetDurationMinutes() != null ?
+                        scheduledWorkout.getTargetDurationMinutes() : completionData.getTotalDurationMinutes());
+                record.setReps(record.getDurationMinutes());
+
+            } else if (exercise.getIsIsometric() != null && exercise.getIsIsometric()) {
+                record.setHoldDurationSeconds(scheduledWorkout.getHoldDurationSeconds() != null ?
+                        scheduledWorkout.getHoldDurationSeconds() : 30);
+                record.setReps(record.getHoldDurationSeconds());
+
+            } else {
+                // Strength exercise defaults
+                int defaultReps = parseTargetReps(scheduledWorkout.getTargetReps());
+                record.setReps(defaultReps);
+                record.setWeight(scheduledWorkout.getTargetWeight());
+                record.setTargetRepsPlanned(defaultReps);
+                record.setTargetWeightPlanned(scheduledWorkout.getTargetWeight());
+            }
+
+            // Set common defaults
+            record.setPerceivedExertion(scheduledWorkout.getTargetRpe() != null ?
+                    scheduledWorkout.getTargetRpe() : 7);
+            record.setRestTimeBeforeSetSeconds(scheduledWorkout.getRestSeconds() != null ?
+                    scheduledWorkout.getRestSeconds() : 90);
+            record.setPerformanceVsTarget(PerformanceRecord.PerformanceVsTarget.MET);
+
+            records.add(record);
+        }
+
+        log.info("✅ Created {} default performance records for exercise {}",
+                records.size(), exercise.getExerciseName());
+
+        return records;
+    }
+
+    /**
+     * ✅ NEW: Create basic performance record when exercise is not resolved
+     */
+    private PerformanceRecord createBasicPerformanceRecord(
+            WorkoutSession workoutSession,
+            ScheduledWorkout scheduledWorkout,
+            WorkoutCompletionData completionData) {
+
+        // Try to find exercise by ID from scheduled workout
+        Exercise exercise = null;
+        try {
+            if (scheduledWorkout.getExercise() != null) {
+                exercise = scheduledWorkout.getExercise();
+            } else {
+                // Try to find any exercise from workout plan
+                List<PlanExercise> planExercises = planExerciseRepository
+                        .findByWorkoutPlanOrderByOrderInWorkout(scheduledWorkout.getWorkoutPlan());
+                if (!planExercises.isEmpty()) {
+                    exercise = planExercises.get(0).getExercise();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Could not resolve exercise for basic performance record");
+        }
+
+        if (exercise == null) {
+            throw new RuntimeException("Cannot create performance record without exercise reference");
+        }
+
+        PerformanceRecord record = PerformanceRecord.builder()
+                .workoutSession(workoutSession)
+                .exercise(exercise)
+                .setNumber(1)
+                .isExerciseCompleted(true)
+                .notes("Completed via calendar")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        // Set basic performance data
+        record.setPerceivedExertion(7); // Default moderate effort
+        record.setPerformanceVsTarget(PerformanceRecord.PerformanceVsTarget.MET);
+
+        return record;
+    }
+
+    /**
+     * ✅ NEW: Update workout session completion
+     */
+    private void updateWorkoutSessionCompletion(WorkoutSession workoutSession,
+                                                WorkoutCompletionData completionData) {
+        workoutSession.setSessionStatus(WorkoutSession.SessionStatus.COMPLETED);
+
+        // Store additional completion data if available
+        if (completionData.getPerformanceSummary() != null) {
+            workoutSession.setPerformanceSummary(completionData.getPerformanceSummary());
+        }
+
+        // Calculate estimated calories if not provided
+        if (workoutSession.getEstimatedCalories() == null && completionData.getTotalDurationMinutes() != null) {
+            // Simple calorie estimation: 5 calories per minute (very rough estimate)
+            workoutSession.setEstimatedCalories(completionData.getTotalDurationMinutes() * 5);
+        }
+    }
+
+    /**
+     * ✅ BACKWARD COMPATIBILITY: Keep the simple version for existing code
+     */
+    @Transactional
+    public ScheduledWorkoutResponse markExerciseCompleted(String username, Long exerciseId) {
+        return markExerciseCompleted(exerciseId, username, null, null, null, "MET");
+    }
+
+    /**
+     * Enhanced markExerciseCompleted that creates full performance tracking
+     */
+    @Transactional
+    public ScheduledWorkoutResponse markExerciseCompleted(String username, String exerciseId,
+                                                          LocalDateTime completedAt,
+                                                          Integer totalDurationMinutes,
+                                                          String notes,
+                                                          String performanceRating) {
+
+        // Create completion data from parameters
+        WorkoutCompletionData completionData = WorkoutCompletionData.builder()
+                .exerciseId(exerciseId)
+                .scheduledExerciseId(exerciseId)
+                .completedAt(completedAt != null ? completedAt : LocalDateTime.now())
+                .totalDurationMinutes(totalDurationMinutes)
+                .notes(notes)
+                .performanceRating(performanceRating != null ? performanceRating : "MET")
+                .sets(new ArrayList<>()) // Empty sets - will create defaults
+                .personalRecords(new ArrayList<>())
+                .improvements(new ArrayList<>())
+                .build();
+
+        return markExerciseCompletedWithPerformance(username, exerciseId, completionData);
     }
 
     @Transactional
@@ -247,8 +791,752 @@ public class ScheduledWorkoutService {
         return markMultipleExercisesCompleted(username, longIds);
     }
 
+    /**
+     * Start a workout session from scheduled workout - creates WorkoutSession and tracks performance
+     */
+    @Transactional
+    public WorkoutSessionResponse startWorkoutExecution(String username, Long scheduledWorkoutId) {
+        ScheduledWorkout scheduledWorkout = findScheduledWorkoutById(scheduledWorkoutId);
+        validateOwnership(scheduledWorkout, username);
+
+        log.info("🚀 Starting workout execution for scheduled workout {} by user {}", scheduledWorkoutId, username);
+
+        // Create new workout session
+        WorkoutSession workoutSession = new WorkoutSession();
+        workoutSession.setUser(scheduledWorkout.getUser());
+        workoutSession.setWorkoutPlan(scheduledWorkout.getWorkoutPlan());
+        workoutSession.setScheduledWorkout(scheduledWorkout);
+        workoutSession.setDate(LocalDate.now());
+        workoutSession.setSessionStatus(WorkoutSession.SessionStatus.IN_PROGRESS);
+
+        // Initialize performance tracking
+        if (scheduledWorkout.getExercise() != null) {
+            workoutSession.setTotalExercisesPlanned(1);
+        } else if (scheduledWorkout.getWorkoutPlan() != null) {
+            List<PlanExercise> planExercises = planExerciseRepository.findByWorkoutPlanOrderByOrderInWorkout(scheduledWorkout.getWorkoutPlan());
+            workoutSession.setTotalExercisesPlanned(planExercises.size());
+        }
+
+        workoutSession.setTotalExercisesCompleted(0);
+        workoutSession.setCompletionPercentage(0.0);
+
+        WorkoutSession savedSession = workoutSessionRepository.save(workoutSession);
+
+        // Update scheduled workout status
+        scheduledWorkout.setStatus(ScheduledWorkout.ScheduleStatus.IN_PROGRESS);
+        scheduledWorkoutRepository.save(scheduledWorkout);
+
+        log.info("✅ Created workout session {} for scheduled workout {}", savedSession.getId(), scheduledWorkoutId);
+
+        return mapToWorkoutSessionResponse(savedSession);
+    }
+
+    /**
+     * Complete a set with detailed performance data
+     */
+    @Transactional
+    public PerformanceResponse completeSet(String username, Long workoutSessionId,
+                                           CompleteSetRequest request) {
+        WorkoutSession workoutSession = workoutSessionRepository.findById(workoutSessionId)
+                .orElseThrow(() -> new RuntimeException("Workout session not found: " + workoutSessionId));
+
+        validateWorkoutSessionOwnership(workoutSession, username);
+
+        log.info("💪 Recording performance for exercise {} set {} in session {}",
+                request.getExerciseId(), request.getSetNumber(), workoutSessionId);
+
+        // Create performance record
+        PerformanceRecord performanceRecord = new PerformanceRecord();
+        performanceRecord.setWorkoutSession(workoutSession);
+        performanceRecord.setExercise(findExerciseById(request.getExerciseId()));
+        performanceRecord.setSetNumber(request.getSetNumber());
+
+        // Set performance data based on exercise type
+        Exercise exercise = findExerciseById(request.getExerciseId());
+
+        if (exercise.getIsCardio()) {
+            performanceRecord.setDurationMinutes(request.getDurationMinutes());
+            performanceRecord.setDurationSeconds(request.getDurationSeconds());
+            performanceRecord.setDistanceKm(request.getDistanceKm());
+            performanceRecord.setCaloriesBurned(request.getCaloriesBurned());
+        } else if (exercise.getIsIsometric()) {
+            performanceRecord.setHoldDurationSeconds(request.getHoldDurationSeconds());
+        } else {
+            performanceRecord.setReps(request.getReps());
+            performanceRecord.setWeight(request.getWeight());
+        }
+
+        // Set target comparison data
+        performanceRecord.setTargetRepsPlanned(request.getTargetReps());
+        performanceRecord.setTargetWeightPlanned(request.getTargetWeight());
+
+        // Set timing data
+        performanceRecord.setSetStartTime(request.getSetStartTime());
+        performanceRecord.setSetEndTime(request.getSetEndTime());
+        performanceRecord.setRestTimeBeforeSetSeconds(request.getRestTimeSeconds());
+
+        // Set subjective data
+        performanceRecord.setPerceivedExertion(request.getPerceivedExertion());
+        performanceRecord.setFormRating(request.getFormRating());
+        performanceRecord.setNotes(request.getNotes());
+
+        // Calculate performance vs target
+        performanceRecord.setPerformanceVsTarget(calculatePerformanceVsTarget(performanceRecord));
+
+        PerformanceRecord savedRecord = performanceRecordRepository.save(performanceRecord);
+
+        log.info("✅ Recorded performance for exercise {} set {}", request.getExerciseId(), request.getSetNumber());
+
+        return mapToPerformanceRecordResponse(savedRecord);
+    }
+
+    /**
+     * Complete an exercise (all sets done)
+     */
+    @Transactional
+    public WorkoutSessionResponse completeExercise(String username, Long workoutSessionId,
+                                                   Long exerciseId, String completionNotes) {
+        WorkoutSession workoutSession = workoutSessionRepository.findById(workoutSessionId)
+                .orElseThrow(() -> new RuntimeException("Workout session not found: " + workoutSessionId));
+
+        validateWorkoutSessionOwnership(workoutSession, username);
+
+        log.info("🎯 Completing exercise {} in workout session {}", exerciseId, workoutSessionId);
+
+        // Mark all performance records for this exercise as completed
+        List<PerformanceRecord> exerciseRecords = performanceRecordRepository
+                .findByWorkoutSessionAndExerciseOrderBySetNumber(workoutSession, findExerciseById(exerciseId));
+
+        for (PerformanceRecord record : exerciseRecords) {
+            record.setIsExerciseCompleted(true);
+            record.setExerciseCompletionNotes(completionNotes);
+        }
+
+        performanceRecordRepository.saveAll(exerciseRecords);
+
+        // Update workout session completion - trigger will handle this automatically
+        WorkoutSession updatedSession = workoutSessionRepository.findById(workoutSessionId).orElse(workoutSession);
+
+        log.info("✅ Completed exercise {} in workout session {}", exerciseId, workoutSessionId);
+
+        return mapToWorkoutSessionResponse(updatedSession);
+    }
+
+    /**
+     * Complete entire workout session
+     */
+    @Transactional
+    public ScheduledWorkoutResponse completeWorkoutSession(String username, Long workoutSessionId,
+                                                           CompleteWorkoutRequest request) {
+        WorkoutSession workoutSession = workoutSessionRepository.findById(workoutSessionId)
+                .orElseThrow(() -> new RuntimeException("Workout session not found: " + workoutSessionId));
+
+        validateWorkoutSessionOwnership(workoutSession, username);
+
+        log.info("🏁 Completing workout session {} for user {}", workoutSessionId, username);
+
+        // Update workout session - FIXED: Use correct enum types and available methods
+        workoutSession.setSessionStatus(WorkoutSession.SessionStatus.COMPLETED);
+        workoutSession.setTotalDurationMinutes(request.getTotalDurationMinutes());
+        workoutSession.setDifficultyRating(request.getDifficultyRating());
+        workoutSession.setOverallEffort(request.getOverallEffort());
+
+        // ✅ FIXED: Convert String to enum for mood
+        if (request.getMood() != null) {
+            try {
+                WorkoutSession.WorkoutMood mood = WorkoutSession.WorkoutMood.valueOf(request.getMood().toUpperCase());
+                workoutSession.setMood(mood);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid mood value: {}, using default", request.getMood());
+                workoutSession.setMood(WorkoutSession.WorkoutMood.FOCUSED); // Use FOCUSED as default
+            }
+        }
+
+        // ✅ FIXED: Convert String to enum for location
+        if (request.getLocation() != null) {
+            try {
+                WorkoutSession.WorkoutLocation location = WorkoutSession.WorkoutLocation.valueOf(request.getLocation().toUpperCase());
+                workoutSession.setLocation(location);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid location value: {}, using default", request.getLocation());
+                workoutSession.setLocation(WorkoutSession.WorkoutLocation.HOME);
+            }
+        }
+
+        // ✅ FIXED: Check if these methods exist in WorkoutSession entity
+        // If these methods don't exist, we'll store the data in notes or create the methods
+        if (request.getWorkoutFeedback() != null) {
+            // Option 1: If setWorkoutFeedback doesn't exist, store in notes
+            String existingNotes = workoutSession.getNotes();
+            String feedback = "Feedback: " + request.getWorkoutFeedback();
+            workoutSession.setNotes(existingNotes != null ? existingNotes + " | " + feedback : feedback);
+
+            // Option 2: If you have this method in WorkoutSession, uncomment this:
+            // workoutSession.setWorkoutFeedback(request.getWorkoutFeedback());
+        }
+
+        if (request.getPerformanceSummary() != null) {
+            // Option 1: If setPerformanceSummary doesn't exist, store in notes
+            String existingNotes = workoutSession.getNotes();
+            String summary = "Performance: " + request.getPerformanceSummary();
+            workoutSession.setNotes(existingNotes != null ? existingNotes + " | " + summary : summary);
+
+            // Option 2: If you have this method in WorkoutSession, uncomment this:
+            // workoutSession.setPerformanceSummary(request.getPerformanceSummary());
+        }
+
+        WorkoutSession savedSession = workoutSessionRepository.save(workoutSession);
+
+        // Update scheduled workout
+        ScheduledWorkout scheduledWorkout = workoutSession.getScheduledWorkout();
+        if (scheduledWorkout != null) {
+            scheduledWorkout.setStatus(ScheduledWorkout.ScheduleStatus.COMPLETED);
+            scheduledWorkout.setCompletedAt(LocalDateTime.now());
+            scheduledWorkout.setActualDurationMinutes(request.getTotalDurationMinutes());
+            scheduledWorkout = scheduledWorkoutRepository.save(scheduledWorkout);
+
+            log.info("✅ Completed workout session {} and scheduled workout {}",
+                    workoutSessionId, scheduledWorkout.getId());
+
+            return scheduledWorkoutMapper.toResponse(scheduledWorkout);
+        }
+
+        throw new RuntimeException("No scheduled workout associated with session");
+    }
+
+    /**
+     * Get workout execution summary with performance details
+     */
+    @Transactional(readOnly = true)
+    public WorkoutExecutionSummary getWorkoutExecutionSummary(String username, Long workoutSessionId) {
+        WorkoutSession workoutSession = workoutSessionRepository.findById(workoutSessionId)
+                .orElseThrow(() -> new RuntimeException("Workout session not found: " + workoutSessionId));
+
+        validateWorkoutSessionOwnership(workoutSession, username);
+
+        log.info("📊 Getting execution summary for workout session {}", workoutSessionId);
+
+        // Get all performance records
+        List<PerformanceRecord> performanceRecords = performanceRecordRepository
+                .findByWorkoutSessionOrderByExerciseIdAscSetNumberAsc(workoutSession);
+
+        // Group by exercise
+        Map<Long, List<PerformanceRecord>> recordsByExercise = performanceRecords.stream()
+                .collect(Collectors.groupingBy(pr -> pr.getExercise().getId()));
+
+        // Build summary
+        List<ExerciseExecutionSummary> exerciseSummaries = new ArrayList<>();
+
+        for (Map.Entry<Long, List<PerformanceRecord>> entry : recordsByExercise.entrySet()) {
+            Exercise exercise = findExerciseById(entry.getKey());
+            List<PerformanceRecord> exerciseRecords = entry.getValue();
+
+            ExerciseExecutionSummary exerciseSummary =
+                    ExerciseExecutionSummary.builder()
+                            .exerciseId(exercise.getId())
+                            .exerciseName(exercise.getExerciseName())
+                            .isCompleted(exerciseRecords.stream().anyMatch(PerformanceRecord::getIsExerciseCompleted))
+                            .totalSets(exerciseRecords.size())
+                            .averageRpe(calculateAverageRpe(exerciseRecords))
+                            .averageFormRating(calculateAverageFormRating(exerciseRecords))
+                            .totalVolume(calculateTotalVolume(exerciseRecords))
+                            .performanceRecords(exerciseRecords.stream()
+                                    .map(this::mapToPerformanceRecordResponse)
+                                    .collect(Collectors.toList()))
+                            .build();
+
+            exerciseSummaries.add(exerciseSummary);
+        }
+
+        return WorkoutExecutionSummary.builder()
+                .workoutSessionId(workoutSessionId)
+                .sessionStatus(workoutSession.getSessionStatus().toString())
+                .totalExercisesPlanned(workoutSession.getTotalExercisesPlanned())
+                .totalExercisesCompleted(workoutSession.getTotalExercisesCompleted())
+                .completionPercentage(workoutSession.getCompletionPercentage())
+                .totalDurationMinutes(workoutSession.getTotalDurationMinutes())
+                .exerciseSummaries(exerciseSummaries)
+                .overallPerformanceRating(calculateOverallPerformanceRating(performanceRecords))
+                .build();
+    }
+
+    /**
+     * Get batch workout results for completed exercises
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getBatchWorkoutResults(String username, List<String> exerciseIds) {
+        User user = findUserByUsername(username);
+
+        log.info("📈 Getting batch workout results for {} scheduled workouts for user {}", exerciseIds.size(), username);
+
+        Map<String, Object> results = new HashMap<>();
+
+        for (String scheduledWorkoutIdStr : exerciseIds) {
+            try {
+                // ✅ FIXED: Parse as scheduled workout ID, not exercise ID
+                Long scheduledWorkoutId = Long.parseLong(scheduledWorkoutIdStr);
+
+                // ✅ FIXED: Find the scheduled workout, not the exercise template
+                Optional<ScheduledWorkout> scheduledWorkoutOpt = scheduledWorkoutRepository.findById(scheduledWorkoutId);
+
+                if (scheduledWorkoutOpt.isPresent()) {
+                    ScheduledWorkout scheduledWorkout = scheduledWorkoutOpt.get();
+
+                    // Verify ownership and completion status
+                    if (scheduledWorkout.getUser().equals(user) &&
+                            scheduledWorkout.getStatus() == ScheduledWorkout.ScheduleStatus.COMPLETED) {
+
+                        // ✅ NEW: Build workout results from the completed scheduled workout
+                        Map<String, Object> workoutResults = buildWorkoutResultsFromScheduledWorkout(scheduledWorkout);
+                        results.put(scheduledWorkoutIdStr, workoutResults);
+
+                        log.debug("✅ Found workout results for scheduled workout {}", scheduledWorkoutIdStr);
+                    } else {
+                        log.debug("⚠️ Scheduled workout {} not completed or not owned by user {}", scheduledWorkoutIdStr, username);
+                    }
+                } else {
+                    log.debug("⚠️ Scheduled workout {} not found", scheduledWorkoutIdStr);
+                }
+            } catch (NumberFormatException e) {
+                log.error("❌ Invalid scheduled workout ID: {}", scheduledWorkoutIdStr);
+            } catch (Exception e) {
+                log.error("❌ Error processing scheduled workout {}: {}", scheduledWorkoutIdStr, e.getMessage());
+            }
+        }
+
+        results.put("summary", Map.of(
+                "totalExercisesAnalyzed", results.size() - 1, // Exclude summary itself
+                "generatedAt", LocalDateTime.now().toString()
+        ));
+
+        log.info("📊 Returning workout results for {}/{} scheduled workouts", results.size() - 1, exerciseIds.size());
+        return results;
+    }
+
+    /**
+     * ✅ NEW: Build workout results from a completed scheduled workout
+     */
+    private Map<String, Object> buildWorkoutResultsFromScheduledWorkout(ScheduledWorkout scheduledWorkout) {
+        Map<String, Object> workoutResults = new HashMap<>();
+
+        // Get the exercise (either direct or from workout plan)
+        Exercise exercise = scheduledWorkout.getResolvedExercise();
+        if (exercise == null) {
+            log.warn("⚠️ No exercise found for scheduled workout {}", scheduledWorkout.getId());
+            return workoutResults;
+        }
+
+        // Basic workout information
+        workoutResults.put("exerciseId", scheduledWorkout.getId().toString());
+        workoutResults.put("exerciseName", exercise.getExerciseName());
+        workoutResults.put("completedAt", scheduledWorkout.getCompletedAt() != null ?
+                scheduledWorkout.getCompletedAt().toString() : LocalDateTime.now().toString());
+        workoutResults.put("totalDurationMinutes", scheduledWorkout.getActualDurationMinutes() != null ?
+                scheduledWorkout.getActualDurationMinutes() : scheduledWorkout.getEstimatedDurationMinutes());
+        workoutResults.put("performanceRating", "MET"); // Default - you can enhance this later
+        workoutResults.put("notes", scheduledWorkout.getCustomNotes());
+
+        // Get performance records if they exist
+        if (scheduledWorkout.getCompletedSession() != null) {
+            List<PerformanceRecord> performanceRecords = performanceRecordRepository
+                    .findByWorkoutSessionAndExerciseOrderBySetNumber(scheduledWorkout.getCompletedSession(), exercise);
+
+            if (!performanceRecords.isEmpty()) {
+                // Build sets data
+                List<Map<String, Object>> sets = performanceRecords.stream()
+                        .map(this::buildSetResultFromPerformanceRecord)
+                        .collect(Collectors.toList());
+                workoutResults.put("sets", sets);
+
+                // Build metrics based on exercise type
+                if (exercise.getIsCardio() != null && exercise.getIsCardio()) {
+                    workoutResults.put("cardioMetrics", buildCardioMetrics(performanceRecords, scheduledWorkout));
+                } else if (exercise.getIsIsometric() != null && exercise.getIsIsometric()) {
+                    workoutResults.put("isometricMetrics", buildIsometricMetrics(performanceRecords));
+                } else {
+                    workoutResults.put("strengthMetrics", buildStrengthMetrics(performanceRecords));
+                }
+            } else {
+                // No performance records - build basic set data from scheduled workout configuration
+                workoutResults.put("sets", buildBasicSetsFromScheduledWorkout(scheduledWorkout));
+
+                // Build basic metrics
+                if (scheduledWorkout.isCardioWorkout()) {
+                    workoutResults.put("cardioMetrics", buildBasicCardioMetrics(scheduledWorkout));
+                } else if (scheduledWorkout.isIsometricWorkout()) {
+                    workoutResults.put("isometricMetrics", buildBasicIsometricMetrics(scheduledWorkout));
+                } else {
+                    workoutResults.put("strengthMetrics", buildBasicStrengthMetrics(scheduledWorkout));
+                }
+            }
+        } else {
+            // No workout session - build basic results from scheduled workout
+            workoutResults.put("sets", buildBasicSetsFromScheduledWorkout(scheduledWorkout));
+        }
+
+        // Add empty arrays for now (you can implement these later)
+        workoutResults.put("personalRecords", List.of());
+        workoutResults.put("improvements", List.of());
+
+        return workoutResults;
+    }
+
+    /**
+     * ✅ NEW: Build set result from performance record
+     */
+    private Map<String, Object> buildSetResultFromPerformanceRecord(PerformanceRecord record) {
+        Map<String, Object> setResult = new HashMap<>();
+
+        setResult.put("setNumber", record.getSetNumber());
+        setResult.put("targetReps", record.getTargetRepsPlanned());
+        setResult.put("actualReps", record.getReps());
+        setResult.put("targetWeight", record.getTargetWeightPlanned());
+        setResult.put("actualWeight", record.getWeight());
+        setResult.put("targetWeightUnit", "lbs"); // You can enhance this
+        setResult.put("rpe", record.getPerceivedExertion());
+        setResult.put("restSeconds", record.getRestTimeBeforeSetSeconds());
+        setResult.put("completed", record.getIsExerciseCompleted());
+        setResult.put("performanceVsTarget", record.getPerformanceVsTarget() != null ?
+                record.getPerformanceVsTarget().toString() : "NOT_SET");
+        setResult.put("notes", record.getNotes());
+        setResult.put("setDurationSeconds", record.calculateActualSetDuration());
+
+        return setResult;
+    }
+
+    /**
+     * ✅ NEW: Build basic sets when no performance records exist
+     */
+    private List<Map<String, Object>> buildBasicSetsFromScheduledWorkout(ScheduledWorkout scheduledWorkout) {
+        List<Map<String, Object>> sets = new ArrayList<>();
+
+        Integer targetSets = scheduledWorkout.getTargetSets() != null ? scheduledWorkout.getTargetSets() :
+                (scheduledWorkout.isCardioWorkout() ? 1 : 3);
+
+        for (int i = 1; i <= targetSets; i++) {
+            Map<String, Object> set = new HashMap<>();
+            set.put("setNumber", i);
+            set.put("targetReps", parseTargetReps(scheduledWorkout.getTargetReps()));
+            set.put("actualReps", parseTargetReps(scheduledWorkout.getTargetReps())); // Assume completed as planned
+            set.put("targetWeight", scheduledWorkout.getTargetWeight());
+            set.put("actualWeight", scheduledWorkout.getTargetWeight());
+            set.put("targetWeightUnit", scheduledWorkout.getTargetWeightUnit());
+            set.put("rpe", scheduledWorkout.getTargetRpe());
+            set.put("restSeconds", scheduledWorkout.getRestSeconds());
+            set.put("completed", true);
+            set.put("performanceVsTarget", "MET");
+            set.put("notes", "");
+            sets.add(set);
+        }
+
+        return sets;
+    }
+
+    /**
+     * ✅ NEW: Parse target reps (handles String to Integer conversion)
+     */
+    private Integer parseTargetReps(String targetReps) {
+        if (targetReps == null) return 10; // Default
+        try {
+            return Integer.parseInt(targetReps);
+        } catch (NumberFormatException e) {
+            return 10; // Default fallback
+        }
+    }
+
+    /**
+     * ✅ NEW: Build strength metrics from performance records
+     */
+    private Map<String, Object> buildStrengthMetrics(List<PerformanceRecord> records) {
+        Map<String, Object> metrics = new HashMap<>();
+
+        double totalVolume = records.stream()
+                .filter(r -> r.getReps() != null && r.getWeight() != null)
+                .mapToDouble(r -> r.getReps() * r.getWeight())
+                .sum();
+
+        double averageRpe = records.stream()
+                .filter(r -> r.getPerceivedExertion() != null)
+                .mapToInt(PerformanceRecord::getPerceivedExertion)
+                .average()
+                .orElse(0.0);
+
+        int totalReps = records.stream()
+                .filter(r -> r.getReps() != null)
+                .mapToInt(PerformanceRecord::getReps)
+                .sum();
+
+        metrics.put("totalVolume", totalVolume);
+        metrics.put("averageRpe", averageRpe);
+        metrics.put("totalReps", totalReps);
+
+        return metrics;
+    }
+
+    /**
+     * ✅ NEW: Build basic strength metrics from scheduled workout
+     */
+    private Map<String, Object> buildBasicStrengthMetrics(ScheduledWorkout scheduledWorkout) {
+        Map<String, Object> metrics = new HashMap<>();
+
+        Integer sets = scheduledWorkout.getTargetSets() != null ? scheduledWorkout.getTargetSets() : 3;
+        Integer reps = parseTargetReps(scheduledWorkout.getTargetReps());
+        Double weight = scheduledWorkout.getTargetWeight() != null ? scheduledWorkout.getTargetWeight() : 0.0;
+
+        metrics.put("totalVolume", sets * reps * weight);
+        metrics.put("averageRpe", scheduledWorkout.getTargetRpe() != null ? scheduledWorkout.getTargetRpe() : 7.0);
+        metrics.put("totalReps", sets * reps);
+
+        return metrics;
+    }
+
+    /**
+     * ✅ NEW: Build cardio metrics from performance records
+     */
+    private Map<String, Object> buildCardioMetrics(List<PerformanceRecord> records, ScheduledWorkout scheduledWorkout) {
+        Map<String, Object> metrics = new HashMap<>();
+
+        metrics.put("totalDurationMinutes", scheduledWorkout.getActualDurationMinutes() != null ?
+                scheduledWorkout.getActualDurationMinutes() : scheduledWorkout.getTargetDurationMinutes());
+        metrics.put("totalDistanceKm", records.stream()
+                .filter(r -> r.getDistanceKm() != null)
+                .mapToDouble(PerformanceRecord::getDistanceKm)
+                .sum());
+        metrics.put("totalCaloriesBurned", records.stream()
+                .filter(r -> r.getCaloriesBurned() != null)
+                .mapToInt(PerformanceRecord::getCaloriesBurned)
+                .sum());
+
+        return metrics;
+    }
+
+    /**
+     * ✅ NEW: Build basic cardio metrics from scheduled workout
+     */
+    private Map<String, Object> buildBasicCardioMetrics(ScheduledWorkout scheduledWorkout) {
+        Map<String, Object> metrics = new HashMap<>();
+
+        metrics.put("totalDurationMinutes", scheduledWorkout.getActualDurationMinutes() != null ?
+                scheduledWorkout.getActualDurationMinutes() : scheduledWorkout.getTargetDurationMinutes());
+        metrics.put("totalDistanceKm", scheduledWorkout.getTargetDistanceKm());
+        metrics.put("averagePace", scheduledWorkout.getTargetPace());
+        metrics.put("totalCaloriesBurned", 0); // Could estimate based on duration
+
+        return metrics;
+    }
+
+    /**
+     * ✅ NEW: Build isometric metrics from performance records
+     */
+    private Map<String, Object> buildIsometricMetrics(List<PerformanceRecord> records) {
+        Map<String, Object> metrics = new HashMap<>();
+
+        int totalHoldTime = records.stream()
+                .filter(r -> r.getHoldDurationSeconds() != null)
+                .mapToInt(PerformanceRecord::getHoldDurationSeconds)
+                .sum();
+
+        double averageHoldTime = records.stream()
+                .filter(r -> r.getHoldDurationSeconds() != null)
+                .mapToInt(PerformanceRecord::getHoldDurationSeconds)
+                .average()
+                .orElse(0.0);
+
+        int longestHold = records.stream()
+                .filter(r -> r.getHoldDurationSeconds() != null)
+                .mapToInt(PerformanceRecord::getHoldDurationSeconds)
+                .max()
+                .orElse(0);
+
+        metrics.put("totalHoldTimeSeconds", totalHoldTime);
+        metrics.put("averageHoldTimeSeconds", averageHoldTime);
+        metrics.put("longestHoldSeconds", longestHold);
+
+        return metrics;
+    }
+
+    /**
+     * ✅ NEW: Build basic isometric metrics from scheduled workout
+     */
+    private Map<String, Object> buildBasicIsometricMetrics(ScheduledWorkout scheduledWorkout) {
+        Map<String, Object> metrics = new HashMap<>();
+
+        Integer sets = scheduledWorkout.getTargetSets() != null ? scheduledWorkout.getTargetSets() : 3;
+        Integer holdDuration = scheduledWorkout.getHoldDurationSeconds() != null ?
+                scheduledWorkout.getHoldDurationSeconds() : 30;
+
+        metrics.put("totalHoldTimeSeconds", sets * holdDuration);
+        metrics.put("averageHoldTimeSeconds", (double) holdDuration);
+        metrics.put("longestHoldSeconds", holdDuration);
+
+        return metrics;
+    }
+
+// =======================
+// HELPER METHODS FOR PERFORMANCE TRACKING
+// =======================
+
+    private void validateWorkoutSessionOwnership(WorkoutSession workoutSession, String username) {
+        if (!workoutSession.getUser().getUsername().equals(username)) {
+            throw new UnauthorizedScheduledWorkoutAccessException(
+                    "User does not have access to this workout session");
+        }
+    }
+
+    private PerformanceRecord.PerformanceVsTarget calculatePerformanceVsTarget(PerformanceRecord record) {
+        // Compare actual vs target performance
+        if (record.getTargetRepsPlanned() != null && record.getReps() != null) {
+            if (record.getReps() > record.getTargetRepsPlanned()) {
+                return PerformanceRecord.PerformanceVsTarget.EXCEEDED;
+            } else if (record.getReps().equals(record.getTargetRepsPlanned())) {
+                return PerformanceRecord.PerformanceVsTarget.MET;
+            } else {
+                return PerformanceRecord.PerformanceVsTarget.BELOW;
+            }
+        }
+
+        // For cardio, compare duration
+        if (record.getDurationMinutes() != null && record.getTargetRepsPlanned() != null) {
+            if (record.getDurationMinutes() >= record.getTargetRepsPlanned()) {
+                return PerformanceRecord.PerformanceVsTarget.MET;
+            } else {
+                return PerformanceRecord.PerformanceVsTarget.BELOW;
+            }
+        }
+
+        return PerformanceRecord.PerformanceVsTarget.NOT_SET;
+    }
+
+    private Double calculateAverageRpe(List<PerformanceRecord> records) {
+        return records.stream()
+                .filter(r -> r.getPerceivedExertion() != null)
+                .mapToInt(PerformanceRecord::getPerceivedExertion)
+                .average()
+                .orElse(0.0);
+    }
+
+    private Double calculateAverageFormRating(List<PerformanceRecord> records) {
+        return records.stream()
+                .filter(r -> r.getFormRating() != null)
+                .mapToInt(PerformanceRecord::getFormRating)
+                .average()
+                .orElse(0.0);
+    }
+
+    private Double calculateTotalVolume(List<PerformanceRecord> records) {
+        return records.stream()
+                .filter(r -> r.getReps() != null && r.getWeight() != null)
+                .mapToDouble(r -> r.getReps() * r.getWeight())
+                .sum();
+    }
+
+    private String calculateOverallPerformanceRating(List<PerformanceRecord> records) {
+        long metOrExceeded = records.stream()
+                .filter(r -> r.getPerformanceVsTarget() == PerformanceRecord.PerformanceVsTarget.MET ||
+                        r.getPerformanceVsTarget() == PerformanceRecord.PerformanceVsTarget.EXCEEDED)
+                .count();
+
+        double percentage = records.isEmpty() ? 0 : (double) metOrExceeded / records.size();
+
+        if (percentage >= 0.9) return "EXCELLENT";
+        if (percentage >= 0.7) return "GOOD";
+        if (percentage >= 0.5) return "AVERAGE";
+        return "NEEDS_IMPROVEMENT";
+    }
+
+    private Map<String, Object> getBestPerformance(List<PerformanceRecord> records) {
+        // Find the best performance based on the exercise type
+        PerformanceRecord bestRecord = records.stream()
+                .max((r1, r2) -> {
+                    if (r1.getWeight() != null && r2.getWeight() != null) {
+                        return Double.compare(r1.getWeight(), r2.getWeight());
+                    }
+                    if (r1.getDurationMinutes() != null && r2.getDurationMinutes() != null) {
+                        return Integer.compare(r1.getDurationMinutes(), r2.getDurationMinutes());
+                    }
+                    return 0;
+                })
+                .orElse(null);
+
+        if (bestRecord != null) {
+            Map<String, Object> best = new HashMap<>();
+            best.put("date", bestRecord.getCreatedAt().toLocalDate());
+            if (bestRecord.getWeight() != null) {
+                best.put("weight", bestRecord.getWeight());
+                best.put("reps", bestRecord.getReps());
+            }
+            if (bestRecord.getDurationMinutes() != null) {
+                best.put("duration", bestRecord.getDurationMinutes());
+            }
+            return best;
+        }
+
+        return Map.of();
+    }
+
+    private String calculateProgressTrend(List<PerformanceRecord> records) {
+        if (records.size() < 2) return "INSUFFICIENT_DATA";
+
+        // Sort by date
+        records.sort((r1, r2) -> r1.getCreatedAt().compareTo(r2.getCreatedAt()));
+
+        // Compare first half vs second half
+        int midPoint = records.size() / 2;
+        List<PerformanceRecord> firstHalf = records.subList(0, midPoint);
+        List<PerformanceRecord> secondHalf = records.subList(midPoint, records.size());
+
+        double firstAvg = calculateAverageRpe(firstHalf);
+        double secondAvg = calculateAverageRpe(secondHalf);
+
+        if (secondAvg > firstAvg + 0.5) return "IMPROVING";
+        if (firstAvg > secondAvg + 0.5) return "DECLINING";
+        return "STABLE";
+    }
+
+    private WorkoutSessionResponse mapToWorkoutSessionResponse(WorkoutSession session) {
+        return WorkoutSessionResponse.builder()
+                .id(session.getId())
+                .sessionStatus(session.getSessionStatus().toString())
+                .totalExercisesPlanned(session.getTotalExercisesPlanned())
+                .totalExercisesCompleted(session.getTotalExercisesCompleted())
+                .completionPercentage(session.getCompletionPercentage())
+                .totalDurationMinutes(session.getTotalDurationMinutes())
+                .startedAt(session.getCreatedAt())
+                .completedAt(session.getUpdatedAt())
+                .date(session.getDate())
+                .build();
+    }
+
+    /**
+     * PerformanceResponse mapping
+     */
+    private PerformanceResponse mapToPerformanceRecordResponse(PerformanceRecord record) {
+        return PerformanceResponse.builder()
+                .id(record.getId())
+                .exerciseId(record.getExercise().getId())
+                .exerciseName(record.getExercise().getExerciseName())
+                .setNumber(record.getSetNumber())
+                .reps(record.getReps())
+                .weight(record.getWeight())
+                .durationMinutes(record.getDurationMinutes())
+                .perceivedExertion(record.getPerceivedExertion())
+                .formRating(record.getFormRating())
+                .performanceVsTarget(record.getPerformanceVsTarget().toString())
+                .isExerciseCompleted(record.getIsExerciseCompleted())
+                .recordedAt(record.getCreatedAt())
+                .workoutSessionId(record.getWorkoutSession().getId())
+                .workoutDate(record.getWorkoutSession().getDate())
+                .restTimeBeforeSetSeconds(record.getRestTimeBeforeSetSeconds())
+                .setStartTime(record.getSetStartTime())
+                .setEndTime(record.getSetEndTime())
+                .targetRepsPlanned(record.getTargetRepsPlanned())
+                .targetWeightPlanned(record.getTargetWeightPlanned())
+                .exerciseCompletionNotes(record.getExerciseCompletionNotes())
+                .build();
+    }
+
     // =======================
-    // ✅ FIXED: ENHANCED CALENDAR VIEWS
+    // ENHANCED CALENDAR VIEWS
     // =======================
 
     /**
@@ -545,7 +1833,6 @@ public class ScheduledWorkoutService {
     }
 
 
-
     // =======================
     // CALENDAR VIEW & RETRIEVAL
     // =======================
@@ -717,6 +2004,41 @@ public class ScheduledWorkoutService {
         );
     }
 
+    /**
+     * Create comprehensive exercise analysis report (for debugging)
+     */
+    public void logExerciseAnalysis(String username, LocalDate date) {
+        try {
+            User user = findUserByUsername(username);
+            List<ScheduledWorkout> workouts = scheduledWorkoutRepository
+                    .findByUserAndScheduledDateOrderByCreatedAtAsc(user, date);
+
+            log.info("🔍 Exercise Analysis Report for {} on {}:", username, date);
+            log.info("📊 Found {} scheduled workouts", workouts.size());
+
+            for (ScheduledWorkout workout : workouts) {
+                Exercise exercise = exerciseMapper.extractExerciseFromScheduledWorkout(workout);
+
+                if (exercise != null) {
+                    String trackingMode = exerciseMapper.getExerciseTypeForFrontend(exercise);
+                    log.info("🏋️ Workout {}: {} → Frontend Type: {} (Cardio: {}, Isometric: {})",
+                            workout.getId(),
+                            exercise.getExerciseName(),
+                            trackingMode,
+                            exercise.getIsCardio(),
+                            exercise.getIsIsometric());
+                } else {
+                    log.info("❓ Workout {}: No exercise resolved (Plan: {})",
+                            workout.getId(),
+                            workout.getWorkoutPlan() != null ? workout.getWorkoutPlan().getWorkoutName() : "None");
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Failed to generate exercise analysis: {}", e.getMessage(), e);
+        }
+    }
+
     // =======================
     // DATA RETENTION (FREE USER LIMITS)
     // =======================
@@ -797,7 +2119,7 @@ public class ScheduledWorkoutService {
     }
 
     // =======================
-    // ✅ NEW: INDIVIDUAL EXERCISE HELPERS
+    //  INDIVIDUAL EXERCISE HELPERS
     // =======================
 
     /**
@@ -904,7 +2226,7 @@ public class ScheduledWorkoutService {
     }
 
     // =======================
-    // ✅ STATISTICS CALCULATION HELPERS
+    //  STATISTICS CALCULATION HELPERS
     // =======================
 
     private int calculateCurrentStreak(User user) {
@@ -996,7 +2318,7 @@ public class ScheduledWorkoutService {
     }
 
     // =======================
-    // ✅ EXISTING: WORKOUT PLAN SCHEDULING HELPERS
+    //  WORKOUT PLAN SCHEDULING HELPERS
     // =======================
 
     private void validateWorkoutPlanScheduling(User user, ScheduleMultipleExercisesRequestDTO request, int totalExercises) {
@@ -1036,7 +2358,7 @@ public class ScheduledWorkoutService {
 
         if (user.getSubscriptionTier() == SubscriptionTier.FREE) {
             long currentScheduledToday = scheduledWorkoutRepository.countByUserAndScheduledDate(user, request.getScheduledDate());
-            int remainingLimit = Math.max(0, (int)(getDailySchedulingLimit(user) - currentScheduledToday));
+            int remainingLimit = Math.max(0, (int) (getDailySchedulingLimit(user) - currentScheduledToday));
 
             if (remainingLimit == 0) {
                 throw new SubscriptionLimitExceededException("Daily exercise limit reached. Upgrade to PLUS for unlimited scheduling!");
@@ -1306,13 +2628,15 @@ public class ScheduledWorkoutService {
      * Mark multiple exercises completed with String IDs (for calendar controller compatibility)
      */
     @Transactional
-    public List<ScheduledWorkoutResponse> markMultipleExercisesCompletedStringIds(String username, List<String> exerciseIds){
+    public List<ScheduledWorkoutResponse> markMultipleExercisesCompletedStringIds(String username, List<String> exerciseIds) {
         // Convert String IDs to Long and delegate to existing method
         List<Long> exerciseIdsLong = exerciseIds.stream()
                 .map(Long::parseLong)
                 .collect(Collectors.toList());
         return markMultipleExercisesCompleted(username, exerciseIdsLong);
-    };
+    }
+
+    ;
 
     // =======================
     // HELPER METHODS - ENTITY LOOKUPS
@@ -1532,5 +2856,58 @@ public class ScheduledWorkoutService {
         scheduledWorkout.setTargetReps("10");
         scheduledWorkout.setRestSeconds(90);
         scheduledWorkout.setTargetWeightUnit("lbs");
+    }
+
+    /**
+     * ✅ WorkoutCompletionData class to hold completion information
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WorkoutCompletionData {
+        private String exerciseId;
+        private String scheduledExerciseId;
+        private LocalDateTime completedAt;
+        private Integer totalDurationMinutes;
+        private List<CompletedSetData> sets;
+        private String notes;
+        private String performanceRating;
+        private List<Object> personalRecords;
+        private List<Object> improvements;
+
+        // Optional workout session data
+        private Integer difficultyRating;
+        private Double overallEffort;
+        private String mood;
+        private String location;
+        private String workoutFeedback;
+        private String performanceSummary;
+
+        // Optional cardio data
+        private Double distanceKm;
+        private Integer caloriesBurned;
+    }
+
+    /**
+     * ✅ CompletedSetData class for individual set information
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CompletedSetData {
+        private Integer setNumber;
+        private Integer targetReps;
+        private Integer actualReps;
+        private Double targetWeight;
+        private Double actualWeight;
+        private String targetWeightUnit;
+        private Integer rpe;
+        private Integer restSeconds;
+        private Boolean completed;
+        private Integer actualDurationMinutes;
+        private Integer actualHoldSeconds;
+        private String notes;
     }
 }

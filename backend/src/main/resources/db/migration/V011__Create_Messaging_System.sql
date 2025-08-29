@@ -26,6 +26,7 @@ CREATE TABLE conversation_participants (
     user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     role VARCHAR(20) NOT NULL DEFAULT 'MEMBER', -- 'ADMIN', 'MEMBER'
     is_starred BOOLEAN NOT NULL DEFAULT false, -- User's starred conversations
+    is_muted BOOLEAN NOT NULL DEFAULT false,
     joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     left_at TIMESTAMP NULL, -- NULL = still active participant
 

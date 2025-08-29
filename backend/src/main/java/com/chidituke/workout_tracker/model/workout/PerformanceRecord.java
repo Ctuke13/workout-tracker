@@ -8,6 +8,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Performance Record entity representing exercise performance data
@@ -25,8 +26,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"workoutLog", "exercise"})
-@EqualsAndHashCode(exclude = {"workoutLog", "exercise"})
+@ToString(exclude = {"workoutSession", "exercise"})
+@EqualsAndHashCode(exclude = {"workoutSession", "exercise"})
 @EntityListeners(AuditingEntityListener.class)
 public class PerformanceRecord {
 
@@ -132,6 +133,48 @@ public class PerformanceRecord {
     private Double powerOutputWatts;
 
     // ==============================================
+    // NEW: REST TIME AND SET TIMING TRACKING
+    // ==============================================
+
+    @Column(name = "set_start_time")
+    private LocalDateTime setStartTime;
+
+    @Column(name = "set_end_time")
+    private LocalDateTime setEndTime;
+
+    @Column(name = "rest_time_before_set_seconds")
+    @Min(value = 0, message = "Rest time cannot be negative")
+    private Integer restTimeBeforeSetSeconds; // Time rested before this set
+
+    @Column(name = "actual_set_duration_seconds")
+    @Min(value = 0, message = "Set duration cannot be negative")
+    private Integer actualSetDurationSeconds;
+
+    // ==============================================
+    // EXERCISE COMPLETION TRACKING
+    // ==============================================
+
+    @Column(name = "is_exercise_completed")
+    private Boolean isExerciseCompleted = false; // Last set of this exercise
+
+    @Column(name = "exercise_completion_notes", length = 500)
+    private String exerciseCompletionNotes;
+
+    // ==============================================
+    // ENHANCED: TARGET COMPARISON (Add these if not present)
+    // ==============================================
+
+    @Column(name = "target_reps_planned")
+    private Integer targetRepsPlanned; // What was planned for this set
+
+    @Column(name = "target_weight_planned")
+    private Double targetWeightPlanned; // What weight was planned
+
+    @Column(name = "performance_vs_target")
+    @Enumerated(EnumType.STRING)
+    private PerformanceVsTarget performanceVsTarget;
+
+    // ==============================================
     // PROFESSIONAL TRAINING METRICS
     // ==============================================
 
@@ -206,13 +249,6 @@ public class PerformanceRecord {
     }
 
     /**
-     * Check if this performance exceeded targets
-     */
-    public boolean exceededTargets() {
-        return achievementStatus == AchievementStatus.EXCEEDED;
-    }
-
-    /**
      * Get workout intensity based on perceived exertion
      */
     public WorkoutIntensity getWorkoutIntensity() {
@@ -272,6 +308,130 @@ public class PerformanceRecord {
     }
 
     // ==============================================
+// NEW: BUSINESS LOGIC METHODS
+// ==============================================
+
+    /**
+     * Calculate actual set duration in seconds
+     */
+    public Integer calculateActualSetDuration() {
+        if (setStartTime != null && setEndTime != null) {
+            return (int) ChronoUnit.SECONDS.between(setStartTime, setEndTime);
+        }
+        return actualSetDurationSeconds;
+    }
+
+    /**
+     * Set timing for this set
+     */
+    public void recordSetTiming(LocalDateTime startTime, LocalDateTime endTime) {
+        this.setStartTime = startTime;
+        this.setEndTime = endTime;
+        this.actualSetDurationSeconds = calculateActualSetDuration();
+    }
+
+    /**
+     * Record rest time before this set
+     */
+    public void recordRestTime(Integer restSeconds) {
+        this.restTimeBeforeSetSeconds = restSeconds;
+    }
+
+    /**
+     * Compare performance vs planned targets
+     */
+    public void evaluatePerformanceVsTarget() {
+        if (targetRepsPlanned == null && targetWeightPlanned == null) {
+            this.performanceVsTarget = PerformanceVsTarget.NOT_SET;
+            return;
+        }
+
+        boolean metReps = (targetRepsPlanned == null) ||
+                (reps != null && reps >= targetRepsPlanned);
+        boolean metWeight = (targetWeightPlanned == null) ||
+                (weight != null && weight >= targetWeightPlanned);
+
+        if (metReps && metWeight) {
+            // Check if exceeded
+            boolean exceededReps = (targetRepsPlanned != null) &&
+                    (reps != null && reps > targetRepsPlanned);
+            boolean exceededWeight = (targetWeightPlanned != null) &&
+                    (weight != null && weight > targetWeightPlanned);
+
+            if (exceededReps || exceededWeight) {
+                this.performanceVsTarget = PerformanceVsTarget.EXCEEDED;
+            } else {
+                this.performanceVsTarget = PerformanceVsTarget.MET;
+            }
+        } else {
+            this.performanceVsTarget = PerformanceVsTarget.BELOW;
+        }
+    }
+
+    /**
+     * Mark this as the final set of an exercise
+     */
+    public void markExerciseCompleted(boolean completed, String notes) {
+        this.isExerciseCompleted = completed;
+        this.exerciseCompletionNotes = notes;
+    }
+
+    /**
+     * Get rest time in minutes and seconds format
+     */
+    public String getFormattedRestTime() {
+        if (restTimeBeforeSetSeconds == null || restTimeBeforeSetSeconds == 0) {
+            return "No rest recorded";
+        }
+
+        int minutes = restTimeBeforeSetSeconds / 60;
+        int seconds = restTimeBeforeSetSeconds % 60;
+
+        if (minutes == 0) {
+            return seconds + "s";
+        } else if (seconds == 0) {
+            return minutes + "m";
+        } else {
+            return minutes + "m " + seconds + "s";
+        }
+    }
+
+    /**
+     * Get set duration in formatted string
+     */
+    public String getFormattedSetDuration() {
+        Integer duration = actualSetDurationSeconds != null ?
+                actualSetDurationSeconds :
+                calculateActualSetDuration();
+
+        if (duration == null || duration == 0) {
+            return "Duration not recorded";
+        }
+
+        if (duration < 60) {
+            return duration + "s";
+        } else {
+            int minutes = duration / 60;
+            int seconds = duration % 60;
+            return minutes + "m " + seconds + "s";
+        }
+    }
+
+    /**
+     * Check if this performance exceeded targets
+     */
+    public boolean exceededTargets() {
+        return performanceVsTarget == PerformanceVsTarget.EXCEEDED;
+    }
+
+    /**
+     * Check if this performance met targets
+     */
+    public boolean metTargets() {
+        return performanceVsTarget == PerformanceVsTarget.MET;
+    }
+
+    // ==============================================
     // JPA LIFECYCLE METHODS
     // ==============================================
 
@@ -327,6 +487,24 @@ public class PerformanceRecord {
 
         public String getDisplayName() {
             return displayName;
+        }
+    }
+
+    public enum PerformanceVsTarget {
+        EXCEEDED("Exceeded planned target"),
+        MET("Met planned target exactly"),
+        BELOW("Below planned target"),
+        MODIFIED("Modified exercise/target"),
+        NOT_SET("No target comparison available");
+
+        private final String description;
+
+        PerformanceVsTarget(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
         }
     }
 }

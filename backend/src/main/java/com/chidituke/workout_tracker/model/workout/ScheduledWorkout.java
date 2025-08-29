@@ -1,12 +1,16 @@
 package com.chidituke.workout_tracker.model.workout;
 
 import com.chidituke.workout_tracker.model.user.User;
+import com.chidituke.workout_tracker.model.workout.Exercise;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.List;
 
 @Data
 @Entity
@@ -22,6 +26,10 @@ public class ScheduledWorkout {
     @JoinColumn(name = "user_id", nullable = false)
     @NotNull(message = "User is required")
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "exercise_id")
+    private Exercise exercise;
 
     @Column(name = "target_sets")
     private Integer targetSets;
@@ -48,6 +56,9 @@ public class ScheduledWorkout {
     @Column(name = "target_duration_minutes")
     private Integer targetDurationMinutes;
 
+    @Column(name = "actual_duration_minutes")
+    private Integer actualDurationMinutes;
+
     @Column(name = "target_distance_km")
     private Double targetDistanceKm;
 
@@ -58,9 +69,11 @@ public class ScheduledWorkout {
     @Column(name = "hold_duration_seconds")
     private Integer holdDurationSeconds;
 
+    // =============================================================================
+    // Workout Plan Relationship
+    // =============================================================================
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "workout_plan_id", nullable = false)
-    @NotNull(message = "Workout plan is required")
+    @JoinColumn(name = "workout_plan_id")
     private WorkoutPlan workoutPlan;
 
     @Column(name = "scheduled_date", nullable = false)
@@ -107,9 +120,201 @@ public class ScheduledWorkout {
     private LocalDateTime updatedAt;
 
     @Column(name = "created_by_user_id")
-    private Long createdByUserId; // For coach-assigned workouts
+    private Long createdByUserId;
 
-    // ENUMS
+    // =============================================================================
+    // EXERCISE RESOLUTION METHODS (Key business logic!)
+    // =============================================================================
+
+    /**
+     * Get the exercise for this scheduled workout
+     * Handles both direct exercise references and workout plan exercises via PlanExercise
+     */
+    public Exercise getResolvedExercise() {
+        // Priority 1: Direct exercise reference
+        if (exercise != null) {
+            return exercise;
+        }
+
+        // Priority 2: Exercise from workout plan via PlanExercise
+        if (workoutPlan != null) {
+            // Get the first exercise from the workout plan
+            // Note: For multi-exercise workout plans, you might need additional logic
+            // to determine which specific exercise this scheduled workout refers to
+
+            Exercise firstExercise = workoutPlan.getFirstExercise();
+            if (firstExercise != null) {
+                return firstExercise;
+            }
+
+            // If workout plan has multiple exercises, you might want to:
+            // 1. Add an exercise_order field to scheduled_workouts
+            // 2. Create separate scheduled_workout entries for each exercise
+            // 3. Use some other business logic to determine the specific exercise
+
+            if (workoutPlan.getExerciseCount() > 1) {
+                System.out.println("Warning: Workout plan " + workoutPlan.getId() +
+                        " has " + workoutPlan.getExerciseCount() + " exercises. " +
+                        "Consider adding exercise_order field or creating separate scheduled workouts.");
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * ✅ NEW: Get all exercises from workout plan (for multi-exercise workouts)
+     */
+    public List<Exercise> getAllWorkoutPlanExercises() {
+        if (workoutPlan != null) {
+            return workoutPlan.getExercises();
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * ✅ NEW: Check if this is a multi-exercise workout
+     */
+    public boolean isMultiExerciseWorkout() {
+        return workoutPlan != null && workoutPlan.getExerciseCount() > 1;
+    }
+
+    /**
+     * Check if this scheduled workout has a valid exercise reference
+     */
+    public boolean hasValidExercise() {
+        return getResolvedExercise() != null;
+    }
+
+    /**
+     * Get the exercise type for this scheduled workout
+     */
+    public String getExerciseType() {
+        Exercise resolvedExercise = getResolvedExercise();
+        if (resolvedExercise != null && resolvedExercise.getExerciseType() != null) {
+            return resolvedExercise.getExerciseType().name();
+        }
+
+        // Fallback: Use workout plan type if available
+        if (workoutPlan != null && workoutPlan.getWorkoutType() != null) {
+            switch (workoutPlan.getWorkoutType()) {
+                case CARDIO:
+                case HIIT:
+                    return "CARDIO";
+                case STRENGTH:
+                case POWERLIFTING:
+                    return "STRENGTH";
+                case FLEXIBILITY:
+                    return "FLEXIBILITY";
+                case MIXED:
+                default:
+                    return "STRENGTH"; // Default for mixed workouts
+            }
+        }
+
+        // Final fallback: try to determine from configuration
+        if (targetDurationMinutes != null || targetDistanceKm != null || targetPace != null) {
+            return "CARDIO";
+        }
+        if (holdDurationSeconds != null) {
+            return "BALANCE"; // Isometric
+        }
+        return "STRENGTH"; // Default
+    }
+
+    /**
+     * Check if this is a cardio workout
+     */
+    public boolean isCardioWorkout() {
+        Exercise resolvedExercise = getResolvedExercise();
+        if (resolvedExercise != null) {
+            return resolvedExercise.getIsCardio() != null && resolvedExercise.getIsCardio();
+        }
+
+        // Fallback: Check workout plan
+        if (workoutPlan != null) {
+            return workoutPlan.isCardio() ||
+                    workoutPlan.getWorkoutType() == WorkoutPlan.WorkoutType.CARDIO ||
+                    workoutPlan.getWorkoutType() == WorkoutPlan.WorkoutType.HIIT;
+        }
+
+        // Final fallback: Check configuration
+        return targetDurationMinutes != null || targetDistanceKm != null || targetPace != null;
+    }
+
+    /**
+     * Check if this is an isometric workout
+     */
+    public boolean isIsometricWorkout() {
+        Exercise resolvedExercise = getResolvedExercise();
+        if (resolvedExercise != null) {
+            return resolvedExercise.getIsIsometric() != null && resolvedExercise.getIsIsometric();
+        }
+
+        // Fallback: Check workout plan
+        if (workoutPlan != null) {
+            return workoutPlan.getWorkoutType() == WorkoutPlan.WorkoutType.FLEXIBILITY;
+        }
+
+        // Final fallback: Check configuration
+        return holdDurationSeconds != null;
+    }
+
+    /**
+     * Check if this is a strength workout
+     */
+    public boolean isStrengthWorkout() {
+        return !isCardioWorkout() && !isIsometricWorkout();
+    }
+
+    /**
+     * ✅ NEW: Get workout tracking mode from exercise or workout plan
+     */
+    public String getWorkoutTrackingMode() {
+        Exercise resolvedExercise = getResolvedExercise();
+        if (resolvedExercise != null) {
+            Exercise.WorkoutTrackingMode mode = resolvedExercise.getWorkoutTrackingMode();
+            switch (mode) {
+                case TIME_BASED:
+                    return "cardio";
+                case HOLD_BASED:
+                    return "isometric";
+                case REP_BASED:
+                    return "strength";
+                default:
+                    return "strength";
+            }
+        }
+
+        // Fallback: Use workout plan type
+        if (workoutPlan != null && workoutPlan.getWorkoutType() != null) {
+            switch (workoutPlan.getWorkoutType()) {
+                case CARDIO:
+                case HIIT:
+                    return "cardio";
+                case FLEXIBILITY:
+                    return "isometric";
+                case STRENGTH:
+                case POWERLIFTING:
+                case MIXED:
+                default:
+                    return "strength";
+            }
+        }
+
+        // Final fallback: detect from configuration
+        if (targetDurationMinutes != null || targetDistanceKm != null || targetPace != null) {
+            return "cardio";
+        }
+        if (holdDurationSeconds != null) {
+            return "isometric";
+        }
+        return "strength";
+    }
+
+    // =============================================================================
+    // EXISTING ENUMS (Keep as-is)
+    // =============================================================================
     public enum ScheduleStatus {
         SCHEDULED,      // Future workout
         IN_PROGRESS,    // Currently doing workout
@@ -119,10 +324,12 @@ public class ScheduledWorkout {
         RESCHEDULED     // Moved to different date
     }
 
-    // BUSINESS LOGIC METHODS
+    // =============================================================================
+    // EXISTING BUSINESS LOGIC METHODS (Keep as-is, just update validation)
+    // =============================================================================
 
     /**
-     * Check if user can schedule workout this far in advance
+     * ✅ UPDATED: Check if user can schedule workout this far in advance
      */
     public boolean canSchedule(User user, LocalDate date) {
         if (user.getSubscriptionTier() == null) {
@@ -264,11 +471,18 @@ public class ScheduledWorkout {
         return ChronoUnit.DAYS.between(LocalDate.now(), scheduledDate);
     }
 
-    // JPA LIFECYCLE METHODS
+    // =============================================================================
+    //  JPA LIFECYCLE METHODS (Enhanced validation)
+    // =============================================================================
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+
+        //  Must have either exercise or workout plan
+        if (exercise == null && workoutPlan == null) {
+            throw new IllegalArgumentException("Scheduled workout must have either an exercise or workout plan");
+        }
 
         // Set estimated duration from workout plan if not set
         if (estimatedDurationMinutes == null && workoutPlan != null) {

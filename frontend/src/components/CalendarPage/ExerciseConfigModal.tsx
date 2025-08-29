@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
     ScheduledExercise,
     ExerciseType,
@@ -17,9 +17,12 @@ import {
     getDistancePresets,
     getCardioSessionType
 } from '../../types/exercise';
-import { calendarApi } from '../../services/calendarApi';
-import { WorkoutPlanInfo } from '../../types/api';
-
+import {calendarApi} from '../../services/calendarApi';
+import {exerciseApi} from '../../services/exerciseApi';
+import {toast} from 'react-hot-toast';
+import {WorkoutPlanInfo} from '../../types/api';
+import {StarIcon} from "@heroicons/react/24/outline";
+import {StarIcon as StarIconSolid} from "@heroicons/react/24/solid";
 // =============================================================================
 // COMPONENT PROPS INTERFACE
 // =============================================================================
@@ -39,6 +42,7 @@ interface ExerciseConfigModalProps {
     selectedWorkoutPlan: WorkoutPlanInfo | null;
     isEditMode: boolean;
     editingExercise: ScheduledExercise | null;
+    onFavoriteToggle?: (exercise: Exercise) => void;
 }
 
 // =============================================================================
@@ -59,7 +63,8 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                                                                      onWorkoutPlanSelect,
                                                                      selectedWorkoutPlan,
                                                                      isEditMode,
-                                                                     editingExercise
+                                                                     editingExercise,
+                                                                     onFavoriteToggle
                                                                  }) => {
     // =============================================================================
     // STATE MANAGEMENT
@@ -68,6 +73,7 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
     // Common state
     const [trackingMode, setTrackingMode] = useState<'strength' | 'cardio' | 'isometric'>('strength');
     const [notes, setNotes] = useState('');
+    const [isFavorited, setIsFavorited] = useState(false);
 
     // Strength configuration state
     const [targetSets, setTargetSets] = useState(3);
@@ -170,6 +176,40 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
         setTargetRpe(rpe);
     };
 
+    const handleToggleFavorite = async () => {
+        if (!exercise) return;
+
+        try {
+            console.log(`🌟 Modal: Toggling favorite for ${exercise.name}, current status: ${exercise.isFavorite}`);
+
+            // 🚀 OPTIMISTIC UPDATE
+            const newFavoriteStatus = !exercise.isFavorite;
+            setIsFavorited(newFavoriteStatus);
+            exercise.isFavorite = newFavoriteStatus;
+
+            // 🌐 API CALL
+            const result = await exerciseApi.toggleFavorite(exercise.id);
+
+            // ✅ SYNC: Ensure state matches API response
+            setIsFavorited(result.isFavorite);
+            exercise.isFavorite = result.isFavorite;
+
+            // 📢 NOTIFY PARENT: Let CalendarPage know about the change
+            if (onFavoriteToggle) {
+                onFavoriteToggle(exercise);
+            }
+
+            toast.success(result.isFavorite ? 'Added to favorites' : 'Removed from favorites');
+
+        } catch (error) {
+            console.error('❌ Modal: Failed to toggle favorite:', error);
+
+            // 🔄 REVERT on error
+            setIsFavorited(exercise.isFavorite || false);
+            toast.error('Failed to update favorites');
+        }
+    };
+
     // Use a ref to store the latest onConfigChange to avoid dependency issues
     const onConfigChangeRef = React.useRef(onConfigChange);
     React.useEffect(() => {
@@ -232,6 +272,15 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
             }
         }
     }, [config, exercise]);
+
+    // Add useEffect to sync favorite status
+    useEffect(() => {
+        if (exercise) {
+            const favoriteStatus = exercise.isFavorite || false;
+            setIsFavorited(favoriteStatus);
+            console.log(`🔄 Modal: Syncing favorite status for ${exercise.name}: ${favoriteStatus}`);
+        }
+    }, [exercise, exercise?.isFavorite]);
 
     // Update configuration when state changes - properly debounced
     useEffect(() => {
@@ -317,13 +366,36 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                     <h2 className="text-2xl font-bold text-gray-900">
                         {isEditMode ? 'Edit Exercise' : mode === 'workout-plan' ? 'Schedule Workout Plan' : 'Configure Exercise'}
                     </h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
-                        aria-label="Close modal"
-                    >
-                        ×
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {/* ✅ NEW: Favorite Button in Header */}
+                        {exercise && mode === 'exercise' && (
+                            <button
+                                onClick={handleToggleFavorite}
+                                className={`
+            p-2 rounded-full transition-all duration-200
+            active:scale-95 shadow-sm hover:shadow-md border
+            ${isFavorited
+                                    ? 'text-yellow-500 bg-yellow-100 hover:bg-yellow-200 border-yellow-300'
+                                    : 'text-gray-400 bg-gray-100 hover:bg-yellow-100 border-gray-300'
+                                }
+        `}
+                                title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                            >
+                                {isFavorited ? (
+                                    <StarIconSolid className="w-5 h-5 text-yellow-500"/> // ✅ Use solid star when favorited
+                                ) : (
+                                    <StarIcon className="w-5 h-5"/> // ✅ Use outline star when not favorited
+                                )}
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                            aria-label="Close modal"
+                        >
+                            ×
+                        </button>
+                    </div>
                 </div>
 
                 {/* =============================================================================
@@ -420,7 +492,6 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                         </div>
 
 
-
                         {/* =============================================================================
                             STRENGTH CONFIGURATION
                             ============================================================================= */}
@@ -490,7 +561,9 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
 
                                     {/* Weight Presets */}
                                     <div className="mt-2">
-                                        <div className="text-xs text-gray-600 mb-1">Quick weights ({targetWeightUnit}):</div>
+                                        <div className="text-xs text-gray-600 mb-1">Quick weights
+                                            ({targetWeightUnit}):
+                                        </div>
                                         <div className="flex flex-wrap gap-1">
                                             {getWeightPresets().map((weight) => (
                                                 <button
@@ -541,7 +614,8 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
 
                                     {/* RPE Guide */}
                                     <div className="mt-2 text-xs text-gray-500">
-                                        <strong>RPE Guide:</strong> 6-7 = Easy, 8 = Challenging, 9 = Hard, 10 = Maximum effort
+                                        <strong>RPE Guide:</strong> 6-7 = Easy, 8 = Challenging, 9 = Hard, 10 = Maximum
+                                        effort
                                     </div>
                                 </div>
 
@@ -638,7 +712,8 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
 
                                                     {/* Sets Presets for HIIT */}
                                                     <div className="mt-2">
-                                                        <div className="text-xs text-gray-600 mb-1">Common set counts:</div>
+                                                        <div className="text-xs text-gray-600 mb-1">Common set counts:
+                                                        </div>
                                                         <div className="flex gap-1">
                                                             {[3, 4, 5, 6, 8, 10].map((sets) => (
                                                                 <button
@@ -706,7 +781,8 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                                             {/* Distance Configuration - High Priority */}
                                             <div>
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                                                    <label
+                                                        className="text-sm font-medium text-gray-700 flex items-center gap-1">
                                                         📍 Target Distance ({targetDistanceUnit})
                                                         <span className="text-xs text-gray-500">(optional)</span>
                                                     </label>
@@ -823,7 +899,8 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
 
                                                     {/* Rest Time Presets */}
                                                     <div className="mt-2">
-                                                        <div className="text-xs text-gray-600 mb-1">Quick rest times:</div>
+                                                        <div className="text-xs text-gray-600 mb-1">Quick rest times:
+                                                        </div>
                                                         <div className="flex gap-1">
                                                             {[15, 30, 45, 60, 90, 120].map((seconds) => (
                                                                 <button
@@ -972,9 +1049,12 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                     >
                         {loading ? (
                             <>
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline"
+                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                            strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor"
+                                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
                                 Saving...
                             </>

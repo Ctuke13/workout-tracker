@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
-import { ScheduledWorkoutResponse, WorkoutPlanInfo } from '../types/api';
+import {ScheduledWorkoutResponse, WorkoutPlanInfo} from '../types/api';
+import {WorkoutResults} from '../types/exercise';
 
 export class CalendarApiService {
     // ==================== INDIVIDUAL EXERCISE SCHEDULING ====================
@@ -80,41 +81,40 @@ export class CalendarApiService {
     // ==================== CALENDAR DATA RETRIEVAL ====================
 
     /**
-     * ✅ FIXED: Get scheduled workouts with proper query parameter handling
+     *  Get scheduled workouts with proper query parameter handling
      */
     async getScheduledWorkouts(startDate: string, endDate: string): Promise<ScheduledWorkoutResponse[]> {
         try {
-            console.log('📅 API: Getting scheduled workouts from', startDate, 'to', endDate);
+            console.log('📅 API: Getting scheduled workouts with exercise type debugging from', startDate, 'to', endDate);
 
-            // ✅ UNIFIED: Use the main calendar endpoint
             const response = await apiClient.get('/api/calendar', {
                 startDate,
                 endDate
             });
 
-            // 🔍 DEBUG: Let's see what we're actually getting
-            console.log('🔍 DEBUG: Raw API response:', response);
-            console.log('🔍 DEBUG: Response type:', typeof response);
-            console.log('🔍 DEBUG: Is array?', Array.isArray(response));
+            console.log('🔍 DEBUG: Raw API response structure:', {
+                type: typeof response,
+                isArray: Array.isArray(response),
+                keys: response && typeof response === 'object' ? Object.keys(response) : 'not an object',
+                firstItem: Array.isArray(response) ? response[0] :
+                    response && typeof response === 'object' ? Object.values(response)[0] : null
+            });
 
-            // ✅ FIXED: Handle CalendarViewResponse format
+            // Handle CalendarViewResponse format
             let workouts: ScheduledWorkoutResponse[] = [];
 
             if (Array.isArray(response)) {
-                // Direct array response
                 workouts = response;
             } else if (response && typeof response === 'object') {
                 const calendarResponse = response as any;
 
-                // Handle CalendarViewResponse format with workoutsByDate map
                 if (calendarResponse.workoutsByDate && typeof calendarResponse.workoutsByDate === 'object') {
-                    console.log('🔍 DEBUG: Found workoutsByDate:', calendarResponse.workoutsByDate);
+                    console.log('🔍 DEBUG: Found workoutsByDate with dates:', Object.keys(calendarResponse.workoutsByDate));
 
-                    // Flatten the map of date -> workout arrays into a single array
-                    workouts = Object.values(calendarResponse.workoutsByDate)
-                        .flat() as ScheduledWorkoutResponse[];
+                    // Flatten the map
+                    workouts = Object.values(calendarResponse.workoutsByDate).flat() as ScheduledWorkoutResponse[];
 
-                    console.log('🔍 DEBUG: Flattened workouts:', workouts);
+                    console.log('🔍 DEBUG: Flattened to', workouts.length, 'workouts');
                 } else if (calendarResponse.scheduledWorkouts && Array.isArray(calendarResponse.scheduledWorkouts)) {
                     workouts = calendarResponse.scheduledWorkouts;
                 } else if (calendarResponse.data && Array.isArray(calendarResponse.data)) {
@@ -122,16 +122,38 @@ export class CalendarApiService {
                 } else if (calendarResponse.content && Array.isArray(calendarResponse.content)) {
                     workouts = calendarResponse.content;
                 } else {
-                    console.warn('⚠️ Unexpected response format:', calendarResponse);
-                    console.warn('⚠️ Available properties:', Object.keys(calendarResponse));
+                    console.warn('⚠️ Unexpected response format. Available properties:', Object.keys(calendarResponse));
                     workouts = [];
                 }
-            } else {
-                console.warn('⚠️ Response is not an object or array:', response);
-                workouts = [];
             }
 
+            // 🔍 DEBUG: Log exercise type information for each workout
+            workouts.forEach((workout, index) => {
+                console.log(`🔍 DEBUG: Workout ${index + 1}:`, {
+                    id: workout.id,
+                    hasExercise: !!workout.exercise,
+                    exerciseName: workout.exercise?.name,
+                    exerciseType: workout.exercise?.exerciseType,
+                    isCardio: workout.exercise?.isCardio,
+                    isIsometric: workout.exercise?.isIsometric,
+                    workoutPlanName: workout.workoutPlan?.name,
+                    status: workout.status
+                });
+
+                // ✅ CRITICAL: Log if exercise data is missing
+                if (!workout.exercise) {
+                    console.warn(`⚠️ MISSING EXERCISE DATA for workout ${workout.id}:`, {
+                        hasWorkoutPlan: !!workout.workoutPlan,
+                        workoutPlanName: workout.workoutPlan?.name,
+                        status: workout.status
+                    });
+                }
+            });
+
             console.log(`✅ Successfully fetched ${workouts.length} scheduled workouts`);
+            console.log(`🔍 Workouts with exercise data: ${workouts.filter(w => w.exercise).length}`);
+            console.log(`⚠️ Workouts missing exercise data: ${workouts.filter(w => !w.exercise).length}`);
+
             return workouts;
         } catch (error) {
             console.error('❌ Failed to fetch scheduled workouts:', error);
@@ -181,13 +203,13 @@ export class CalendarApiService {
     // ==================== WORKOUT MANAGEMENT ====================
 
     /**
-     * ✅ UNIFIED: Update a scheduled exercise
+     *  Update a scheduled exercise
      */
     async updateScheduledExercise(exerciseId: string, updates: any): Promise<ScheduledWorkoutResponse> {
         try {
             console.log('📅 API: Updating scheduled exercise:', exerciseId);
 
-            // ✅ UNIFIED: This endpoint remains the same
+            //  This endpoint remains the same
             const response = await apiClient.put<ScheduledWorkoutResponse>(`/api/calendar/exercises/${exerciseId}`, updates);
 
             console.log(`✅ Successfully updated exercise: ${exerciseId}`);
@@ -199,13 +221,13 @@ export class CalendarApiService {
     }
 
     /**
-     * ✅ UNIFIED: Delete a scheduled exercise
+     *  Delete a scheduled exercise
      */
     async deleteScheduledExercise(exerciseId: string): Promise<void> {
         try {
             console.log('📅 API: Deleting scheduled exercise:', exerciseId);
 
-            // ✅ UNIFIED: This endpoint remains the same
+            //  This endpoint remains the same
             await apiClient.delete(`/api/calendar/exercises/${exerciseId}`);
 
             console.log(`✅ Successfully deleted exercise: ${exerciseId}`);
@@ -216,16 +238,36 @@ export class CalendarApiService {
     }
 
     /**
-     * ✅ UNIFIED: Mark exercise as completed
+     *  Mark exercise as completed
      */
-    async markExerciseCompleted(exerciseId: string): Promise<ScheduledWorkoutResponse> {
+    async markExerciseCompleted(
+        exerciseId: string,
+        completionData?: {
+            completedAt?: string;
+            totalDurationMinutes?: number;
+            notes?: string;
+            performanceRating?: 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL';
+        }
+    ): Promise<ScheduledWorkoutResponse> {
         try {
             console.log('✅ API: Marking exercise as completed:', exerciseId);
 
-            // ✅ UNIFIED: This endpoint remains the same
-            const response = await apiClient.put<ScheduledWorkoutResponse>(`/api/calendar/exercises/${exerciseId}/complete`);
+            const payload = completionData ? {
+                completedAt: completionData.completedAt || new Date().toISOString(),
+                totalDurationMinutes: completionData.totalDurationMinutes,
+                notes: completionData.notes,
+                performanceRating: completionData.performanceRating || 'MET'
+            } : {
+                completedAt: new Date().toISOString(),
+                performanceRating: 'MET'
+            };
 
-            console.log(`✅ Successfully marked exercise as completed: ${exerciseId}`);
+            const response = await apiClient.put<ScheduledWorkoutResponse>(
+                `/api/calendar/exercises/${exerciseId}/complete`,
+                payload
+            );
+
+            console.log(`✅ Successfully marked exercise ${exerciseId} as completed`);
             return response;
         } catch (error) {
             console.error('❌ Failed to mark exercise as completed:', error);
@@ -234,7 +276,7 @@ export class CalendarApiService {
     }
 
     /**
-     * ✅ UNIFIED: Cancel a scheduled workout
+     * Cancel a scheduled workout
      */
     async cancelScheduledWorkout(scheduledWorkoutId: number): Promise<void> {
         try {
@@ -251,7 +293,7 @@ export class CalendarApiService {
     }
 
     /**
-     * ✅ UNIFIED: Start a scheduled workout
+     * Start a scheduled workout
      */
     async startWorkout(workoutId: string): Promise<ScheduledWorkoutResponse> {
         try {
@@ -269,7 +311,149 @@ export class CalendarApiService {
     }
 
     /**
-     * ✅ UNIFIED: Delete a workout
+     * Batch mark multiple exercises as completed
+     */
+    async batchMarkExercisesCompleted(exerciseCompletions: Array<{
+        exerciseId: string;
+        completedAt?: string;
+        totalDurationMinutes?: number;
+        notes?: string;
+        performanceRating?: 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL';
+    }>): Promise<{ successful: string[]; failed: string[] }> {
+        try {
+            console.log('✅ API: Batch marking exercises as completed:', exerciseCompletions.length);
+
+            const response = await apiClient.post<{ successful: string[]; failed: string[] }>(
+                '/api/calendar/exercises/batch-complete',
+                {completions: exerciseCompletions}
+            );
+
+            console.log(`✅ Batch completion: ${response.successful.length} successful, ${response.failed.length} failed`);
+            return response;
+        } catch (error) {
+            console.error('❌ Failed to batch mark exercises as completed:', error);
+
+            // Fallback: try to complete each exercise individually
+            const results: { successful: string[]; failed: string[] } = {successful: [], failed: []};
+
+            for (const completion of exerciseCompletions) {
+                try {
+                    await this.markExerciseCompleted(completion.exerciseId, {
+                        completedAt: completion.completedAt,
+                        totalDurationMinutes: completion.totalDurationMinutes,
+                        notes: completion.notes,
+                        performanceRating: completion.performanceRating
+                    });
+                    results.successful.push(completion.exerciseId);
+                } catch (err) {
+                    results.failed.push(completion.exerciseId);
+                }
+            }
+
+            return results;
+        }
+    }
+
+    /**
+     * Save detailed workout results for performance tracking
+     */
+    async saveWorkoutResults(exerciseId: string, resultsData: {
+        sets: Array<{
+            setNumber: number;
+            targetReps: number;
+            actualReps: number;
+            targetWeight?: number;
+            actualWeight?: number;
+            targetWeightUnit: 'kg' | 'lbs';
+            rpe?: number;
+            restSeconds?: number;
+            completed: boolean;
+            actualDurationMinutes?: number;
+            actualHoldSeconds?: number;
+        }>;
+        totalDurationMinutes: number;
+        caloriesBurned?: number;
+        averageHeartRate?: number;
+        notes?: string;
+        performanceRating: 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL';
+    }): Promise<void> {
+        try {
+            console.log('💾 API: Saving detailed workout results:', exerciseId);
+
+            await apiClient.post(`/api/calendar/exercises/${exerciseId}/results`, resultsData);
+
+            console.log(`✅ Successfully saved workout results for exercise ${exerciseId}`);
+        } catch (error) {
+            console.error('❌ Failed to save workout results:', error);
+            // Don't throw here - workout completion should succeed even if detailed results fail
+            console.warn('⚠️ Workout marked as completed, but detailed results could not be saved');
+        }
+    }
+
+    /**
+     * ✅ NEW: Retry failed workout saves
+     */
+    async retryPendingWorkoutSaves(): Promise<void> {
+        try {
+            const pendingSaves = JSON.parse(localStorage.getItem('pendingWorkoutSaves') || '[]');
+
+            if (pendingSaves.length === 0) {
+                console.log('📱 No pending workout saves to retry');
+                return;
+            }
+
+            console.log(`🔄 Retrying ${pendingSaves.length} pending workout saves...`);
+
+            const completedRetries: any[] = [];
+            const failedRetries: any[] = [];
+
+            for (const pendingSave of pendingSaves) {
+                try {
+                    // Extract exercises that need to be marked as completed
+                    const exerciseCompletions = pendingSave.workout.exercises
+                        .filter((ex: any) => ex.completed) // ✅ FIXED: Added explicit type annotation
+                        .map((ex: any) => ({ // ✅ FIXED: Added explicit type annotation
+                            exerciseId: ex.scheduledExercise.id,
+                            completedAt: ex.completedAt?.toISOString?.() || pendingSave.workout.completedAt?.toISOString?.(),
+                            totalDurationMinutes: pendingSave.workout.totalDurationMinutes,
+                            notes: ex.notes,
+                            performanceRating: 'MET' as const
+                        }));
+
+                    const result = await this.batchMarkExercisesCompleted(exerciseCompletions);
+
+                    if (result.failed.length === 0) {
+                        completedRetries.push(pendingSave);
+                        console.log(`✅ Successfully retried workout save: ${pendingSave.workout.id}`);
+                    } else {
+                        failedRetries.push({
+                            ...pendingSave,
+                            retryCount: (pendingSave.retryCount || 0) + 1
+                        });
+                        console.warn(`⚠️ Partial success for workout save: ${pendingSave.workout.id}`);
+                    }
+                } catch (error) {
+                    failedRetries.push({
+                        ...pendingSave,
+                        retryCount: (pendingSave.retryCount || 0) + 1
+                    });
+                    console.error(`❌ Failed to retry workout save: ${pendingSave.workout.id}`, error);
+                }
+            }
+
+            // Update localStorage with remaining failed retries (max 3 attempts)
+            const remainingRetries = failedRetries.filter(retry => retry.retryCount < 3);
+            localStorage.setItem('pendingWorkoutSaves', JSON.stringify(remainingRetries));
+
+            console.log(`🔄 Retry completed: ${completedRetries.length} successful, ${remainingRetries.length} remaining`);
+
+        } catch (error) {
+            console.error('❌ Failed to process pending workout saves:', error);
+        }
+    }
+
+    /**
+     * Delete a workout
      */
     async deleteWorkout(workoutId: string): Promise<void> {
         try {
@@ -285,6 +469,103 @@ export class CalendarApiService {
         }
     }
 
+    /**
+     * Get workout results for a completed exercise
+     */
+    async getWorkoutResults(exerciseId: string): Promise<WorkoutResults | null> {
+        try {
+            const response = await apiClient.get<WorkoutResults>(`/api/calendar/exercises/${exerciseId}/results`);
+            return response;
+        } catch (error) {
+            console.error('Failed to fetch workout results:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Get workout results for multiple exercises
+     */
+    async getBatchWorkoutResults(exerciseIds: string[]): Promise<Record<string, WorkoutResults>> {
+        try {
+            const response = await apiClient.post<Record<string, WorkoutResults>>('/api/calendar/results/batch', exerciseIds);
+            return response;
+        } catch (error) {
+            console.error('Failed to fetch batch workout results:', error);
+            return {};
+        }
+    }
+
+    /**
+     * ✅ NEW: Mark exercise as completed with full performance tracking
+     */
+    async markExerciseCompletedWithPerformance(
+        exerciseId: string,
+        completionData: {
+            exerciseId: string;
+            scheduledExerciseId: string;
+            completedAt: string;
+            totalDurationMinutes: number;
+            sets: Array<{
+                setNumber: number;
+                targetReps: number;
+                actualReps: number;
+                targetWeight?: number;
+                actualWeight?: number;
+                targetWeightUnit: string;
+                rpe?: number;
+                restSeconds?: number;
+                completed: boolean;
+                actualDurationMinutes?: number;
+                actualHoldSeconds?: number;
+                notes?: string;
+            }>;
+            notes?: string;
+            performanceRating: string;
+            personalRecords: any[];
+            improvements: any[];
+
+            // Optional workout session data
+            difficultyRating?: number;
+            overallEffort?: number;
+            mood?: string;
+            location?: string;
+            workoutFeedback?: string;
+            performanceSummary?: string;
+
+            // Optional cardio data
+            distanceKm?: number;
+            caloriesBurned?: number;
+        }
+    ): Promise<ScheduledWorkoutResponse> {
+        try {
+            console.log('✅ API: Marking exercise as completed with full performance tracking:', exerciseId);
+
+            const response = await apiClient.post<ScheduledWorkoutResponse>(
+                `/api/calendar/exercises/${exerciseId}/complete-with-performance`,
+                completionData
+            );
+
+            console.log(`✅ Successfully marked exercise ${exerciseId} as completed with performance data`);
+            return response;
+        } catch (error) {
+            console.error('❌ Failed to mark exercise as completed with performance:', error);
+
+            // Fallback to simple completion if the enhanced endpoint fails
+            console.log('🔄 Falling back to simple completion...');
+            try {
+                return await this.markExerciseCompleted(exerciseId, {
+                    completedAt: completionData.completedAt,
+                    totalDurationMinutes: completionData.totalDurationMinutes,
+                    notes: completionData.notes,
+                    performanceRating: completionData.performanceRating as any
+                });
+            } catch (fallbackError) {
+                console.error('❌ Fallback completion also failed:', fallbackError);
+                throw new Error('Failed to mark exercise as completed');
+            }
+        }
+    }
+
     // ==================== ANALYTICS & STATISTICS ====================
 
     /**
@@ -295,7 +576,7 @@ export class CalendarApiService {
             console.log('📊 API: Getting workout statistics', date ? `for ${date}` : '');
 
             // ✅ UNIFIED: This endpoint remains the same
-            const params = date ? { date } : {};
+            const params = date ? {date} : {};
             const response = await apiClient.get('/api/calendar/stats', params);
 
             console.log('✅ Successfully fetched workout statistics');
@@ -332,7 +613,7 @@ export class CalendarApiService {
             console.log(`📅 API: Getting upcoming workouts for next ${days} days`);
 
             // ✅ UNIFIED: This endpoint remains the same
-            const response = await apiClient.get<ScheduledWorkoutResponse[]>('/api/calendar/upcoming', { days });
+            const response = await apiClient.get<ScheduledWorkoutResponse[]>('/api/calendar/upcoming', {days});
 
             console.log(`✅ Successfully fetched ${response.length} upcoming workouts`);
             return response;

@@ -101,6 +101,10 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises/type/**").permitAll();            // Exercises by type
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises/{id}").permitAll();               // Individual exercise details
 
+                    // 🌍 PUBLIC FAVORITES - Publicly accessible favorites data
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/favorites/trending").permitAll();      // Trending favorites
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/favorites/most-popular").permitAll();  // Most favorited
+
                     // ===================================================================
                     // 🌍 PUBLIC WORKOUT PLAN LIBRARY - Browse, search, view workout plans
                     // ===================================================================
@@ -117,12 +121,26 @@ public class SecurityConfig {
                     // ===================================================================
                     // 🔐 USER AUTHENTICATED - Requires login
                     // ===================================================================
+
+                    // 🔐 USER-SPECIFIC EXERCISE OPERATIONS - New ExerciseUserController routes
+                    auth.requestMatchers("/api/exercises/user/**").authenticated();                         // All user-specific operations
+
+                    // 🔐 LEGACY USER EXERCISE ROUTES - Will be removed after migration
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises/*/rate").authenticated();        // Rate exercises
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises/*/record-usage").authenticated(); // Record usage
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises/recommended").authenticated();     // Personal recommendations
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises/workout-plan").authenticated();   // Create workout plans
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises/insights").authenticated();        // User insights
 
+                    // 🔐 USER FAVORITES - Personal favorites management
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/favorites").authenticated();           // Get user favorites
+                    auth.requestMatchers(HttpMethod.POST, "/api/exercises/favorites/*/toggle").authenticated(); // Toggle favorite
+                    auth.requestMatchers(HttpMethod.GET, "/api/exercises/favorites/ids").authenticated();       // Get favorite IDs
+                    auth.requestMatchers(HttpMethod.POST, "/api/exercises/favorites/check").authenticated();    // Check multiple
+                    auth.requestMatchers(HttpMethod.POST, "/api/exercises/favorites/bulk/**").authenticated();  // Bulk operations
+                    auth.requestMatchers(HttpMethod.DELETE, "/api/exercises/favorites/**").authenticated();     // Delete operations
+
+                    // 🔐 CALENDAR & WORKOUT TRACKING
                     auth.requestMatchers("/api/calendar/**").authenticated();                               // All calendar operations
 
                     // 🔐 AUTHENTICATED WORKOUT PLAN FEATURES - User-specific workout plans
@@ -143,8 +161,9 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.PUT, "/api/workout-plans/**").hasRole("PROFESSIONAL"); // Update workout plans
 
                     // ===================================================================
-                    // 🔐 ADMIN ROLE - Management operations
+                    // 🔒 ADMIN ROLE - Management operations
                     // ===================================================================
+                    auth.requestMatchers("/api/exercises/admin/**").hasAnyRole("ADMIN", "PROFESSIONAL");
                     auth.requestMatchers(HttpMethod.DELETE, "/api/exercises/**").hasRole("ADMIN");         // Delete exercises
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises/bulk-action").hasRole("ADMIN");  // Bulk operations
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises/analytics").hasRole("ADMIN");     // Analytics

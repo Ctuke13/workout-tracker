@@ -20,8 +20,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // ==================== AUTHENTICATION & BASIC QUERIES ====================
 
     Optional<User> findByUsername(String username);
+
     Optional<User> findByEmail(String email);
+
     boolean existsByUsername(String username);
+
     boolean existsByEmail(String email);
 
     // ==================== LOCATION-BASED QUERIES (NEW FOR ALL USERS) ====================
@@ -282,4 +285,27 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT COUNT(u) FROM User u WHERE (u.city IS NOT NULL AND u.state IS NOT NULL) AND u.accountStatus = 'ACTIVE'")
     Long countUsersWithCityState();
+
+    // ==================== ADMIN OPERATIONS ====================
+
+    /**
+     * Find users by email containing text (for test account cleanup)
+     */
+    List<User> findByEmailContaining(String emailPattern);
+
+    /**
+     * Find users by username containing text (for test account cleanup)
+     */
+    List<User> findByUsernameContaining(String usernamePattern);
+
+    /**
+     * Count users by account status
+     */
+    @Query("SELECT COUNT(u) FROM User u WHERE u.accountStatus = :accountStatus")
+    Long countByAccountStatus(@Param("accountStatus") User.AccountStatus accountStatus);
+
+    /**
+     * Find users by account status
+     */
+    List<User> findByAccountStatus(User.AccountStatus accountStatus);
 }

@@ -19,6 +19,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -205,6 +207,23 @@ public class AuthController {
         return ResponseEntity.ok(jwtResponse);
     }
 
+    @GetMapping("/debug/my-authorities")
+    public ResponseEntity<?> getMyAuthorities(Authentication auth) {
+        if (auth == null) {
+            Map<String, Object> debug = new HashMap<>();
+            debug.put("authenticated", false);
+            debug.put("message", "No authentication found - user not logged in");
+            return ResponseEntity.ok(debug);
+        }
+
+        Map<String, Object> debug = new HashMap<>();
+        debug.put("authenticated", true);
+        debug.put("username", auth.getName());
+        debug.put("authorities", auth.getAuthorities());
+        debug.put("principal", auth.getPrincipal().getClass().getSimpleName());
+        return ResponseEntity.ok(debug);
+    }
+
     // 🧪 TESTING ENDPOINT
     @GetMapping("/test")
     public ResponseEntity<String> testAuth() {
@@ -221,10 +240,21 @@ public class AuthController {
             this.message = message;
         }
 
-        public Boolean getSuccess() { return success; }
-        public void setSuccess(Boolean success) { this.success = success; }
-        public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
+        public Boolean getSuccess() {
+            return success;
+        }
+
+        public void setSuccess(Boolean success) {
+            this.success = success;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
     }
 
     public static class UserSummary {
@@ -258,38 +288,93 @@ public class AuthController {
         }
 
         // ✅ Getters and setters
-        public Long getId() { return id; }
-        public void setId(Long id) { this.id = id; }
+        public Long getId() {
+            return id;
+        }
 
-        public String getUsername() { return username; }
-        public void setUsername(String username) { this.username = username; }
+        public void setId(Long id) {
+            this.id = id;
+        }
 
-        public String getEmail() { return email; }
-        public void setEmail(String email) { this.email = email; }
+        public String getUsername() {
+            return username;
+        }
 
-        public String getFirstName() { return firstName; }
-        public void setFirstName(String firstName) { this.firstName = firstName; }
+        public void setUsername(String username) {
+            this.username = username;
+        }
 
-        public String getLastName() { return lastName; }
-        public void setLastName(String lastName) { this.lastName = lastName; }
+        public String getEmail() {
+            return email;
+        }
 
-        public UserType getUserType() { return userType; }
-        public void setUserType(UserType userType) { this.userType = userType; }
+        public void setEmail(String email) {
+            this.email = email;
+        }
 
-        public User.AccountStatus getAccountStatus() { return accountStatus; }
-        public void setAccountStatus(User.AccountStatus accountStatus) { this.accountStatus = accountStatus; }
+        public String getFirstName() {
+            return firstName;
+        }
 
-        public User.ActivityLevel getActivityLevel() { return activityLevel; }
-        public void setActivityLevel(User.ActivityLevel activityLevel) { this.activityLevel = activityLevel; }
+        public void setFirstName(String firstName) {
+            this.firstName = firstName;
+        }
 
-        public Boolean getIsProfessional() { return isProfessional; }
-        public void setIsProfessional(Boolean isProfessional) { this.isProfessional = isProfessional; }
+        public String getLastName() {
+            return lastName;
+        }
 
-        public Boolean getIsVerified() { return isVerified; }
-        public void setIsVerified(Boolean isVerified) { this.isVerified = isVerified; }
+        public void setLastName(String lastName) {
+            this.lastName = lastName;
+        }
 
-        public SubscriptionTier getSubscriptionTier() { return subscriptionTier; }
-        public void setSubscriptionTier(SubscriptionTier subscriptionTier) { this.subscriptionTier = subscriptionTier; }
+        public UserType getUserType() {
+            return userType;
+        }
+
+        public void setUserType(UserType userType) {
+            this.userType = userType;
+        }
+
+        public User.AccountStatus getAccountStatus() {
+            return accountStatus;
+        }
+
+        public void setAccountStatus(User.AccountStatus accountStatus) {
+            this.accountStatus = accountStatus;
+        }
+
+        public User.ActivityLevel getActivityLevel() {
+            return activityLevel;
+        }
+
+        public void setActivityLevel(User.ActivityLevel activityLevel) {
+            this.activityLevel = activityLevel;
+        }
+
+        public Boolean getIsProfessional() {
+            return isProfessional;
+        }
+
+        public void setIsProfessional(Boolean isProfessional) {
+            this.isProfessional = isProfessional;
+        }
+
+        public Boolean getIsVerified() {
+            return isVerified;
+        }
+
+        public void setIsVerified(Boolean isVerified) {
+            this.isVerified = isVerified;
+        }
+
+        public SubscriptionTier getSubscriptionTier() {
+            return subscriptionTier;
+        }
+
+        public void setSubscriptionTier(SubscriptionTier subscriptionTier) {
+            this.subscriptionTier = subscriptionTier;
+        }
 
         // ✅ Utility methods for subscription checks
         public boolean canAccessPaidPlans() {

@@ -1,8 +1,7 @@
-package com.chidituke.workout_tracker.service.workout;
+package com.chidituke.workout_tracker.service.exercise;
 
 import com.chidituke.workout_tracker.exceptions.common.ResourceNotFoundException;
 import com.chidituke.workout_tracker.exceptions.common.DuplicateResourceException;
-import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.model.workout.Exercise;
 import com.chidituke.workout_tracker.model.workout.UserExerciseFavorite;
 import com.chidituke.workout_tracker.repository.workout.ExerciseRepository;

@@ -402,6 +402,28 @@ CREATE INDEX idx_exercises_tracking_performance ON exercises(is_cardio, is_isome
 CREATE INDEX idx_exercises_mapper_resolution
     ON exercises(published, exercise_type, is_cardio, is_isometric, workout_tracking_mode);
 
+-- Popular exercises optimization
+CREATE INDEX idx_exercises_popular_published
+    ON exercises(published, usage_count DESC, average_rating DESC) WHERE published = true;
+
+-- Search performance with type and difficulty
+CREATE INDEX idx_exercises_search_optimized
+    ON exercises(exercise_type, difficulty_level, published, average_rating DESC) WHERE published = true;
+
+-- Professional content with performance ranking
+CREATE INDEX idx_exercises_professional_ranking
+    ON exercises(created_by_professional, published, average_rating DESC, usage_count DESC)
+    WHERE published = true AND created_by_professional = true;
+
+-- Combined filtering for most common queries
+CREATE INDEX idx_exercises_comprehensive_search
+    ON exercises(published, exercise_type, difficulty_level, is_cardio, average_rating DESC)
+    WHERE published = true;
+
+-- User favorites performance optimization
+CREATE INDEX idx_user_favorites_with_exercise_data
+    ON user_exercise_favorites(user_id, created_at DESC);
+
 -- =====================================================
 -- INITIAL GOALS DATA
 -- =====================================================

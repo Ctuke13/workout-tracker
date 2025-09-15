@@ -5,7 +5,7 @@ import com.chidituke.workout_tracker.controller.workout.WorkoutPlanController;
 import com.chidituke.workout_tracker.controller.workout.WorkoutProgramController;
 import com.chidituke.workout_tracker.controller.user.ProfessionalProfileController;
 import com.chidituke.workout_tracker.controller.user.SubscriptionController;
-import com.chidituke.workout_tracker.controller.workout.ExerciseController;
+import com.chidituke.workout_tracker.controller.exercise.ExerciseController;
 import com.chidituke.workout_tracker.controller.workout.PerformanceController;
 import com.chidituke.workout_tracker.controller.workout.ProgramPlanController;
 import com.chidituke.workout_tracker.controller.workout.ScheduledWorkoutController;
@@ -93,7 +93,7 @@ public class TestController {
                 WorkoutScheduleRequest scheduleRequest;
                 if (day % 2 == 1 && day <= 5) { // Monday, Wednesday, Friday
                     scheduleRequest = createWorkoutScheduleRequest(
-                            workoutPlanIds.get((day-1)/2 % workoutPlanIds.size()),
+                            workoutPlanIds.get((day - 1) / 2 % workoutPlanIds.size()),
                             1, day, ProgramPlan.PhaseType.BASE_BUILDING,
                             BigDecimal.valueOf(60 + day * 5), false
                     );
@@ -409,7 +409,7 @@ public class TestController {
         for (int day = 1; day <= 7; day += 2) {
             if (day <= 5) { // Workouts
                 workouts.add(createWorkoutScheduleRequest(
-                        workoutPlanIds.get((day-1)/2 % workoutPlanIds.size()),
+                        workoutPlanIds.get((day - 1) / 2 % workoutPlanIds.size()),
                         week, day, ProgramPlan.PhaseType.INTENSITY,
                         BigDecimal.valueOf(70 + day * 3), false
                 ));

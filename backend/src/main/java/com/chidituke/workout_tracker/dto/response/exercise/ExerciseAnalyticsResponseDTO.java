@@ -1,6 +1,7 @@
 package com.chidituke.workout_tracker.dto.response.exercise;
 
-import com.chidituke.workout_tracker.service.workout.ExerciseService;
+import com.chidituke.workout_tracker.service.exercise.ExerciseAdminService;
+import com.chidituke.workout_tracker.service.exercise.ExerciseService;
 import lombok.Builder;
 import lombok.Data;
 
@@ -26,7 +27,7 @@ public class ExerciseAnalyticsResponseDTO {
     private Boolean isRising; // Trending upward in usage
 
     public static ExerciseAnalyticsResponseDTO fromServiceAnalytics(
-            ExerciseService.ExerciseAnalytics analytics) {
+            ExerciseAdminService.ExerciseAnalytics analytics) {
         return ExerciseAnalyticsResponseDTO.builder()
                 .exerciseId(analytics.getExerciseId())
                 .exerciseName(analytics.getExerciseName())

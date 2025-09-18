@@ -498,7 +498,7 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                         {trackingMode === 'strength' && (
                             <div className="space-y-6">
                                 {/* Sets and Reps */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 gap-4 text-center">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Target Sets
@@ -509,7 +509,8 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                                             max="20"
                                             value={targetSets}
                                             onChange={(e) => setTargetSets(parseInt(e.target.value) || 1)}
-                                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            className="w-10 p-3 text-lg font-medium border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            inputMode="numeric"
                                         />
                                     </div>
                                     <div>
@@ -522,7 +523,8 @@ const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
                                             max="100"
                                             value={targetReps}
                                             onChange={(e) => setTargetReps(parseInt(e.target.value) || 1)}
-                                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            className="w-10 p-3 text-lg font-medium border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            inputMode="numeric"
                                         />
                                     </div>
                                 </div>

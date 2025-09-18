@@ -5,6 +5,20 @@
 -- =============================================================================
 
 -- =====================================================
+-- ADD SOFT DELETE COLUMNS TO SCHEDULED_WORKOUTS TABLE
+-- =====================================================
+
+-- Add soft delete columns to existing scheduled_workouts table
+ALTER TABLE scheduled_workouts
+    ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT FALSE,
+ADD COLUMN deleted_at TIMESTAMP,
+ADD COLUMN deleted_by VARCHAR(255);
+
+-- Add indexes for soft delete queries
+CREATE INDEX idx_scheduled_workouts_deleted ON scheduled_workouts(deleted);
+CREATE INDEX idx_scheduled_workouts_user_status_deleted ON scheduled_workouts(user_id, status, deleted);
+
+-- =====================================================
 -- WORKOUT_SESSIONS TABLE (matches WorkoutSession.java exactly)
 -- =====================================================
 
@@ -33,7 +47,7 @@ CREATE TABLE workout_sessions (
                                   mood VARCHAR(20),
                                   location VARCHAR(20),
 
-    -- Program integration (nullable - WorkoutProgram/ScheduledWorkout tables don't exist yet)
+    -- Program integration (nullable - WorkoutProgram table may not exist yet)
                                   workout_program_id BIGINT,
                                   week_number INTEGER,
                                   scheduled_workout_id BIGINT,
@@ -51,8 +65,8 @@ CREATE TABLE workout_sessions (
 
     -- Foreign key constraints
                                   CONSTRAINT fk_workout_sessions_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                                  CONSTRAINT fk_workout_sessions_workout_plan FOREIGN KEY (workout_plan_id) REFERENCES workout_plans(workout_plan_id) ON DELETE CASCADE
-    -- Note: workout_program_id and scheduled_workout_id will be added when those tables are created
+                                  CONSTRAINT fk_workout_sessions_workout_plan FOREIGN KEY (workout_plan_id) REFERENCES workout_plans(workout_plan_id) ON DELETE CASCADE,
+                                  CONSTRAINT fk_workout_sessions_scheduled_workout FOREIGN KEY (scheduled_workout_id) REFERENCES scheduled_workouts(scheduled_workout_id) ON DELETE CASCADE
 );
 
 -- Add constraints for WorkoutSession enum values and validation
@@ -111,17 +125,17 @@ CREATE TABLE performance_records (
                                      rest_seconds INTEGER,
                                      tempo VARCHAR(20),
 
-    --  Rest time tracking and set timing
+    -- Rest time tracking and set timing
                                      rest_time_before_set_seconds INTEGER,
                                      set_start_time TIMESTAMP,
                                      set_end_time TIMESTAMP,
                                      actual_set_duration_seconds INTEGER,
 
-    --  Exercise completion tracking
+    -- Exercise completion tracking
                                      is_exercise_completed BOOLEAN DEFAULT FALSE,
                                      exercise_completion_notes TEXT,
 
-    --  Target comparison fields
+    -- Target comparison fields
                                      target_reps_planned INTEGER,
                                      target_weight_planned DECIMAL(5,2),
                                      performance_vs_target VARCHAR(20) DEFAULT 'NOT_SET',
@@ -228,7 +242,7 @@ ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_set_timin
         );
 
 -- =====================================================
--- INDEXES FOR PERFORMANCE (Based on Entity @Index annotations and Expected Queries)
+-- INDEXES FOR PERFORMANCE
 -- =====================================================
 
 -- Workout sessions table indexes
@@ -249,7 +263,7 @@ CREATE INDEX idx_workout_sessions_completion_percentage ON workout_sessions(comp
 CREATE INDEX idx_workout_sessions_user_status ON workout_sessions(user_id, session_status);
 CREATE INDEX idx_workout_sessions_completion_analysis ON workout_sessions(user_id, session_status, completion_percentage, created_at);
 
--- Performance records table indexes (matching entity @Index annotations)
+-- Performance records table indexes
 CREATE INDEX idx_performance_workout_session ON performance_records(workout_session_id);
 CREATE INDEX idx_performance_exercise ON performance_records(exercise_id);
 CREATE INDEX idx_performance_user_date ON performance_records(workout_session_id, created_at);
@@ -276,6 +290,10 @@ CREATE INDEX idx_workout_sessions_user_program ON workout_sessions(user_id, work
 CREATE INDEX idx_workout_sessions_user_workout_plan ON workout_sessions(user_id, workout_plan_id);
 CREATE INDEX idx_performance_records_exercise_date ON performance_records(exercise_id, created_at);
 CREATE INDEX idx_performance_records_weight_reps ON performance_records(exercise_id, weight, reps);
+
+-- =====================================================
+-- UTILITY FUNCTIONS
+-- =====================================================
 
 -- Function to calculate workout completion percentage
 CREATE OR REPLACE FUNCTION calculate_workout_completion_percentage(

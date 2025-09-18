@@ -69,6 +69,15 @@ public class ScheduledWorkout {
     @Column(name = "hold_duration_seconds")
     private Integer holdDurationSeconds;
 
+    @Column(name = "deleted", nullable = false)
+    private Boolean deleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by")
+    private String deletedBy;
+
     // =============================================================================
     // Workout Plan Relationship
     // =============================================================================

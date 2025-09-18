@@ -14,7 +14,7 @@ import com.chidituke.workout_tracker.model.user.enums.SubscriptionTier;
 import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.repository.user.SubscriptionRepository;
 import com.chidituke.workout_tracker.repository.user.UserRepository;
-import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
+import com.chidituke.workout_tracker.repository.scheduled_workouts.ScheduledWorkoutRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -137,10 +137,13 @@ public class SubscriptionService {
     @Cacheable(value = "dailyLimits", key = "#tier")
     public int getDailyExerciseLimit(String tier) {
         switch (tier.toUpperCase()) {
-            case "FREE": return 3;      // Perfect for FREE tier conversion strategy
-            case "PLUS": return 15;     // Allows complete workout plans
+            case "FREE":
+                return 3;      // Perfect for FREE tier conversion strategy
+            case "PLUS":
+                return 15;     // Allows complete workout plans
             case "PRO":
-            case "PRO_PROFESSIONAL": return Integer.MAX_VALUE;
+            case "PRO_PROFESSIONAL":
+                return Integer.MAX_VALUE;
             default:
                 log.warn("Unknown subscription tier: {}, defaulting to FREE limits", tier);
                 return 3;
@@ -153,10 +156,13 @@ public class SubscriptionService {
     @Cacheable(value = "schedulingLimits", key = "#tier")
     public int getAdvanceSchedulingDays(String tier) {
         switch (tier.toUpperCase()) {
-            case "FREE": return 7;      // 1 week advance
-            case "PLUS": return 30;     // 1 month advance
+            case "FREE":
+                return 7;      // 1 week advance
+            case "PLUS":
+                return 30;     // 1 month advance
             case "PRO":
-            case "PRO_PROFESSIONAL": return 365;  // 1 year advance
+            case "PRO_PROFESSIONAL":
+                return 365;  // 1 year advance
             default:
                 log.warn("Unknown subscription tier: {}, defaulting to FREE limits", tier);
                 return 7;
@@ -548,11 +554,16 @@ public class SubscriptionService {
      */
     private int getTierLevel(String tier) {
         switch (tier.toUpperCase()) {
-            case "FREE": return 0;
-            case "PLUS": return 1;
-            case "PRO": return 2;
-            case "PRO_PROFESSIONAL": return 3;
-            default: return 0; // Default to FREE level
+            case "FREE":
+                return 0;
+            case "PLUS":
+                return 1;
+            case "PRO":
+                return 2;
+            case "PRO_PROFESSIONAL":
+                return 3;
+            default:
+                return 0; // Default to FREE level
         }
     }
 }

@@ -1,4 +1,4 @@
-package com.chidituke.workout_tracker.repository.workout;
+package com.chidituke.workout_tracker.repository.scheduled_workouts;
 
 import com.chidituke.workout_tracker.model.workout.ScheduledWorkout;
 import com.chidituke.workout_tracker.model.workout.ScheduledWorkout.ScheduleStatus;
@@ -21,6 +21,22 @@ import java.util.Optional;
 public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorkout, Long> {
 
     // =======================
+    // USER WORKOUT QUERIES
+    // =======================
+
+    // Basic user workout retrieval by ID
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.status != 'DELETED' ORDER BY sw.scheduledDate ASC")
+    List<ScheduledWorkout> findByUserIdAndDeletedFalseOrderByScheduledDateTimeAsc(@Param("userId") Long userId);
+
+    // Upcoming workouts for user
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.scheduledDate >= CURRENT_DATE AND sw.status = 'SCHEDULED' ORDER BY sw.scheduledDate ASC")
+    List<ScheduledWorkout> findUpcomingWorkoutsByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+
+    // Recent completed workouts for user
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.status = 'COMPLETED' ORDER BY sw.completedAt DESC")
+    List<ScheduledWorkout> findRecentCompletedWorkoutsByUserId(@Param("userId") Long userId);
+
+    // =======================
     // CALENDAR VIEW QUERIES
     // =======================
 
@@ -31,6 +47,10 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
     // Get user's workouts for specific date
     List<ScheduledWorkout> findByUserAndScheduledDateOrderByCreatedAtAsc(User user, LocalDate date);
 
+    // Date range queries with user ID
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.scheduledDate >= :startDate AND sw.scheduledDate <= :endDate ORDER BY sw.scheduledDate ASC")
+    List<ScheduledWorkout> findWorkoutsByUserAndDateRange(@Param("userId") Long userId, @Param("startDate") LocalDateTime startDateTime, @Param("endDate") LocalDateTime endDateTime);
+
     // Get user's upcoming workouts (next 7 days)
     @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user = :user " +
             "AND sw.scheduledDate BETWEEN CURRENT_DATE AND :endDate " +
@@ -38,13 +58,6 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
             "ORDER BY sw.scheduledDate ASC, sw.createdAt ASC")
     List<ScheduledWorkout> findUpcomingWorkouts(@Param("user") User user,
                                                 @Param("endDate") LocalDate endDate);
-
-    @Query("SELECT s FROM ScheduledWorkout s WHERE s.user = :user AND s.program = :program AND s.status = :status ORDER BY s.scheduledDate ASC")
-    List<ScheduledWorkout> findByUserAndProgramAndStatusOrderByScheduledDateAsc(
-            @Param("user") User user,
-            @Param("program") WorkoutProgram program,
-            @Param("status") ScheduledWorkout.ScheduleStatus status);
-
 
     // Get today's workouts for user
     @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user = :user " +
@@ -56,8 +69,11 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
     // STATUS-BASED QUERIES
     // =======================
 
-    // Find workouts by status
+    // Find workouts by status (User entity)
     List<ScheduledWorkout> findByUserAndStatusOrderByScheduledDateAsc(User user, ScheduleStatus status);
+
+    // Find workouts by status (User ID)
+    List<ScheduledWorkout> findByUserIdAndStatusAndDeletedFalse(Long userId, ScheduledWorkout.ScheduleStatus status);
 
     // Find overdue workouts (scheduled but past due)
     @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user = :user " +
@@ -71,6 +87,50 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
 
     // Check if user has any in-progress workouts
     boolean existsByUserAndStatus(User user, ScheduleStatus status);
+
+    // =======================
+    // SEARCH & FILTERING
+    // =======================
+
+    // Search user workouts with pagination
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND (sw.workoutPlan.workoutName LIKE %:searchTerm% OR sw.customNotes LIKE %:searchTerm%) ORDER BY sw.scheduledDate DESC")
+    Page<ScheduledWorkout> searchUserWorkouts(@Param("userId") Long userId, @Param("searchTerm") String searchTerm, Pageable pageable);
+
+    // Find workouts containing specific exercise
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND (sw.exercise.id = :exerciseId OR sw.workoutPlan.id IN (SELECT pe.workoutPlan.id FROM PlanExercise pe WHERE pe.exercise.id = :exerciseId))")
+    List<ScheduledWorkout> findWorkoutsContainingExercise(@Param("userId") Long userId, @Param("exerciseId") Long exerciseId);
+
+    // =======================
+    // STREAK & CONSISTENCY QUERIES
+    // =======================
+
+    // Calculate current workout streak
+    @Query(value = "SELECT COALESCE(MAX(streak), 0) FROM (SELECT COUNT(*) as streak FROM scheduled_workouts WHERE user_id = :userId AND status = 'COMPLETED' AND scheduled_date <= CURRENT_DATE GROUP BY user_id) as streaks", nativeQuery = true)
+    int calculateCurrentStreak(@Param("userId") Long userId);
+
+    // Find workouts since specific date for consistency calculation
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.scheduledDate >= :since ORDER BY sw.scheduledDate ASC")
+    List<ScheduledWorkout> findWorkoutsSince(@Param("userId") Long userId, @Param("since") LocalDateTime since);
+
+    // =======================
+    // SCHEDULING CONFLICT DETECTION
+    // =======================
+
+    // Check for scheduling conflicts (same user, date, and time slot)
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user = :user " +
+            "AND sw.scheduledDate = :date " +
+            "AND sw.status IN ('SCHEDULED', 'IN_PROGRESS') " +
+            "AND sw.id != :excludeId")
+    List<ScheduledWorkout> findSchedulingConflicts(@Param("user") User user,
+                                                   @Param("date") LocalDate date,
+                                                   @Param("excludeId") Long excludeId);
+
+    // Find conflicting workouts in time window
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.scheduledDate >= :startWindow AND sw.scheduledDate <= :endWindow AND sw.status IN ('SCHEDULED', 'IN_PROGRESS')")
+    List<ScheduledWorkout> findConflictingWorkouts(@Param("userId") Long userId, @Param("startWindow") LocalDateTime startWindow, @Param("endWindow") LocalDateTime endWindow);
+
+    // Check if user already has workout scheduled for date
+    boolean existsByUserAndScheduledDateAndStatusIn(User user, LocalDate date, List<ScheduleStatus> statuses);
 
     // =======================
     // WORKOUT PLAN QUERIES
@@ -87,14 +147,14 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
             User user, WorkoutPlan workoutPlan);
 
     // =======================
-    // WORKOUT PLAN SCHEDULING SUPPORT (ADD THIS SECTION)
+    // WORKOUT PLAN SCHEDULING SUPPORT
     // =======================
 
     // Count exercises scheduled for user on specific date (for daily limit validation)
     @Query("SELECT COUNT(sw) FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.scheduledDate = :date")
     long countByUserIdAndScheduledDate(@Param("userId") Long userId, @Param("date") LocalDate date);
 
-    // Alternative method using User entity (choose one based on your preference)
+    // Alternative method using User entity
     long countByUserAndScheduledDate(User user, LocalDate date);
 
     // =======================
@@ -108,6 +168,13 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
     // Find scheduled workouts for specific week of program
     List<ScheduledWorkout> findByUserAndProgramAndWeekNumberOrderByDayOfWeekAsc(
             User user, WorkoutProgram program, Integer weekNumber);
+
+    // Program and status combination
+    @Query("SELECT s FROM ScheduledWorkout s WHERE s.user = :user AND s.program = :program AND s.status = :status ORDER BY s.scheduledDate ASC")
+    List<ScheduledWorkout> findByUserAndProgramAndStatusOrderByScheduledDateAsc(
+            @Param("user") User user,
+            @Param("program") WorkoutProgram program,
+            @Param("status") ScheduledWorkout.ScheduleStatus status);
 
     // Check if user has scheduled specific week/day of program
     boolean existsByUserAndProgramAndWeekNumberAndDayOfWeek(
@@ -129,22 +196,6 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
     @Query("SELECT MAX(sw.scheduledDate) FROM ScheduledWorkout sw " +
             "WHERE sw.user = :user AND sw.status = 'SCHEDULED'")
     Optional<LocalDate> findFarthestScheduledDate(@Param("user") User user);
-
-    // =======================
-    // SCHEDULING CONFLICT DETECTION
-    // =======================
-
-    // Check for scheduling conflicts (same user, date, and time slot)
-    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user = :user " +
-            "AND sw.scheduledDate = :date " +
-            "AND sw.status IN ('SCHEDULED', 'IN_PROGRESS') " +
-            "AND sw.id != :excludeId")
-    List<ScheduledWorkout> findSchedulingConflicts(@Param("user") User user,
-                                                   @Param("date") LocalDate date,
-                                                   @Param("excludeId") Long excludeId);
-
-    // Check if user already has workout scheduled for date
-    boolean existsByUserAndScheduledDateAndStatusIn(User user, LocalDate date, List<ScheduleStatus> statuses);
 
     // =======================
     // COACH/TRAINER QUERIES
@@ -198,20 +249,6 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
     List<ScheduledWorkout> findTomorrowsWorkouts(@Param("tomorrow") LocalDate tomorrow);
 
     // =======================
-    // CLEANUP QUERIES
-    // =======================
-
-    // Find old completed/cancelled workouts for cleanup
-    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user = :user " +
-            "AND sw.status IN ('COMPLETED', 'CANCELLED') " +
-            "AND sw.scheduledDate < :cutoffDate")
-    List<ScheduledWorkout> findOldWorkoutsForCleanup(@Param("user") User user,
-                                                     @Param("cutoffDate") LocalDate cutoffDate);
-
-    // Delete old scheduled workouts (for free user data retention)
-    void deleteByUserAndStatusInAndScheduledDateBefore(User user, List<ScheduleStatus> statuses, LocalDate beforeDate);
-
-    // =======================
     // PAGINATION QUERIES
     // =======================
 
@@ -225,6 +262,29 @@ public interface ScheduledWorkoutRepository extends JpaRepository<ScheduledWorko
     Page<ScheduledWorkout> findByUserAndStatusOrderByScheduledDateDesc(User user,
                                                                        ScheduleStatus status,
                                                                        Pageable pageable);
+
+    // Paginated user workouts with deletion filter
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user.id = :userId AND sw.status != 'DELETED' ORDER BY sw.scheduledDate DESC")
+    Page<ScheduledWorkout> findByUserIdAndDeletedFalseOrderByScheduledDateTimeDesc(@Param("userId") Long userId, Pageable pageable);
+
+    List<ScheduledWorkout> findByUserIdAndStatus(Long userId, ScheduledWorkout.ScheduleStatus status); // includes deleted
+
+    // Add method to find deleted records for audit
+    List<ScheduledWorkout> findByUserIdAndDeletedTrue(Long userId);
+
+    // =======================
+    // CLEANUP QUERIES
+    // =======================
+
+    // Find old completed/cancelled workouts for cleanup
+    @Query("SELECT sw FROM ScheduledWorkout sw WHERE sw.user = :user " +
+            "AND sw.status IN ('COMPLETED', 'CANCELLED') " +
+            "AND sw.scheduledDate < :cutoffDate")
+    List<ScheduledWorkout> findOldWorkoutsForCleanup(@Param("user") User user,
+                                                     @Param("cutoffDate") LocalDate cutoffDate);
+
+    // Delete old scheduled workouts (for free user data retention)
+    void deleteByUserAndStatusInAndScheduledDateBefore(User user, List<ScheduleStatus> statuses, LocalDate beforeDate);
 
     // =======================
     // BULK OPERATIONS

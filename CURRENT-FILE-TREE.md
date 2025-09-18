@@ -2,7 +2,7 @@
 
 ## 📊 Project Overview
 - **Total Java Files**: 277
-- **Total TypeScript/JavaScript Files** (excluding node_modules): 83
+- **Total TypeScript/JavaScript Files** (excluding node_modules): 84
 - **Total SQL Migration Files**: 13
 - **Total HTTP Test Files**: 5
 - **Backend Structure**: Spring Boot application with comprehensive modular architecture
@@ -14,6 +14,7 @@
 workout-tracker/
 ├── 📋 CURRENT-FILE-TREE.md
 ├── 📖 README.md
+├── 🔄 REFACTORING-PLAN.md
 ├── 📈 backend-workout-modules-diagram.md
 ├── 📈 project-file-tree.md
 ├── 📦 package.json
@@ -433,7 +434,7 @@ workout-tracker/
 │   │
 │   └── 🎯 target/ (build directory)
 │
-├── 🌐 frontend/ (TypeScript React - 83 source files)
+├── 🌐 frontend/ (TypeScript React - 84 source files)
 │   ├── 📖 README.md
 │   ├── 📦 package.json
 │   ├── 🔒 package-lock.json
@@ -462,7 +463,7 @@ workout-tracker/
 │   │   ├── 🧪 setupTests.js
 │   │   ├── 🎨 theme.js
 │   │   │
-│   │   ├── 🧩 components/ (40 files)
+│   │   ├── 🧩 components/ (41 files)
 │   │   │   ├── 🧪 ApiTestPanel.tsx
 │   │   │   ├── 📋 index.ts
 │   │   │   ├── 📅 CalendarPage/ (6 files)
@@ -599,6 +600,9 @@ workout-tracker/
 - **workoutPlanApi.ts** - Workout plan API service
 - **utils.ts** - Utility functions library
 
+### Documentation & Planning
+- **REFACTORING-PLAN.md** - Comprehensive 10-phase refactoring roadmap for optimization
+
 ### Infrastructure
 - **Scheduled Workouts System** - Complete scheduled workout management
 - **Exercise Favorites System** - User exercise favorites tracking
@@ -617,7 +621,7 @@ workout-tracker/
 - **🗺️ Mapping Layer**: 13 mappers for DTO transformations
 
 ### Frontend (TypeScript React)
-- **🧩 Component Architecture**: 40 reusable components with modern patterns
+- **🧩 Component Architecture**: 41 reusable components with modern patterns
 - **📄 Page Structure**: 15 pages covering all user workflows
 - **🔄 State Management**: Context-based state with custom hooks
 - **🔌 API Integration**: Comprehensive service layer with type safety

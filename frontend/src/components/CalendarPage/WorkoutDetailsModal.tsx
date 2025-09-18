@@ -39,11 +39,17 @@ const WorkoutDetailsModal: React.FC<WorkoutDetailsModalProps> = ({
                                                                  }) => {
     if (!isOpen || !workoutResults) return null;
 
+    const formatPace = (pace: number): string => {
+        const mins = Math.floor(pace);
+        const secs = Math.round((pace - mins) * 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     // Calculate detailed target vs actual analysis
     const getDetailedAnalysis = (): CriterionDetail[] => {
         const details: CriterionDetail[] = [];
 
-        // Sets Analysis
+        // Sets Analysis (applies to all exercise types)
         if (exercise.targetSets) {
             const completedSets = workoutResults.sets.filter(s => s.completed).length;
             const percentage = (completedSets / exercise.targetSets) * 100;
@@ -60,232 +66,221 @@ const WorkoutDetailsModal: React.FC<WorkoutDetailsModalProps> = ({
             });
         }
 
+        // Exercise Type Specific Analysis
         if (exercise.exercise.isCardio) {
-            // Duration Analysis
-            const targetDuration = exercise.targetDurationMinutes || exercise.exercise.estimatedDurationMinutes;
-            if (targetDuration) {
-                const actualDuration = workoutResults.actualDurationMinutes || workoutResults.totalDurationMinutes;
-                const percentage = (actualDuration / targetDuration) * 100;
-
-                details.push({
-                    name: 'Duration',
-                    target: targetDuration,
-                    actual: actualDuration,
-                    status: actualDuration >= targetDuration ?
-                        (actualDuration >= targetDuration * 1.1 ? 'EXCEEDED' : 'MET') :
-                        (actualDuration >= targetDuration * 0.8 ? 'PARTIAL' : 'BELOW_TARGET'),
-                    displayText: `${actualDuration} of ${targetDuration}`,
-                    unit: 'minutes',
-                    percentage
-                });
-            }
-
-            // Distance Analysis
-            if (exercise.targetDistance || exercise.targetDistanceKm) {
-                const targetDistance = exercise.targetDistance ||
-                    (exercise.targetDistanceKm ? exercise.targetDistanceKm * 0.621371 : 0);
-                const actualDistance = workoutResults.actualDistanceKm ?
-                    workoutResults.actualDistanceKm * 0.621371 : 0;
-                const percentage = targetDistance > 0 ? (actualDistance / targetDistance) * 100 : 0;
-
-                details.push({
-                    name: 'Distance',
-                    target: targetDistance,
-                    actual: actualDistance,
-                    status: actualDistance >= targetDistance ?
-                        (actualDistance >= targetDistance * 1.05 ? 'EXCEEDED' : 'MET') :
-                        (actualDistance >= targetDistance * 0.9 ? 'PARTIAL' : 'BELOW_TARGET'),
-                    displayText: `${actualDistance.toFixed(1)} of ${targetDistance.toFixed(1)}`,
-                    unit: 'miles',
-                    percentage
-                });
-            }
-
-            // Pace Analysis (lower is better)
-            if (exercise.targetPace && workoutResults.actualPace) {
-                const percentage = (exercise.targetPace / workoutResults.actualPace) * 100; // Inverted for pace
-
-                details.push({
-                    name: 'Pace',
-                    target: exercise.targetPace,
-                    actual: workoutResults.actualPace,
-                    status: workoutResults.actualPace <= exercise.targetPace ?
-                        (workoutResults.actualPace <= exercise.targetPace * 0.95 ? 'EXCEEDED' : 'MET') :
-                        (workoutResults.actualPace <= exercise.targetPace * 1.1 ? 'PARTIAL' : 'BELOW_TARGET'),
-                    displayText: `${formatPace(workoutResults.actualPace)} vs ${formatPace(exercise.targetPace)}`,
-                    unit: 'min/mile',
-                    percentage
-                });
-            }
-
+            // CARDIO EXERCISE ANALYSIS
+            analyzeCardioPerformance(details);
         } else if (exercise.exercise.isIsometric) {
-            // Hold Duration Analysis
-            if (exercise.holdDurationSeconds) {
-                // Try multiple data sources for hold times
-                let totalActualHold = 0;
-                let actualHoldArray: number[] = [];
-
-                if (workoutResults.actualHoldDurations && workoutResults.actualHoldDurations.length > 0) {
-                    // Primary: Use actualHoldDurations array
-                    totalActualHold = workoutResults.actualHoldDurations.reduce((sum, hold) => sum + hold, 0);
-                    actualHoldArray = workoutResults.actualHoldDurations;
-                } else if (workoutResults.sets.some(set => set.isometricData?.holdDurationSeconds)) {
-                    // Fallback: Use set-level isometric data
-                    totalActualHold = workoutResults.sets.reduce((sum, set) =>
-                        sum + (set.isometricData?.holdDurationSeconds || 0), 0);
-                    actualHoldArray = workoutResults.sets
-                        .map(set => set.isometricData?.holdDurationSeconds || 0)
-                        .filter(hold => hold > 0);
-                } else {
-                    // Last resort: Use actualReps as hold time (for isometric, reps often represent seconds)
-                    totalActualHold = workoutResults.sets.reduce((sum, set) => sum + (set.actualReps || 0), 0);
-                    actualHoldArray = workoutResults.sets.map(set => set.actualReps || 0);
-                }
-
-                const expectedTotalHold = exercise.holdDurationSeconds * (exercise.targetSets || 3);
-                const percentage = (totalActualHold / expectedTotalHold) * 100;
-
-                details.push({
-                    name: 'Total Hold Time',
-                    target: expectedTotalHold,
-                    actual: totalActualHold,
-                    status: totalActualHold >= expectedTotalHold ?
-                        (totalActualHold >= expectedTotalHold * 1.1 ? 'EXCEEDED' : 'MET') :
-                        (totalActualHold >= expectedTotalHold * 0.8 ? 'PARTIAL' : 'BELOW_TARGET'),
-                    displayText: `${totalActualHold}s of ${expectedTotalHold}s`,
-                    unit: 'seconds',
-                    percentage
-                });
-
-                // Average Hold Analysis
-                if (actualHoldArray.length > 0) {
-                    const avgActualHold = totalActualHold / actualHoldArray.length;
-                    const avgPercentage = (avgActualHold / exercise.holdDurationSeconds) * 100;
-
-                    details.push({
-                        name: 'Average Hold Time',
-                        target: exercise.holdDurationSeconds,
-                        actual: Math.round(avgActualHold),
-                        status: avgActualHold >= exercise.holdDurationSeconds ?
-                            (avgActualHold >= exercise.holdDurationSeconds * 1.1 ? 'EXCEEDED' : 'MET') :
-                            (avgActualHold >= exercise.holdDurationSeconds * 0.8 ? 'PARTIAL' : 'BELOW_TARGET'),
-                        displayText: `${Math.round(avgActualHold)}s of ${exercise.holdDurationSeconds}s`,
-                        unit: 'seconds per set',
-                        percentage: avgPercentage
-                    });
-                }
-            }
-
+            // ISOMETRIC EXERCISE ANALYSIS
+            analyzeIsometricPerformance(details);
         } else {
-            // Strength Exercise Analysis
-
-            // Total Reps Analysis
-            if (exercise.targetReps) {
-                const targetReps = typeof exercise.targetReps === 'number' ?
-                    exercise.targetReps : parseInt(String(exercise.targetReps), 10);
-                const totalActualReps = workoutResults.sets.reduce((sum, set) => sum + set.actualReps, 0);
-                const expectedTotalReps = targetReps * workoutResults.sets.length;
-                const percentage = (totalActualReps / expectedTotalReps) * 100;
-
-                details.push({
-                    name: 'Total Reps',
-                    target: expectedTotalReps,
-                    actual: totalActualReps,
-                    status: totalActualReps >= expectedTotalReps ?
-                        (totalActualReps >= expectedTotalReps * 1.1 ? 'EXCEEDED' : 'MET') :
-                        (totalActualReps >= expectedTotalReps * 0.8 ? 'PARTIAL' : 'BELOW_TARGET'),
-                    displayText: `${totalActualReps} of ${expectedTotalReps}`,
-                    unit: 'reps',
-                    percentage
-                });
-
-                // Rep Consistency Analysis
-                const setConsistency = workoutResults.sets.filter(set =>
-                    set.actualReps >= targetReps).length;
-                const consistencyPercentage = (setConsistency / workoutResults.sets.length) * 100;
-
-                details.push({
-                    name: 'Rep Consistency',
-                    target: workoutResults.sets.length,
-                    actual: setConsistency,
-                    status: setConsistency === workoutResults.sets.length ? 'MET' :
-                        setConsistency >= workoutResults.sets.length * 0.8 ? 'PARTIAL' : 'BELOW_TARGET',
-                    displayText: `${setConsistency} of ${workoutResults.sets.length} sets`,
-                    unit: 'sets at target',
-                    percentage: consistencyPercentage
-                });
-            }
-
-            // Weight Analysis
-            if (exercise.targetWeight && exercise.targetWeight > 0) {
-                const maxActualWeight = Math.max(...workoutResults.sets.map(set => set.actualWeight || 0));
-                const percentage = (maxActualWeight / exercise.targetWeight) * 100;
-
-                details.push({
-                    name: 'Max Weight',
-                    target: exercise.targetWeight,
-                    actual: maxActualWeight,
-                    status: maxActualWeight >= exercise.targetWeight ?
-                        (maxActualWeight > exercise.targetWeight * 1.05 ? 'EXCEEDED' : 'MET') :
-                        (maxActualWeight >= exercise.targetWeight * 0.9 ? 'PARTIAL' : 'BELOW_TARGET'),
-                    displayText: `${maxActualWeight} of ${exercise.targetWeight}`,
-                    unit: exercise.targetWeightUnit || 'lbs',
-                    percentage
-                });
-
-                // Weight Consistency
-                const weightConsistency = workoutResults.sets.filter(set => {
-                    const targetWeight = exercise.targetWeight;
-                    if (targetWeight === undefined) return false;
-                    return (set.actualWeight || 0) >= targetWeight;
-                }).length;
-                const weightConsistencyPercentage = (weightConsistency / workoutResults.sets.length) * 100;
-
-                details.push({
-                    name: 'Weight Consistency',
-                    target: workoutResults.sets.length,
-                    actual: weightConsistency,
-                    status: weightConsistency === workoutResults.sets.length ? 'MET' :
-                        weightConsistency >= workoutResults.sets.length * 0.8 ? 'PARTIAL' : 'BELOW_TARGET',
-                    displayText: `${weightConsistency} of ${workoutResults.sets.length} sets`,
-                    unit: 'sets at target weight',
-                    percentage: weightConsistencyPercentage
-                });
-            }
-
-            // RPE Analysis
-            if (exercise.targetRpe) {
-                const rpeValues = workoutResults.sets
-                    .filter(set => set.rpe && set.rpe > 0)
-                    .map(set => set.rpe!);
-
-                if (rpeValues.length > 0) {
-                    const avgRpe = rpeValues.reduce((sum, rpe) => sum + rpe, 0) / rpeValues.length;
-                    // For RPE, lower is better (less perceived exertion for same work)
-                    const percentage = (exercise.targetRpe / avgRpe) * 100;
-
-                    details.push({
-                        name: 'Average RPE',
-                        target: exercise.targetRpe,
-                        actual: Math.round(avgRpe * 10) / 10,
-                        status: avgRpe <= exercise.targetRpe ?
-                            (avgRpe <= exercise.targetRpe - 1 ? 'EXCEEDED' : 'MET') :
-                            (avgRpe <= exercise.targetRpe + 1 ? 'PARTIAL' : 'BELOW_TARGET'),
-                        displayText: `${(Math.round(avgRpe * 10) / 10)} vs ${exercise.targetRpe}`,
-                        unit: 'effort level',
-                        percentage
-                    });
-                }
-            }
+            // STRENGTH EXERCISE ANALYSIS
+            analyzeStrengthPerformance(details);
         }
 
         return details;
     };
 
-    const formatPace = (pace: number): string => {
-        const mins = Math.floor(pace);
-        const secs = Math.round((pace - mins) * 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    // Cardio Exercise Analysis
+    const analyzeCardioPerformance = (details: CriterionDetail[]) => {
+        // Duration Analysis
+        const targetDuration = exercise.targetDurationMinutes || exercise.exercise.estimatedDurationMinutes;
+        if (targetDuration) {
+            const actualDuration = workoutResults.actualDurationMinutes || workoutResults.totalDurationMinutes;
+            const percentage = (actualDuration / targetDuration) * 100;
+
+            details.push({
+                name: 'Duration',
+                target: targetDuration,
+                actual: actualDuration,
+                status: actualDuration >= targetDuration ?
+                    (actualDuration >= targetDuration * 1.1 ? 'EXCEEDED' : 'MET') :
+                    (actualDuration >= targetDuration * 0.8 ? 'PARTIAL' : 'BELOW_TARGET'),
+                displayText: `${actualDuration} of ${targetDuration}`,
+                unit: 'minutes',
+                percentage
+            });
+        }
+
+        // Distance Analysis
+        if (exercise.targetDistance || exercise.targetDistanceKm) {
+            const targetDistance = exercise.targetDistance ||
+                (exercise.targetDistanceKm ? exercise.targetDistanceKm * 0.621371 : 0);
+            const actualDistance = workoutResults.actualDistanceKm ?
+                workoutResults.actualDistanceKm * 0.621371 : 0;
+            const percentage = targetDistance > 0 ? (actualDistance / targetDistance) * 100 : 0;
+
+            details.push({
+                name: 'Distance',
+                target: targetDistance,
+                actual: actualDistance,
+                status: actualDistance >= targetDistance ?
+                    (actualDistance >= targetDistance * 1.05 ? 'EXCEEDED' : 'MET') :
+                    (actualDistance >= targetDistance * 0.9 ? 'PARTIAL' : 'BELOW_TARGET'),
+                displayText: `${actualDistance.toFixed(1)} of ${targetDistance.toFixed(1)}`,
+                unit: 'miles',
+                percentage
+            });
+        }
+
+        // Pace Analysis (lower is better)
+        if (exercise.targetPace && workoutResults.actualPace) {
+            const percentage = (exercise.targetPace / workoutResults.actualPace) * 100; // Inverted for pace
+
+            details.push({
+                name: 'Pace',
+                target: exercise.targetPace,
+                actual: workoutResults.actualPace,
+                status: workoutResults.actualPace <= exercise.targetPace ?
+                    (workoutResults.actualPace <= exercise.targetPace * 0.95 ? 'EXCEEDED' : 'MET') :
+                    (workoutResults.actualPace <= exercise.targetPace * 1.1 ? 'PARTIAL' : 'BELOW_TARGET'),
+                displayText: `${formatPace(workoutResults.actualPace)} vs ${formatPace(exercise.targetPace)}`,
+                unit: 'min/mile',
+                percentage
+            });
+        }
+    };
+
+    // Isometric Exercise Analysis
+    const analyzeIsometricPerformance = (details: CriterionDetail[]) => {
+        if (exercise.holdDurationSeconds) {
+            // For isometric exercises, actualReps contains the hold time in seconds
+            const totalActualHold = workoutResults.sets.reduce((sum, set) => sum + (set.actualReps || 0), 0);
+            const expectedTotalHold = exercise.holdDurationSeconds * (exercise.targetSets || 1);
+            const percentage = (totalActualHold / expectedTotalHold) * 100;
+
+            details.push({
+                name: 'Total Hold Time',
+                target: expectedTotalHold,
+                actual: totalActualHold,
+                status: totalActualHold >= expectedTotalHold ?
+                    (totalActualHold >= expectedTotalHold * 1.1 ? 'EXCEEDED' : 'MET') :
+                    (totalActualHold >= expectedTotalHold * 0.8 ? 'PARTIAL' : 'BELOW_TARGET'),
+                displayText: `${totalActualHold}s of ${expectedTotalHold}s`,
+                unit: 'seconds',
+                percentage
+            });
+
+            // Average Hold Analysis
+            if (workoutResults.sets.length > 0) {
+                const avgActualHold = totalActualHold / workoutResults.sets.length;
+                const avgPercentage = (avgActualHold / exercise.holdDurationSeconds) * 100;
+
+                details.push({
+                    name: 'Average Hold Time',
+                    target: exercise.holdDurationSeconds,
+                    actual: Math.round(avgActualHold),
+                    status: avgActualHold >= exercise.holdDurationSeconds ?
+                        (avgActualHold >= exercise.holdDurationSeconds * 1.1 ? 'EXCEEDED' : 'MET') :
+                        (avgActualHold >= exercise.holdDurationSeconds * 0.8 ? 'PARTIAL' : 'BELOW_TARGET'),
+                    displayText: `${Math.round(avgActualHold)}s of ${exercise.holdDurationSeconds}s`,
+                    unit: 'seconds per set',
+                    percentage: avgPercentage
+                });
+            }
+        }
+    };
+
+    // Strength Exercise Analysis
+    const analyzeStrengthPerformance = (details: CriterionDetail[]) => {
+        // Total Reps Analysis
+        if (exercise.targetReps) {
+            const targetReps = typeof exercise.targetReps === 'number' ?
+                exercise.targetReps : parseInt(String(exercise.targetReps), 10);
+            const totalActualReps = workoutResults.sets.reduce((sum, set) => sum + set.actualReps, 0);
+            const expectedTotalReps = targetReps * workoutResults.sets.length;
+            const percentage = (totalActualReps / expectedTotalReps) * 100;
+
+            details.push({
+                name: 'Total Reps',
+                target: expectedTotalReps,
+                actual: totalActualReps,
+                status: totalActualReps >= expectedTotalReps ?
+                    (totalActualReps >= expectedTotalReps * 1.1 ? 'EXCEEDED' : 'MET') :
+                    (totalActualReps >= expectedTotalReps * 0.8 ? 'PARTIAL' : 'BELOW_TARGET'),
+                displayText: `${totalActualReps} of ${expectedTotalReps}`,
+                unit: 'reps',
+                percentage
+            });
+
+            // Rep Consistency Analysis
+            const setConsistency = workoutResults.sets.filter(set =>
+                set.actualReps >= targetReps).length;
+            const consistencyPercentage = (setConsistency / workoutResults.sets.length) * 100;
+
+            details.push({
+                name: 'Rep Consistency',
+                target: workoutResults.sets.length,
+                actual: setConsistency,
+                status: setConsistency === workoutResults.sets.length ? 'MET' :
+                    setConsistency >= workoutResults.sets.length * 0.8 ? 'PARTIAL' : 'BELOW_TARGET',
+                displayText: `${setConsistency} of ${workoutResults.sets.length} sets`,
+                unit: 'sets at target',
+                percentage: consistencyPercentage
+            });
+        }
+
+        // Weight Analysis
+        if (exercise.targetWeight && exercise.targetWeight > 0) {
+            const maxActualWeight = Math.max(...workoutResults.sets.map(set => set.actualWeight || 0));
+            const percentage = (maxActualWeight / exercise.targetWeight) * 100;
+
+            details.push({
+                name: 'Max Weight',
+                target: exercise.targetWeight,
+                actual: maxActualWeight,
+                status: maxActualWeight >= exercise.targetWeight ?
+                    (maxActualWeight > exercise.targetWeight * 1.05 ? 'EXCEEDED' : 'MET') :
+                    (maxActualWeight >= exercise.targetWeight * 0.9 ? 'PARTIAL' : 'BELOW_TARGET'),
+                displayText: `${maxActualWeight} of ${exercise.targetWeight}`,
+                unit: exercise.targetWeightUnit || 'lbs',
+                percentage
+            });
+
+            // Weight Consistency
+            const weightConsistency = workoutResults.sets.filter(set => {
+                const targetWeight = exercise.targetWeight;
+                if (targetWeight === undefined) return false;
+                return (set.actualWeight || 0) >= targetWeight;
+            }).length;
+            const weightConsistencyPercentage = (weightConsistency / workoutResults.sets.length) * 100;
+
+            details.push({
+                name: 'Weight Consistency',
+                target: workoutResults.sets.length,
+                actual: weightConsistency,
+                status: weightConsistency === workoutResults.sets.length ? 'MET' :
+                    weightConsistency >= workoutResults.sets.length * 0.8 ? 'PARTIAL' : 'BELOW_TARGET',
+                displayText: `${weightConsistency} of ${workoutResults.sets.length} sets`,
+                unit: 'sets at target weight',
+                percentage: weightConsistencyPercentage
+            });
+        }
+
+        // RPE Analysis
+        if (exercise.targetRpe) {
+            const rpeValues = workoutResults.sets
+                .filter(set => set.rpe && set.rpe > 0)
+                .map(set => set.rpe!);
+
+            if (rpeValues.length > 0) {
+                const avgRpe = rpeValues.reduce((sum, rpe) => sum + rpe, 0) / rpeValues.length;
+                // For RPE, lower is better (less perceived exertion for same work)
+                const percentage = (exercise.targetRpe / avgRpe) * 100;
+
+                details.push({
+                    name: 'Average RPE',
+                    target: exercise.targetRpe,
+                    actual: Math.round(avgRpe * 10) / 10,
+                    status: avgRpe <= exercise.targetRpe ?
+                        (avgRpe <= exercise.targetRpe - 1 ? 'EXCEEDED' : 'MET') :
+                        (avgRpe <= exercise.targetRpe + 1 ? 'PARTIAL' : 'BELOW_TARGET'),
+                    displayText: `${(Math.round(avgRpe * 10) / 10)} vs ${exercise.targetRpe}`,
+                    unit: 'effort level',
+                    percentage
+                });
+            }
+        }
     };
 
     const getStatusIcon = (status: string) => {
@@ -448,12 +443,17 @@ const WorkoutDetailsModal: React.FC<WorkoutDetailsModalProps> = ({
 
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                         <div>
-                                            <span className="text-gray-600">Reps:</span>
+    <span className="text-gray-600">
+        {exercise.exercise.isCardio ? 'Duration:' :
+            exercise.exercise.isIsometric ? 'Hold Time:' : 'Reps:'}
+    </span>
                                             <span className={`ml-2 font-medium ${
                                                 set.actualReps >= set.targetReps ? 'text-green-600' : 'text-red-600'
                                             }`}>
-                                                {set.actualReps}/{set.targetReps}
-                                            </span>
+        {set.actualReps}/{exercise.exercise.isIsometric ? exercise.holdDurationSeconds : set.targetReps}
+                                                {exercise.exercise.isCardio ? ' min' :
+                                                    exercise.exercise.isIsometric ? 's' : ''}
+    </span>
                                         </div>
 
                                         {set.actualWeight && (

@@ -487,7 +487,21 @@ export class CalendarApiService {
      */
     async getBatchWorkoutResults(exerciseIds: string[]): Promise<Record<string, WorkoutResults>> {
         try {
+            console.log('🔍 RAW: Requesting batch results for:', exerciseIds);
+
             const response = await apiClient.post<Record<string, WorkoutResults>>('/api/calendar/results/batch', exerciseIds);
+
+            // Add this debug logging
+            console.log('🔍 RAW batch results from API:', response);
+            console.log('🔍 First result structure:', Object.keys(response)[0] ? response[Object.keys(response)[0]] : 'No results');
+
+            if (Object.keys(response).length > 0) {
+                const firstResult = response[Object.keys(response)[0]];
+                console.log('🔍 First result sets data:', firstResult?.sets);
+                console.log('🔍 Sets array length:', firstResult?.sets?.length || 0);
+                console.log('🔍 All fields in first result:', Object.keys(firstResult || {}));
+            }
+
             return response;
         } catch (error) {
             console.error('Failed to fetch batch workout results:', error);

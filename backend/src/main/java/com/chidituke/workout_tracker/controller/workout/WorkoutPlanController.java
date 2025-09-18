@@ -8,14 +8,13 @@ import com.chidituke.workout_tracker.dto.response.workout_plan.WorkoutPlanSearch
 import com.chidituke.workout_tracker.exceptions.workout_plan.WorkoutPlanNotFoundException;
 import com.chidituke.workout_tracker.exceptions.common.UnauthorizedOperationException;
 import com.chidituke.workout_tracker.exceptions.subscription.SubscriptionLimitExceededException;
-import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.service.user.UserService;
 import com.chidituke.workout_tracker.model.workout.PlanExercise;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan.DifficultyLevel;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan.WorkoutType;
 import com.chidituke.workout_tracker.service.workout.WorkoutPlanService;
 import com.chidituke.workout_tracker.service.user.SubscriptionService;
-import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
+import com.chidituke.workout_tracker.repository.scheduled_workouts.ScheduledWorkoutRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

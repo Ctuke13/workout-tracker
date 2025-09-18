@@ -91,6 +91,7 @@ public class SecurityConfig {
                     auth.requestMatchers("/api/public/**").permitAll();
                     auth.requestMatchers("/api/subscriptions/test/**").permitAll();
                     auth.requestMatchers("/api/users/professionals").permitAll();
+                    auth.requestMatchers("/api/calendar/debug/**").permitAll();
 
                     // 🌍 PUBLIC EXERCISE LIBRARY - Browse, search, view exercises
                     auth.requestMatchers(HttpMethod.GET, "/api/exercises").permitAll();                    // Browse/search exercises

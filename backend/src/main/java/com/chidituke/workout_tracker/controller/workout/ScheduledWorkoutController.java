@@ -16,10 +16,13 @@ import com.chidituke.workout_tracker.exceptions.scheduled_workout.InvalidWorkout
 import com.chidituke.workout_tracker.exceptions.subscription.SubscriptionLimitExceededException;
 import com.chidituke.workout_tracker.dto.request.scheduled_workouts.IndividualExerciseRequest;
 import com.chidituke.workout_tracker.model.user.User;
-import com.chidituke.workout_tracker.service.workout.ScheduledWorkoutService;
+import com.chidituke.workout_tracker.model.workout.ScheduledWorkout;
+import com.chidituke.workout_tracker.service.scheduled_workouts.ScheduledWorkoutQueryService;
+import com.chidituke.workout_tracker.service.scheduled_workouts.ScheduledWorkoutService;
+import com.chidituke.workout_tracker.service.scheduled_workouts.WorkoutExecutionService;
 import com.chidituke.workout_tracker.service.user.SubscriptionService;
 import com.chidituke.workout_tracker.service.user.UserService;
-import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
+import com.chidituke.workout_tracker.repository.scheduled_workouts.ScheduledWorkoutRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -28,7 +31,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.Data;
@@ -69,6 +71,7 @@ public class ScheduledWorkoutController {
     private final SubscriptionService subscriptionService;
     private final UserService userService;
     private final ScheduledWorkoutRepository scheduledWorkoutRepository;
+    private final ScheduledWorkoutQueryService queryService;
 
     // ===========================================================================================
     // CALENDAR VIEW ENDPOINTS
@@ -94,6 +97,87 @@ public class ScheduledWorkoutController {
         String username = authentication.getName();
         CalendarViewResponse calendar = scheduledWorkoutService.getCalendarView(username, startDate, endDate);
         return ResponseEntity.ok(calendar);
+    }
+
+    /**
+     * DEBUG: Get scheduled workouts without transformation
+     */
+    /**
+     * DEBUG: Get scheduled workouts without transformation
+     */
+    @GetMapping("/debug/workouts")
+    @Operation(summary = "Debug workout retrieval",
+            description = "Debug endpoint to see raw workout data")
+    public ResponseEntity<?> debugWorkouts(Authentication authentication) {
+        try {
+            // For debugging, let's hardcode the username since we know from the database
+            // that user_id = 1 has the exercises
+            String username = "testuser"; // Replace with your actual username
+
+            log.info("DEBUG: Using hardcoded username: {}", username);
+
+            // Get user
+            User user = userService.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("User not found: " + username));
+
+            log.info("DEBUG: User ID resolved to: {}", user.getId());
+
+            // Get today's date range
+            LocalDate today = LocalDate.now();
+            LocalDate startDate = today.minusDays(3);
+            LocalDate endDate = today.plusDays(3);
+
+            log.info("DEBUG: Querying from {} to {} for user {}", startDate, endDate, username);
+
+            // Use existing repository method
+            List<ScheduledWorkout> workouts = scheduledWorkoutRepository
+                    .findByUserAndScheduledDateBetweenOrderByScheduledDateAsc(user, startDate, endDate);
+
+            log.info("DEBUG: Repository returned {} workouts directly", workouts.size());
+
+            // Log each workout
+            workouts.forEach(workout -> {
+                log.info("DEBUG: Workout ID: {}, ExerciseID: {}, Date: {}, Deleted: {}, Status: {}",
+                        workout.getId(),
+                        workout.getExercise() != null ? workout.getExercise().getId() : "NULL",
+                        workout.getScheduledDate(),
+                        workout.getDeleted(),
+                        workout.getStatus());
+            });
+
+            // Create simple response
+            List<Map<String, Object>> response = workouts.stream()
+                    .map(workout -> {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("id", workout.getId());
+                        map.put("userId", workout.getUser().getId());
+                        map.put("exerciseId", workout.getExercise() != null ? workout.getExercise().getId() : null);
+                        map.put("exerciseName", workout.getExercise() != null ? workout.getExercise().getExerciseName() : null);
+                        map.put("scheduledDate", workout.getScheduledDate().toString());
+                        map.put("deleted", workout.getDeleted());
+                        map.put("status", workout.getStatus().toString());
+                        map.put("createdAt", workout.getCreatedAt() != null ? workout.getCreatedAt().toString() : null);
+                        return map;
+                    })
+                    .collect(Collectors.toList());
+
+            log.info("DEBUG: Returning {} workout responses", response.size());
+
+            return ResponseEntity.ok(Map.of(
+                    "totalFound", workouts.size(),
+                    "workouts", response,
+                    "username", username,
+                    "userId", user.getId(),
+                    "debugNote", "Using hardcoded username for debugging"
+            ));
+
+        } catch (Exception e) {
+            log.error("DEBUG: Error: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", e.getMessage(),
+                    "stackTrace", e.getStackTrace()[0].toString()
+            ));
+        }
     }
 
     /**
@@ -170,11 +254,16 @@ public class ScheduledWorkoutController {
             Authentication authentication) {
 
         String username = authentication.getName();
-        List<ScheduledWorkoutResponse> exercises = scheduledWorkoutService
-                .getScheduledExercisesForDateRange(username, startDate, endDate);
+        
+        User user = userService.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+
+        List<ScheduledWorkoutResponse> exercises = queryService
+                .getWorkoutsForDateRange(user.getId(), startDate, endDate);
 
         log.info("Found {} scheduled exercises for user {} from {} to {}",
                 exercises.size(), username, startDate, endDate);
+
         return ResponseEntity.ok(exercises);
     }
 
@@ -929,7 +1018,7 @@ public class ScheduledWorkoutController {
                     exerciseId, username);
 
             // Convert request to completion data
-            ScheduledWorkoutService.WorkoutCompletionData completionData = mapToCompletionData(request);
+            WorkoutExecutionService.WorkoutCompletionData completionData = mapToCompletionData(request);
 
             ScheduledWorkoutResponse response = scheduledWorkoutService
                     .markExerciseCompletedWithPerformance(username, exerciseId, completionData);
@@ -1299,13 +1388,13 @@ public class ScheduledWorkoutController {
     /**
      * ✅ NEW: Convert request to completion data
      */
-    private ScheduledWorkoutService.WorkoutCompletionData mapToCompletionData(WorkoutCompletionRequest request) {
+    private WorkoutExecutionService.WorkoutCompletionData mapToCompletionData(WorkoutCompletionRequest request) {
 
         // Map sets data
-        List<ScheduledWorkoutService.CompletedSetData> sets = new ArrayList<>();
+        List<WorkoutExecutionService.CompletedSetData> sets = new ArrayList<>();
         if (request.getSets() != null) {
             sets = request.getSets().stream()
-                    .map(setRequest -> ScheduledWorkoutService.CompletedSetData.builder()
+                    .map(setRequest -> WorkoutExecutionService.CompletedSetData.builder()
                             .setNumber(setRequest.getSetNumber())
                             .targetReps(setRequest.getTargetReps())
                             .actualReps(setRequest.getActualReps())
@@ -1322,7 +1411,7 @@ public class ScheduledWorkoutController {
                     .collect(Collectors.toList());
         }
 
-        return ScheduledWorkoutService.WorkoutCompletionData.builder()
+        return WorkoutExecutionService.WorkoutCompletionData.builder()
                 .exerciseId(request.getExerciseId())
                 .scheduledExerciseId(request.getScheduledExerciseId())
                 .completedAt(request.getCompletedAt() != null ?

@@ -1,7 +1,13 @@
 import React from 'react';
 import {Clock, Eye, Target, TrendingUp, TrendingDown, Minus, CheckCircle, XCircle} from 'lucide-react';
 import {ScheduledExercise, WorkoutResults} from '../../types/exercise';
-
+import {analyzeWorkout} from '../../utils/workoutPerformanceAnalyzer';
+import {
+    getPerformanceColor,
+    getPerformanceIcon,
+    getPerformanceMessage,
+    getStatusIcon
+} from '../../utils/workoutDisplayHelpers';
 
 interface CompletedWorkoutDisplayProps {
     exercise: ScheduledExercise;
@@ -9,342 +15,22 @@ interface CompletedWorkoutDisplayProps {
     onViewDetails: () => void;
 }
 
-// Enhanced performance evaluation that checks ALL targets
-const evaluateTargetAchievement = (exercise: ScheduledExercise, results: WorkoutResults): {
-    overall: 'EXCEEDED' | 'MET' | 'PARTIAL' | 'BELOW_TARGET';
-    criteria: Array<{
-        name: string;
-        target: any;
-        actual: any;
-        status: 'EXCEEDED' | 'MET' | 'PARTIAL' | 'BELOW_TARGET' | 'NOT_SET';
-        weight: number;
-        displayText: string;
-    }>;
-    achievementScore: number;
-} => {
-    const criteria: Array<{
-        name: string;
-        target: any;
-        actual: any;
-        status: 'EXCEEDED' | 'MET' | 'PARTIAL' | 'BELOW_TARGET' | 'NOT_SET';
-        weight: number;
-        displayText: string;
-    }> = [];
-
-    let totalWeight = 0;
-    let achievedWeight = 0;
-
-    // 1. Sets criterion (always applicable)
-    if (exercise.targetSets) {
-        const completedSets = results.sets.filter(s => s.completed).length;
-        const setsStatus = completedSets >= exercise.targetSets ? 'MET' :
-            completedSets >= exercise.targetSets * 0.8 ? 'PARTIAL' : 'BELOW_TARGET';
-
-        criteria.push({
-            name: 'Sets',
-            target: exercise.targetSets,
-            actual: completedSets,
-            status: setsStatus,
-            weight: 0.25,
-            displayText: `${completedSets}/${exercise.targetSets} sets`
-        });
-
-        totalWeight += 0.25;
-        if (setsStatus === 'MET') achievedWeight += 0.25;
-        else if (setsStatus === 'PARTIAL') achievedWeight += 0.15;
-    }
-
-    // 2. Exercise type specific criteria
-    if (exercise.exercise.isCardio) {
-        // Duration criterion for cardio
-        if (exercise.targetDurationMinutes || exercise.exercise.estimatedDurationMinutes) {
-            const targetDuration = exercise.targetDurationMinutes || exercise.exercise.estimatedDurationMinutes!;
-            const actualDuration = results.actualDurationMinutes || results.totalDurationMinutes;
-
-            const durationStatus = actualDuration >= targetDuration ?
-                (actualDuration >= targetDuration * 1.1 ? 'EXCEEDED' : 'MET') :
-                (actualDuration >= targetDuration * 0.8 ? 'PARTIAL' : 'BELOW_TARGET');
-
-            criteria.push({
-                name: 'Duration',
-                target: targetDuration,
-                actual: actualDuration,
-                status: durationStatus,
-                weight: 0.4,
-                displayText: `${actualDuration}/${targetDuration} min`
-            });
-
-            totalWeight += 0.4;
-            if (durationStatus === 'EXCEEDED') achievedWeight += 0.44; // 110% credit for exceeding
-            else if (durationStatus === 'MET') achievedWeight += 0.4;
-            else if (durationStatus === 'PARTIAL') achievedWeight += 0.25;
-        }
-
-        // Distance criterion (if set)
-        if (exercise.targetDistance || exercise.targetDistanceKm) {
-            const targetDistance = exercise.targetDistance ||
-                (exercise.targetDistanceKm ? exercise.targetDistanceKm * 0.621371 : 0);
-            const actualDistance = results.actualDistanceKm ?
-                results.actualDistanceKm * 0.621371 : 0;
-
-            const distanceStatus = actualDistance >= targetDistance ?
-                (actualDistance >= targetDistance * 1.05 ? 'EXCEEDED' : 'MET') :
-                (actualDistance >= targetDistance * 0.9 ? 'PARTIAL' : 'BELOW_TARGET');
-
-            criteria.push({
-                name: 'Distance',
-                target: targetDistance,
-                actual: actualDistance,
-                status: distanceStatus,
-                weight: 0.25,
-                displayText: `${actualDistance.toFixed(1)}/${targetDistance.toFixed(1)} mi`
-            });
-
-            totalWeight += 0.25;
-            if (distanceStatus === 'EXCEEDED') achievedWeight += 0.275;
-            else if (distanceStatus === 'MET') achievedWeight += 0.25;
-            else if (distanceStatus === 'PARTIAL') achievedWeight += 0.15;
-        }
-
-        // Pace criterion (if set)
-        if (exercise.targetPace) {
-            const actualPace = results.actualPace || 0;
-            // For pace, lower is better
-            const paceStatus = actualPace <= exercise.targetPace ?
-                (actualPace <= exercise.targetPace * 0.95 ? 'EXCEEDED' : 'MET') :
-                (actualPace <= exercise.targetPace * 1.1 ? 'PARTIAL' : 'BELOW_TARGET');
-
-            const formatPace = (pace: number) => {
-                const mins = Math.floor(pace);
-                const secs = Math.round((pace - mins) * 60);
-                return `${mins}:${secs.toString().padStart(2, '0')}`;
-            };
-
-            criteria.push({
-                name: 'Pace',
-                target: exercise.targetPace,
-                actual: actualPace,
-                status: paceStatus,
-                weight: 0.1,
-                displayText: `${formatPace(actualPace)}/${formatPace(exercise.targetPace)} /mi`
-            });
-
-            totalWeight += 0.1;
-            if (paceStatus === 'EXCEEDED') achievedWeight += 0.11;
-            else if (paceStatus === 'MET') achievedWeight += 0.1;
-            else if (paceStatus === 'PARTIAL') achievedWeight += 0.05;
-        }
-
-    } else if (exercise.exercise.isIsometric) {
-        // Hold duration criterion
-        if (exercise.holdDurationSeconds) {
-            // For isometric exercises, actualReps contains the hold time in seconds
-            const totalActualHold = results.sets.reduce((sum, set) => sum + (set.actualReps || 0), 0);
-            const expectedTotalHold = exercise.holdDurationSeconds * (exercise.targetSets || 3);
-
-            const holdStatus = totalActualHold >= expectedTotalHold ?
-                (totalActualHold >= expectedTotalHold * 1.1 ? 'EXCEEDED' : 'MET') :
-                (totalActualHold >= expectedTotalHold * 0.8 ? 'PARTIAL' : 'BELOW_TARGET');
-
-            criteria.push({
-                name: 'Hold Time',
-                target: expectedTotalHold,
-                actual: totalActualHold,
-                status: holdStatus,
-                weight: 0.5,
-                displayText: `${totalActualHold}/${expectedTotalHold}s total`
-            });
-
-            totalWeight += 0.5;
-            if (holdStatus === 'EXCEEDED') achievedWeight += 0.55;
-            else if (holdStatus === 'MET') achievedWeight += 0.5;
-            else if (holdStatus === 'PARTIAL') achievedWeight += 0.3;
-        }
-
-    } else {
-        // Strength exercise criteria
-
-        // Reps criterion
-        if (exercise.targetReps) {
-            const targetReps = typeof exercise.targetReps === 'number' ?
-                exercise.targetReps : parseInt(String(exercise.targetReps), 10);
-
-            const repsAchieved = results.sets.every(set => set.actualReps >= targetReps);
-            const totalActualReps = results.sets.reduce((sum, set) => sum + set.actualReps, 0);
-            const expectedTotalReps = targetReps * results.sets.length;
-
-            const repsRatio = totalActualReps / expectedTotalReps;
-            const repsStatus = repsRatio >= 1.0 ?
-                (repsRatio >= 1.1 ? 'EXCEEDED' : 'MET') :
-                (repsRatio >= 0.8 ? 'PARTIAL' : 'BELOW_TARGET');
-
-            criteria.push({
-                name: 'Reps',
-                target: expectedTotalReps,
-                actual: totalActualReps,
-                status: repsStatus,
-                weight: 0.4,
-                displayText: `${totalActualReps}/${expectedTotalReps} total reps`
-            });
-
-            totalWeight += 0.4;
-            if (repsStatus === 'EXCEEDED') achievedWeight += 0.44;
-            else if (repsStatus === 'MET') achievedWeight += 0.4;
-            else if (repsStatus === 'PARTIAL') achievedWeight += 0.25;
-        }
-
-        // Weight criterion (if set)
-        if (exercise.targetWeight && exercise.targetWeight > 0) {
-            const weightAchieved = results.sets.every(set =>
-                (set.actualWeight || 0) >= exercise.targetWeight!);
-            const maxActualWeight = Math.max(...results.sets.map(set => set.actualWeight || 0));
-
-            const weightStatus = weightAchieved ?
-                (maxActualWeight > exercise.targetWeight * 1.05 ? 'EXCEEDED' : 'MET') :
-                (maxActualWeight >= exercise.targetWeight * 0.9 ? 'PARTIAL' : 'BELOW_TARGET');
-
-            criteria.push({
-                name: 'Weight',
-                target: exercise.targetWeight,
-                actual: maxActualWeight,
-                status: weightStatus,
-                weight: 0.3,
-                displayText: `${maxActualWeight}/${exercise.targetWeight} ${exercise.targetWeightUnit || 'lbs'}`
-            });
-
-            totalWeight += 0.3;
-            if (weightStatus === 'EXCEEDED') achievedWeight += 0.33;
-            else if (weightStatus === 'MET') achievedWeight += 0.3;
-            else if (weightStatus === 'PARTIAL') achievedWeight += 0.18;
-        }
-
-        // RPE criterion (if set) - lower is better for same performance
-        if (exercise.targetRpe) {
-            const avgActualRpe = results.sets
-                .filter(set => set.rpe)
-                .reduce((sum, set, _, arr) => sum + (set.rpe || 0) / arr.length, 0);
-
-            if (avgActualRpe > 0) {
-                const rpeStatus = avgActualRpe <= exercise.targetRpe ?
-                    (avgActualRpe <= exercise.targetRpe - 1 ? 'EXCEEDED' : 'MET') :
-                    (avgActualRpe <= exercise.targetRpe + 1 ? 'PARTIAL' : 'BELOW_TARGET');
-
-                criteria.push({
-                    name: 'RPE',
-                    target: exercise.targetRpe,
-                    actual: avgActualRpe,
-                    status: rpeStatus,
-                    weight: 0.05,
-                    displayText: `${avgActualRpe.toFixed(1)}/${exercise.targetRpe} effort`
-                });
-
-                totalWeight += 0.05;
-                if (rpeStatus === 'EXCEEDED') achievedWeight += 0.055;
-                else if (rpeStatus === 'MET') achievedWeight += 0.05;
-                else if (rpeStatus === 'PARTIAL') achievedWeight += 0.025;
-            }
-        }
-    }
-
-    // Calculate overall achievement
-    const achievementScore = totalWeight > 0 ? (achievedWeight / totalWeight) * 100 : 0;
-
-    let overall: 'EXCEEDED' | 'MET' | 'PARTIAL' | 'BELOW_TARGET';
-    if (achievementScore >= 100) overall = 'EXCEEDED';
-    else if (achievementScore >= 90) overall = 'MET';
-    else if (achievementScore >= 70) overall = 'PARTIAL';
-    else overall = 'BELOW_TARGET';
-
-    return {overall, criteria, achievementScore};
-};
-
 const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                                                                              exercise,
                                                                              workoutResults,
                                                                              onViewDetails
                                                                          }) => {
     // Enhanced performance evaluation
-    const performanceEval = workoutResults ?
-        evaluateTargetAchievement(exercise, workoutResults) : null;
-
-    React.useEffect(() => {
-        if (workoutResults && exercise.exercise.isIsometric) {
-            console.log('HOLD TIME DEBUG:', {
-                exerciseName: exercise.exercise.name,
-                actualHoldDurations: workoutResults.actualHoldDurations,
-                sets: workoutResults.sets,
-                setsWithIsometricData: workoutResults.sets?.map(set => ({
-                    setNumber: set.setNumber,
-                    actualReps: set.actualReps,
-                    actualHoldSeconds: set.isometricData?.holdDurationSeconds,
-                    isometricData: set.isometricData
-                }))
-            });
-        }
-    }, [workoutResults, exercise]);
-
-    const getPerformanceColor = (rating: WorkoutResults['performanceRating']) => {
-        switch (rating) {
-            case 'EXCEEDED':
-                return 'text-green-600 bg-green-50 border-green-200';
-            case 'MET':
-                return 'text-blue-600 bg-blue-50 border-blue-200';
-            case 'PARTIAL':
-                return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-            case 'BELOW_TARGET':
-                return 'text-red-600 bg-red-50 border-red-200';
-            default:
-                return 'text-gray-600 bg-gray-50 border-gray-200';
-        }
-    };
-
-    const getPerformanceIcon = (rating: WorkoutResults['performanceRating']) => {
-        switch (rating) {
-            case 'EXCEEDED':
-                return <TrendingUp className="w-4 h-4"/>;
-            case 'MET':
-                return <Target className="w-4 h-4"/>;
-            case 'PARTIAL':
-                return <Minus className="w-4 h-4"/>;
-            case 'BELOW_TARGET':
-                return <TrendingDown className="w-4 h-4"/>;
-            default:
-                return <CheckCircle className="w-4 h-4"/>;
-        }
-    };
-
-    const getPerformanceMessage = (rating: WorkoutResults['performanceRating']) => {
-        switch (rating) {
-            case 'EXCEEDED':
-                return 'Exceeded targets!';
-            case 'MET':
-                return 'All targets achieved';
-            case 'PARTIAL':
-                return 'Most targets achieved';
-            case 'BELOW_TARGET':
-                return 'Some targets missed';
-            default:
-                return 'Completed';
-        }
-    };
+    const analysis = workoutResults ?
+        analyzeWorkout(exercise, workoutResults) : null;
 
     const getCriteriaIcon = (status: string) => {
-        switch (status) {
-            case 'EXCEEDED':
-                return <TrendingUp className="w-3 h-3 text-green-600"/>;
-            case 'MET':
-                return <CheckCircle className="w-3 h-3 text-blue-600"/>;
-            case 'PARTIAL':
-                return <Minus className="w-3 h-3 text-yellow-600"/>;
-            case 'BELOW_TARGET':
-                return <XCircle className="w-3 h-3 text-red-600"/>;
-            default:
-                return <Minus className="w-3 h-3 text-gray-400"/>;
-        }
+        const IconComponent = getStatusIcon(status);
+        return <IconComponent className="w-3 h-3"/>;
     };
 
     const renderEnhancedResults = () => {
-        if (!workoutResults || !performanceEval) return null;
+        if (!workoutResults || !analysis) return null;
 
         return (
             <div className="space-y-4">
@@ -353,18 +39,18 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Target Achievement</span>
                         <span className="text-lg font-bold text-gray-900">
-                            {Math.round(performanceEval.achievementScore)}%
+                            {Math.round(analysis.performance.achievementScore)}%
                         </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                             className={`h-2 rounded-full transition-all duration-300 ${
-                                performanceEval.achievementScore >= 100 ? 'bg-green-500' :
-                                    performanceEval.achievementScore >= 90 ? 'bg-blue-500' :
-                                        performanceEval.achievementScore >= 70 ? 'bg-yellow-500' :
+                                analysis.performance.achievementScore >= 100 ? 'bg-green-500' :
+                                    analysis.performance.achievementScore >= 90 ? 'bg-blue-500' :
+                                        analysis.performance.achievementScore >= 70 ? 'bg-yellow-500' :
                                             'bg-red-500'
                             }`}
-                            style={{width: `${Math.min(performanceEval.achievementScore, 100)}%`}}
+                            style={{width: `${Math.min(analysis.performance.achievementScore, 100)}%`}}
                         />
                     </div>
                 </div>
@@ -373,7 +59,7 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                 <div className="space-y-2">
                     <div className="text-sm font-medium text-gray-700">Target Breakdown:</div>
                     <div className="space-y-1">
-                        {performanceEval.criteria.map((criterion, index) => (
+                        {analysis.performance.criteria.map((criterion, index) => (
                             <div key={index}
                                  className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded">
                                 <div className="flex items-center gap-2">
@@ -515,12 +201,15 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                 </div>
 
                 {/* Enhanced Performance Badge */}
-                {workoutResults && performanceEval && (
+                {workoutResults && analysis && (
                     <div className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-1 ${
-                        getPerformanceColor(performanceEval.overall)
+                        getPerformanceColor(analysis.performance.overall)
                     }`}>
-                        {getPerformanceIcon(performanceEval.overall)}
-                        <span>{getPerformanceMessage(performanceEval.overall)}</span>
+                        {(() => {
+                            const IconComponent = getPerformanceIcon(analysis.performance.overall);
+                            return <IconComponent className="w-4 h-4"/>;
+                        })()}
+                        <span>{getPerformanceMessage(analysis.performance.overall)}</span>
                     </div>
                 )}
             </div>

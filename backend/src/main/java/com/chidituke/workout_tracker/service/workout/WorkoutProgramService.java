@@ -20,7 +20,7 @@ import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession;
 import com.chidituke.workout_tracker.repository.user.UserRepository;
 import com.chidituke.workout_tracker.repository.workout.ProgramPlanRepository;
-import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
+import com.chidituke.workout_tracker.repository.scheduled_workouts.ScheduledWorkoutRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutProgramRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutSessionRepository;
 import lombok.RequiredArgsConstructor;

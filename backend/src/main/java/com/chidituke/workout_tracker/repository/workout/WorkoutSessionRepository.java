@@ -1,5 +1,6 @@
 package com.chidituke.workout_tracker.repository.workout;
 
+import com.chidituke.workout_tracker.model.workout.ScheduledWorkout;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession.WorkoutMood;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession.WorkoutLocation;
@@ -54,6 +55,8 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     // Find user's last completion of specific workout plan
     Optional<WorkoutSession> findTopByUserAndWorkoutPlanOrderByDateDesc(User user, WorkoutPlan workoutPlan);
 
+    Optional<WorkoutSession> findByScheduledWorkout(ScheduledWorkout scheduledWorkout);
+
     // =======================
     // WORKOUT PROGRAM TRACKING (Multi-week programs)
     // =======================
@@ -88,7 +91,6 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     @Query("SELECT MAX(ws.weekNumber) FROM WorkoutSession ws " +
             "WHERE ws.user = :user AND ws.program = :program")
     Optional<Integer> findMaxWeekNumberByUserAndProgram(@Param("user") User user, @Param("program") WorkoutProgram program);
-
 
 
     // =======================

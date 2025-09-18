@@ -15,7 +15,7 @@ import com.chidituke.workout_tracker.model.workout.WorkoutPlan;
 import com.chidituke.workout_tracker.model.workout.WorkoutProgram;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession;
 import com.chidituke.workout_tracker.repository.user.UserRepository;
-import com.chidituke.workout_tracker.repository.workout.ScheduledWorkoutRepository;
+import com.chidituke.workout_tracker.repository.scheduled_workouts.ScheduledWorkoutRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutPlanRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutProgramRepository;
 import com.chidituke.workout_tracker.repository.workout.WorkoutSessionRepository;

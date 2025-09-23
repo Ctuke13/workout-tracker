@@ -1,6 +1,11 @@
-import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {useAuth} from '../../contexts/AuthContext';
-import {Exercise} from '../../types/exercise';
+import {Exercise, ExerciseConfiguration, formatTime} from '../../types/exercise';
+import WorkoutPlanGrid from '../tabs/WorkoutPlanGrid';
+import ExerciseGrid from '../tabs/ExerciseGrid';
+import FavoritesGrid from '../tabs/FavoritesGrid';
+import CategoryGrid from '../tabs/CategoryGrid';
+import PopularGrid from '../tabs/PopularGrid';
 import {WorkoutPlanInfo} from '../../types/api';
 import {
     MagnifyingGlassIcon,
@@ -22,36 +27,18 @@ import {
     CogIcon,
     BoltIcon,
     TrophyIcon,
-    StarIcon as StarIconSolid
+    StarIcon as StarIconSolid, PlusIcon
 } from '@heroicons/react/24/outline';
-import {exerciseApi} from '../../services/exerciseApi';
-import {workoutPlanApi} from '../../services/workoutPlanApi';
+import {CalendarDay} from '../../types/calendar';
+import {useExerciseSelector} from '../../hooks/useExerciseSelector';
+import {useWorkout} from '../../contexts/WorkoutContext';
 
 // ==================== INTERFACES ====================
 
-interface ExerciseCategory {
-    id: string;
-    name: string;
-    emoji: string;
-    count: number;
-}
-
-interface CalendarDay {
-    dateString: string;
-    date: Date;
-    isToday: boolean;
-    exercises: any[];
-}
-
-interface WorkoutPlanCategory {
-    id: string;
-    name: string;
-    emoji: string;
-    count: number;
-    description: string;
-}
-
 interface EnhancedExerciseSelectorProps {
+    mode?: 'calendar' | 'workout';
+    onAddToWorkout?: (exercise: Exercise, config: ExerciseConfiguration) => Promise<void>;
+    currentWorkoutExerciseCount?: number;
     open: boolean;
     onClose: () => void;
     onExerciseSelect: (exercise: Exercise) => void;
@@ -69,6 +56,9 @@ interface EnhancedExerciseSelectorProps {
 // ==================== MAIN COMPONENT ====================
 
 const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
+                                                                       mode = 'calendar',
+                                                                       onAddToWorkout,
+                                                                       currentWorkoutExerciseCount,
                                                                        open,
                                                                        onClose,
                                                                        onExerciseSelect,
@@ -77,7 +67,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                                                        onDragStart,
                                                                        selectedDate,
                                                                        canAddToSelectedDate = true,
-                                                                       title = "Choose Exercise or Workout Plan",
+                                                                       title = mode === 'workout' ? "Add Exercise to Workout" : "Choose Exercise or Workout Plan",
                                                                        calendarDays = [],
                                                                        onDateChange,
                                                                        initialTab = 0
@@ -86,35 +76,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
 
     // ==================== STATE MANAGEMENT ====================
 
-    // Exercise state
-    const [searchTerm, setSearchTerm] = useState('');
-    const [exercises, setExercises] = useState<Exercise[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [categories, setCategories] = useState<ExerciseCategory[]>([]);
-    const [popularExercises, setPopularExercises] = useState<Exercise[]>([]);
-
-    // Enhanced workout plan state
-    const [workoutPlans, setWorkoutPlans] = useState<WorkoutPlanInfo[]>([]);
-    const [freePlans, setFreePlans] = useState<WorkoutPlanInfo[]>([]);
-    const [featuredPlans, setFeaturedPlans] = useState<WorkoutPlanInfo[]>([]);
-    const [workoutPlanCategories, setWorkoutPlanCategories] = useState<WorkoutPlanCategory[]>([]);
-    const [selectedPlanCategory, setSelectedPlanCategory] = useState<string>('all');
-
-    // UI state
-    const [selectedTab, setSelectedTab] = useState(initialTab);
-    const [hasInitialized, setHasInitialized] = useState(false);
-    const [planView, setPlanView] = useState<'grid' | 'list'>('grid');
-
-    // Favorite state
-    const [favoriteExercises, setFavoriteExercises] = useState<Exercise[]>([]);
-    const [userFavoriteIds, setUserFavoriteIds] = useState<Set<number>>(new Set());
-    const [loadingFavorites, setLoadingFavorites] = useState(false);
-
-    // Refs to prevent duplicate API calls
-    const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-    const lastSearchTermRef = useRef<string>('');
-    const isLoadingRef = useRef<boolean>(false);
+    const selectorData = useExerciseSelector();
 
     // ==================== COMPUTED VALUES ====================
 
@@ -123,7 +85,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
     const canAccessPaidPlans = userTier === 'PLUS' || userTier === 'PRO';
 
     // Enhanced tab definitions with workout plan focus
-    const tabs = [
+    const allTabs = [
         {id: 0, name: 'Exercises', icon: FireIcon, description: 'Individual exercises'},
         {id: 1, name: 'Favorites', icon: StarIcon, description: 'Your saved exercises', highlight: true},
         {id: 2, name: 'Workout Plans', icon: UserGroupIcon, description: 'Complete routines', highlight: true},
@@ -131,21 +93,9 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
         {id: 4, name: 'Popular', icon: TrophyIcon, description: 'Trending choices'},
     ];
 
-    // Enhanced workout plan categories
-    const enhancedWorkoutPlanCategories: WorkoutPlanCategory[] = [
-        {
-            id: 'all',
-            name: 'All Plans',
-            emoji: '🎯',
-            count: workoutPlans.length,
-            description: 'All available workout plans'
-        },
-        {id: 'strength', name: 'Strength', emoji: '💪', count: 0, description: 'Build muscle and power'},
-        {id: 'cardio', name: 'Cardio', emoji: '❤️', count: 0, description: 'Improve cardiovascular fitness'},
-        {id: 'hiit', name: 'HIIT', emoji: '⚡', count: 0, description: 'High-intensity interval training'},
-        {id: 'beginner', name: 'Beginner', emoji: '🌱', count: 0, description: 'Perfect for getting started'},
-        {id: 'advanced', name: 'Advanced', emoji: '🏆', count: 0, description: 'Challenge your limits'}
-    ];
+    const tabs = mode === 'workout'
+        ? allTabs.filter(tab => tab.id !== 2) // Remove workout plans in workout mode
+        : allTabs;
 
     // ==================== DATE NAVIGATION FUNCTIONS ====================
 
@@ -205,145 +155,19 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
         return true;
     };
 
-    // ==================== API FUNCTIONS ====================
-
-    // Fetch exercises function (existing)
-    const fetchExercises = useCallback(async (query: string = '', skipLoading: boolean = false) => {
-        if (isLoadingRef.current && !skipLoading) {
-            console.log('⏳ API call already in progress, skipping duplicate');
-            return;
-        }
-
-        if (query === lastSearchTermRef.current && exercises.length > 0) {
-            console.log('🔄 Same search term, using cached results');
-            return;
-        }
-
-        isLoadingRef.current = true;
-        if (!skipLoading) setLoading(true);
-        setError(null);
-
-        try {
-            console.log('🔍 Searching exercises with real API:', query);
-            const results = query
-                ? await exerciseApi.searchExercises(query)
-                : await exerciseApi.getPublicExercises();
-
-            setExercises(results);
-            lastSearchTermRef.current = query;
-            console.log('✅ Real exercises loaded:', results.length);
-        } catch (err) {
-            console.error('❌ Exercise search failed:', err);
-            setError(err instanceof Error ? err.message : 'Failed to load exercises from backend');
-        } finally {
-            isLoadingRef.current = false;
-            if (!skipLoading) setLoading(false);
-        }
-    }, [exercises.length]);
-
-    // Enhanced workout plan fetching
-    const fetchWorkoutPlans = useCallback(async () => {
-        if (workoutPlans.length > 0) {
-            console.log('📋 Workout plans already loaded, skipping');
-            return;
-        }
-
-        try {
-            console.log('📋 Loading enhanced workout plans from API');
-            const data = await workoutPlanApi.getInitialWorkoutPlanData();
-
-            setWorkoutPlans(data.allPlans);
-            setFreePlans(data.freePlans);
-            setFeaturedPlans(data.popularPlans || data.trendingPlans || []);
-
-            // Enhanced categories with real counts
-            const categoryCounts = data.allPlans.reduce((acc, plan) => {
-                const category = plan.category?.toLowerCase() || 'other';
-                acc[category] = (acc[category] || 0) + 1;
-                return acc;
-            }, {} as Record<string, number>);
-
-            const updatedCategories = enhancedWorkoutPlanCategories.map(cat => ({
-                ...cat,
-                count: cat.id === 'all' ? data.allPlans.length : (categoryCounts[cat.id] || 0)
-            }));
-
-            setWorkoutPlanCategories(updatedCategories);
-            console.log('✅ Enhanced workout plans loaded:', data.allPlans.length);
-        } catch (err) {
-            console.error('❌ Failed to fetch workout plans:', err);
-            setWorkoutPlanCategories(enhancedWorkoutPlanCategories);
-        }
-    }, [workoutPlans.length]);
-
-    // Fetch categories and popular exercises (existing functions)
-    const fetchCategories = useCallback(async () => {
-        if (categories.length > 0) return;
-        try {
-            const goalsData = await exerciseApi.getGoals();
-            const categoryList: ExerciseCategory[] = goalsData.map((goal: any) => ({
-                id: goal.goal,
-                name: formatGoalName(goal.goal),
-                emoji: getGoalEmoji(goal.goal),
-                count: goal.count
-            }));
-            setCategories(categoryList);
-        } catch (err) {
-            console.error('❌ Failed to fetch categories:', err);
-        }
-    }, [categories.length]);
-
-    const fetchPopularExercises = useCallback(async () => {
-        if (popularExercises.length > 0) return;
-        try {
-            const allExercises = await exerciseApi.getPublicExercises();
-            const popular = allExercises
-                .filter(ex => ex.isPopular || ex.usageCount > 100)
-                .sort((a, b) => {
-                    const aScore = (a.usageCount * 0.7) + (a.averageRating * 30);
-                    const bScore = (b.usageCount * 0.7) + (b.averageRating * 30);
-                    return bScore - aScore;
-                })
-                .slice(0, 10);
-            setPopularExercises(popular);
-        } catch (err) {
-            console.error('❌ Failed to fetch popular exercises:', err);
-        }
-    }, [popularExercises.length]);
-
-    // ==================== HELPER FUNCTIONS ====================
-
-    const formatGoalName = (goal: string): string => {
-        const goalMap: Record<string, string> = {
-            'fat-burn': 'Fat Burn',
-            'muscle-building': 'Muscle Building',
-            'endurance': 'Endurance',
-            'strength': 'Strength',
-            'flexibility': 'Flexibility',
-        };
-        return goalMap[goal.toLowerCase()] || goal.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    };
-
-    const getGoalEmoji = (goal: string): string => {
-        const emojiMap: Record<string, string> = {
-            'fat-burn': '🔥',
-            'muscle-building': '💪',
-            'endurance': '🏃‍♂️',
-            'strength': '🏋️‍♀️',
-            'flexibility': '🤸‍♀️',
-        };
-        return emojiMap[goal.toLowerCase()] || '🎯';
-    };
-
     // ==================== EVENT HANDLERS ====================
 
     const handleClearSearch = () => {
-        setSearchTerm('');
+        selectorData.handleClearSearch();
     };
 
     const handleExerciseSelect = (exercise: Exercise) => {
-        onExerciseSelect(exercise);
-        onClose();
+        if (mode === 'workout') {
+            selectorData.handleExerciseSelect(exercise);
+        } else {
+            onExerciseSelect(exercise);
+            onClose();
+        }
     };
 
     const handleWorkoutPlanSelect = (plan: WorkoutPlanInfo) => {
@@ -362,548 +186,248 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
     };
 
     const handleCategorySelect = async (categoryId: string) => {
-        try {
-            setLoading(true);
-            const results = await exerciseApi.searchExercises(categoryId);
-            setExercises(results);
-            setSelectedTab(0);
-            lastSearchTermRef.current = categoryId;
-        } catch (err) {
-            console.error('❌ Category filter failed:', err);
-            setError('Failed to filter by category');
-        } finally {
-            setLoading(false);
-        }
+        selectorData.handleCategorySelect(categoryId);
     };
 
     const handlePlanCategoryFilter = (categoryId: string) => {
-        setSelectedPlanCategory(categoryId);
+        selectorData.handlePlanCategoryFilter(categoryId);
+    };
+
+    const handleAddToWorkout = async () => {
+        if (!selectorData.selectedExercise || !selectorData.exerciseConfig || !onAddToWorkout) return;
+
+        selectorData.setAddingExercise(true);
+        try {
+            await onAddToWorkout(selectorData.selectedExercise, selectorData.exerciseConfig);
+            selectorData.handleCloseConfig();
+            onClose();
+        } catch (err) {
+            console.error('Failed to add exercise to workout:', err);
+            selectorData.setError('Failed to add exercise. Please try again.');
+        } finally {
+            selectorData.setAddingExercise(false);
+        }
+    };
+
+    const handleCloseConfig = () => {
+        selectorData.handleCloseConfig();
+    };
+
+    const getPresetConfigs = () => {
+        if (!selectorData.selectedExercise) return [];
+
+        const presets = [];
+        const exerciseType = selectorData.selectedExercise.exerciseType.toLowerCase();
+
+        if (exerciseType === 'strength') {
+            presets.push(
+                {
+                    name: 'Light',
+                    targetSets: 3,
+                    targetReps: 10,
+                    restSeconds: 60,
+                    targetRpe: 6
+                },
+                {
+                    name: 'Moderate',
+                    targetSets: 3,
+                    targetReps: 8,
+                    restSeconds: 90,
+                    targetRpe: 7
+                },
+                {
+                    name: 'Intense',
+                    targetSets: 4,
+                    targetReps: 6,
+                    restSeconds: 120,
+                    targetRpe: 8
+                }
+            );
+        } else if (exerciseType === 'cardio') {
+            presets.push(
+                {
+                    name: 'Short',
+                    targetDurationMinutes: 10
+                },
+                {
+                    name: 'Standard',
+                    targetDurationMinutes: 20
+                },
+                {
+                    name: 'Long',
+                    targetDurationMinutes: 30
+                }
+            );
+        } else if (exerciseType === 'flexibility') {
+            presets.push(
+                {
+                    name: 'Quick',
+                    targetSets: 2,
+                    holdDurationSeconds: 30,
+                    restSeconds: 15
+                },
+                {
+                    name: 'Standard',
+                    targetSets: 3,
+                    holdDurationSeconds: 45,
+                    restSeconds: 20
+                }
+            );
+        }
+
+        return presets;
     };
 
     // ==================== FILTERED DATA ====================
 
     const filteredExercises = useMemo(() => {
-        return exercises.filter(exercise => {
-            const matchesSearch = !searchTerm ||
-                exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                exercise.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        return selectorData.exercises.filter(exercise => {
+            const matchesSearch = !selectorData.searchTerm ||
+                exercise.name.toLowerCase().includes(selectorData.searchTerm.toLowerCase()) ||
+                exercise.description?.toLowerCase().includes(selectorData.searchTerm.toLowerCase());
             return matchesSearch;
         });
-    }, [exercises, searchTerm]);
+    }, [selectorData.exercises, selectorData.searchTerm]);
 
     const filteredWorkoutPlans = useMemo(() => {
-        let filtered = workoutPlans.filter(plan => {
+        let filtered = selectorData.workoutPlans.filter(plan => {
             if (!plan.name) return false;
-            const matchesSearch = !searchTerm ||
-                plan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (plan.description && plan.description.toLowerCase().includes(searchTerm.toLowerCase()));
+            const matchesSearch = !selectorData.searchTerm ||
+                plan.name.toLowerCase().includes(selectorData.searchTerm.toLowerCase()) ||
+                (plan.description && plan.description.toLowerCase().includes(selectorData.searchTerm.toLowerCase()));
             return matchesSearch;
         });
 
         // Apply category filter
-        if (selectedPlanCategory !== 'all') {
+        if (selectorData.selectedPlanCategory !== 'all') {
             filtered = filtered.filter(plan => {
                 const planCategory = plan.category?.toLowerCase() || 'other';
-                return planCategory.includes(selectedPlanCategory) ||
-                    plan.difficulty?.toLowerCase() === selectedPlanCategory ||
-                    (selectedPlanCategory === 'hiit' && plan.workoutType?.toLowerCase().includes('hiit'));
+                return planCategory.includes(selectorData.selectedPlanCategory) ||
+                    plan.difficulty?.toLowerCase() === selectorData.selectedPlanCategory ||
+                    (selectorData.selectedPlanCategory === 'hiit' && plan.workoutType?.toLowerCase().includes('hiit'));
             });
         }
 
         return filtered;
-    }, [workoutPlans, searchTerm, selectedPlanCategory]);
+    }, [selectorData.workoutPlans, selectorData.searchTerm, selectorData.selectedPlanCategory]);
 
     // ==================== EFFECTS ====================
 
     useEffect(() => {
         if (open) {
-            setSelectedTab(initialTab);
+            selectorData.setSelectedTab(initialTab);
         }
-    }, [open, initialTab]);
+    }, [open, initialTab, selectorData.setSelectedTab]);
 
     useEffect(() => {
-        if (open && !hasInitialized) {
-            const initializeData = async () => {
-                console.log('🚀 Initializing Enhanced ExerciseSelector...');
-                await Promise.all([
-                    fetchExercises('', true),
-                    fetchCategories(),
-                    fetchPopularExercises(),
-                    fetchWorkoutPlans()
-                ]);
-                setHasInitialized(true);
-            };
-            initializeData();
+        if (open && !selectorData.hasInitialized) {
+            selectorData.initializeData();
         }
-    }, [open, hasInitialized, fetchExercises, fetchCategories, fetchPopularExercises, fetchWorkoutPlans]);
-
-    useEffect(() => {
-        if (!hasInitialized) return;
-
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-
-        searchTimeoutRef.current = setTimeout(() => {
-            if (searchTerm !== lastSearchTermRef.current) {
-                if (selectedTab === 0) {
-                    fetchExercises(searchTerm);
-                }
-            }
-        }, 300);
-
-        return () => {
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-        };
-    }, [searchTerm, hasInitialized, fetchExercises, selectedTab]);
+    }, [open, selectorData.hasInitialized, selectorData.initializeData]);
 
     useEffect(() => {
         if (!open) {
-            setSearchTerm('');
-            setSelectedTab(0);
-            setError(null);
-            setHasInitialized(false);
-            setSelectedPlanCategory('all');
-            lastSearchTermRef.current = '';
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
+            selectorData.resetState();
         }
-    }, [open]);
+    }, [open, selectorData.resetState]);
 
-    const fetchFavoriteExercises = useCallback(async () => {
-        if (!user || favoriteExercises.length > 0) return;
-
-        try {
-            setLoadingFavorites(true);
-            console.log('🌟 Loading user favorite exercises');
-
-            // 🔥 GET BOTH: Full Exercise objects AND favorite IDs
-            const [favorites, favoriteIds] = await Promise.all([
-                exerciseApi.getFavoriteExercises(),  // Full Exercise objects
-                exerciseApi.getFavoriteExerciseIds() // Set of IDs for quick lookup
-            ]);
-
-            // ✅ CRITICAL FIX: Ensure all favorite exercises have isFavorite = true
-            const favoritesWithCorrectFlag = favorites.map(exercise => ({
-                ...exercise,
-                isFavorite: true // 🌟 FORCE this to true since these ARE favorites
-            }));
-
-            setFavoriteExercises(favoritesWithCorrectFlag);
-            setUserFavoriteIds(favoriteIds);
-
-            console.log(`✅ Loaded ${favoritesWithCorrectFlag.length} favorite exercises with isFavorite flag set`);
-            console.log('🐛 DEBUG: First favorite exercise:', favoritesWithCorrectFlag[0]);
-        } catch (err) {
-            console.error('❌ Failed to fetch favorite exercises:', err);
-        } finally {
-            setLoadingFavorites(false);
-        }
-    }, [user, favoriteExercises.length]);
-
-
-    const handleToggleFavorite = async (exercise: Exercise, event?: React.MouseEvent) => {
-        if (event) {
-            event.stopPropagation(); // Prevent exercise selection when clicking star
-        }
-
-        if (!user) {
-            console.log('User not authenticated, cannot toggle favorite');
-            return;
-        }
-
-        try {
-            console.log(`🌟 Toggling favorite for exercise: ${exercise.name}`);
-
-            // Optimistic update
-            const wasFavorited = userFavoriteIds.has(exercise.id);
-            const newFavoriteIds = new Set(userFavoriteIds);
-
-            if (wasFavorited) {
-                newFavoriteIds.delete(exercise.id);
-                setFavoriteExercises(prev => prev.filter(fav => fav.id !== exercise.id));
-            } else {
-                newFavoriteIds.add(exercise.id);
-                setFavoriteExercises(prev => [...prev, exercise]);
-            }
-
-            setUserFavoriteIds(newFavoriteIds);
-
-            // Update exercise object
-            setExercises(prev => prev.map(ex =>
-                ex.id === exercise.id ? {...ex, isFavorite: !wasFavorited} : ex
-            ));
-            setPopularExercises(prev => prev.map(ex =>
-                ex.id === exercise.id ? {...ex, isFavorite: !wasFavorited} : ex
-            ));
-
-            // Make API call
-            const result = await exerciseApi.toggleFavorite(exercise.id);
-
-            // Show success feedback
-            console.log(`✅ ${result.isFavorite ? 'Added to' : 'Removed from'} favorites: ${exercise.name}`);
-
-            // Optional: Show toast notification
-            // toast.success(`${result.isFavorite ? 'Added to' : 'Removed from'} favorites`);
-
-        } catch (error) {
-            console.error('❌ Failed to toggle favorite:', error);
-
-            // Revert optimistic update on error
-            const originalFavoriteIds = new Set(userFavoriteIds);
-            if (originalFavoriteIds.has(exercise.id)) {
-                originalFavoriteIds.delete(exercise.id);
-                setFavoriteExercises(prev => prev.filter(fav => fav.id !== exercise.id));
-            } else {
-                originalFavoriteIds.add(exercise.id);
-                setFavoriteExercises(prev => [...prev, exercise]);
-            }
-            setUserFavoriteIds(originalFavoriteIds);
-            exercise.isFavorite = !exercise.isFavorite;
-
-            // Optional: Show error toast
-            // toast.error('Failed to update favorites');
-        }
-    };
 
 // Update your filteredExercises to include favorite status
     const filteredExercisesWithFavorites = useMemo(() => {
         return filteredExercises.map(exercise => ({
             ...exercise,
-            isFavorite: userFavoriteIds.has(exercise.id)
+            isFavorite: selectorData.userFavoriteIds.has(exercise.id)
         }));
-    }, [filteredExercises, userFavoriteIds]);
+    }, [filteredExercises, selectorData.userFavoriteIds]);
 
 // Add filtered favorites
     const filteredFavoriteExercises = useMemo(() => {
-        return favoriteExercises
+        return selectorData.favoriteExercises
             .map(exercise => ({
                 ...exercise,
                 isFavorite: true // 🌟 ENSURE this is always true in favorites tab
             }))
             .filter(exercise => {
-                const matchesSearch = !searchTerm ||
-                    exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    exercise.description?.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesSearch = !selectorData.searchTerm ||
+                    exercise.name.toLowerCase().includes(selectorData.searchTerm.toLowerCase()) ||
+                    exercise.description?.toLowerCase().includes(selectorData.searchTerm.toLowerCase());
                 return matchesSearch;
             });
-    }, [favoriteExercises, searchTerm]);
+    }, [selectorData.favoriteExercises, selectorData.searchTerm]);
 
 // Update your useEffect for initialization to include favorites
-    useEffect(() => {
-        if (open && !hasInitialized) {
-            const initializeData = async () => {
-                console.log('🚀 Initializing Enhanced ExerciseSelector...');
-                await Promise.all([
-                    fetchExercises('', true),
-                    fetchCategories(),
-                    fetchPopularExercises(),
-                    fetchWorkoutPlans(),
-                    user ? fetchFavoriteExercises() : Promise.resolve() // Only fetch favorites if user is logged in
-                ]);
-                setHasInitialized(true);
-            };
-            initializeData();
-        }
-    }, [open, hasInitialized, fetchExercises, fetchCategories, fetchPopularExercises, fetchWorkoutPlans, fetchFavoriteExercises, user]);
 
     // ==================== RENDER FUNCTIONS ====================
 
     const renderTabContent = () => {
-        switch (selectedTab) {
-            case 0: // Exercises (updated with favorites)
+        switch (selectorData.selectedTab) {
+            case 0: // Exercises Tab
                 return (
-                    <div className="space-y-2">
-                        {loading ? (
-                            <div className="space-y-3">
-                                {[1, 2, 3, 4].map((i) => (
-                                    <div key={i} className="animate-pulse">
-                                        <div
-                                            className="bg-gradient-to-r from-gray-200 to-gray-300 h-24 rounded-2xl"></div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : filteredExercisesWithFavorites.length > 0 ? (
-                            <div className="space-y-2">
-                                {filteredExercisesWithFavorites.map((exercise) => (
-                                    <ExerciseCard
-                                        key={exercise.id}
-                                        exercise={exercise}
-                                        onSelect={() => handleExerciseSelect(exercise)}
-                                        onDragStart={() => onDragStart?.(exercise)}
-                                        onToggleFavorite={handleToggleFavorite}
-                                        disabled={!canAddToTargetDate()}
-                                        showFavoriteButton={user ? true : false}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <div
-                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                                    <MagnifyingGlassIcon className="w-10 h-10 text-gray-400"/>
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                    {searchTerm ? 'No exercises found' : 'No exercises available'}
-                                </h3>
-                                <p className="text-gray-500 max-w-sm mx-auto">
-                                    {searchTerm ? 'Try a different search term' : 'Loading exercises...'}
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                    <ExerciseGrid
+                        loading={selectorData.loading}
+                        filteredExercisesWithFavorites={filteredExercisesWithFavorites}
+                        searchTerm={selectorData.searchTerm}
+                        canAddToTargetDate={canAddToTargetDate}
+                        user={user}
+                        onExerciseSelect={handleExerciseSelect}
+                        onDragStart={onDragStart}
+                        onToggleFavorite={selectorData.handleToggleFavorite}
+                    />
                 );
 
-            case 1: // Favorites Tab (NEW!)
+            case 1: // Favorite Tab
                 return (
-                    <div className="space-y-2">
-                        {!user ? (
-                            <div className="text-center py-12">
-                                <div
-                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center">
-                                    <StarIcon className="w-10 h-10 text-yellow-500"/>
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Sign in to see favorites</h3>
-                                <p className="text-gray-500 max-w-sm mx-auto">
-                                    Create an account to save your favorite exercises
-                                </p>
-                            </div>
-                        ) : loadingFavorites ? (
-                            <div className="space-y-3">
-                                {[1, 2, 3, 4].map((i) => (
-                                    <div key={i} className="animate-pulse">
-                                        <div
-                                            className="bg-gradient-to-r from-yellow-200 to-orange-300 h-24 rounded-2xl"></div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : filteredFavoriteExercises.length > 0 ? (
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between mb-4 px-2">
-                                    <p className="text-sm text-gray-600">
-                                        ⭐ {filteredFavoriteExercises.length} favorite
-                                        exercise{filteredFavoriteExercises.length !== 1 ? 's' : ''}
-                                    </p>
-                                    <button
-                                        onClick={async () => {
-                                            if (window.confirm('Remove all favorites? This cannot be undone.')) {
-                                                try {
-                                                    await exerciseApi.clearAllFavorites();
-                                                    setFavoriteExercises([]);
-                                                    setUserFavoriteIds(new Set());
-                                                    // Optional: Show success toast
-                                                } catch (error) {
-                                                    console.error('Failed to clear favorites:', error);
-                                                }
-                                            }
-                                        }}
-                                        className="text-xs text-red-600 hover:text-red-700 underline"
-                                    >
-                                        Clear All
-                                    </button>
-                                </div>
-                                {filteredFavoriteExercises.map((exercise) => (
-                                    <ExerciseCard
-                                        key={exercise.id}
-                                        exercise={{
-                                            ...exercise,
-                                            isFavorite: true // 🌟 FORCE yellow star in favorites tab
-                                        }}
-                                        onSelect={() => handleExerciseSelect(exercise)}
-                                        onDragStart={() => onDragStart?.(exercise)}
-                                        onToggleFavorite={handleToggleFavorite}
-                                        disabled={!canAddToTargetDate()}
-                                        showFavoriteButton={true}
-                                        isFavoritesTab={true}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <div
-                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center">
-                                    <StarIcon className="w-10 h-10 text-yellow-500"/>
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                    {searchTerm ? 'No favorite exercises found' : 'No favorites yet'}
-                                </h3>
-                                <p className="text-gray-500 max-w-sm mx-auto">
-                                    {searchTerm ? 'Try a different search term' : 'Browse exercises and tap the ⭐ star to add favorites'}
-                                </p>
-                                <button
-                                    onClick={() => setSelectedTab(0)}
-                                    className="mt-4 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors"
-                                >
-                                    Browse Exercises
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                    <FavoritesGrid
+                        user={user}
+                        loadingFavorites={selectorData.loadingFavorites}
+                        filteredFavoriteExercises={filteredFavoriteExercises}
+                        searchTerm={selectorData.searchTerm}
+                        canAddToTargetDate={canAddToTargetDate}
+                        onExerciseSelect={handleExerciseSelect}
+                        onDragStart={onDragStart}
+                        onToggleFavorite={selectorData.handleToggleFavorite}
+                        onSwitchToExercisesTab={() => selectorData.setSelectedTab(0)}
+                    />
                 );
 
             case 2: // Workout Plans (moved to index 2)
                 return (
-                    <div className="space-y-4">
-                        {/* Category Filter Pills */}
-                        <div className="flex gap-2 pb-4 border-b border-gray-200 overflow-x-auto">
-                            {workoutPlanCategories.map((category) => (
-                                <button
-                                    key={category.id}
-                                    onClick={() => handlePlanCategoryFilter(category.id)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                                        selectedPlanCategory === category.id
-                                            ? 'bg-purple-100 text-purple-700 border-2 border-purple-300'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    <span>{category.emoji}</span>
-                                    <span>{category.name}</span>
-                                    <span className="bg-white px-2 py-0.5 rounded-full text-xs">
-                                    {category.count}
-                                </span>
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* View Toggle */}
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm text-gray-600">
-                                {filteredWorkoutPlans.length} plan{filteredWorkoutPlans.length !== 1 ? 's' : ''} found
-                            </p>
-                            <div className="flex bg-gray-100 rounded-lg p-1">
-                                <button
-                                    onClick={() => setPlanView('grid')}
-                                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                                        planView === 'grid'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-600'
-                                    }`}
-                                >
-                                    Grid
-                                </button>
-                                <button
-                                    onClick={() => setPlanView('list')}
-                                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                                        planView === 'list'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-600'
-                                    }`}
-                                >
-                                    List
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Workout Plans Display */}
-                        {loading ? (
-                            <div
-                                className={`grid gap-4 ${planView === 'grid' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                                {[1, 2, 3, 4].map((i) => (
-                                    <div key={i} className="animate-pulse">
-                                        <div
-                                            className="bg-gradient-to-r from-gray-200 to-gray-300 h-32 rounded-2xl"></div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : filteredWorkoutPlans.length > 0 ? (
-                            <div
-                                className={`grid gap-4 ${planView === 'grid' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                                {filteredWorkoutPlans.map((plan) => (
-                                    <WorkoutPlanCard
-                                        key={plan.id}
-                                        plan={plan}
-                                        onSelect={() => handleWorkoutPlanSelect(plan)}
-                                        canAccess={canAccessPlan(plan)}
-                                        userTier={userTier}
-                                        disabled={!canAddToTargetDate()}
-                                        viewMode={planView}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <div
-                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center">
-                                    <UserGroupIcon className="w-10 h-10 text-gray-400"/>
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                    {searchTerm ? 'No workout plans found' : 'No workout plans available'}
-                                </h3>
-                                <p className="text-gray-500 max-w-sm mx-auto">
-                                    {searchTerm ? 'Try a different search term' : 'Loading workout plans...'}
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                    <WorkoutPlanGrid
+                        loading={selectorData.loading}
+                        filteredWorkoutPlans={filteredWorkoutPlans}
+                        searchTerm={selectorData.searchTerm}
+                        workoutPlanCategories={selectorData.workoutPlanCategories}
+                        selectedPlanCategory={selectorData.selectedPlanCategory}
+                        planView={selectorData.planView}
+                        userTier={userTier}
+                        canAddToTargetDate={canAddToTargetDate}
+                        onPlanCategoryFilter={handlePlanCategoryFilter}
+                        onPlanViewChange={selectorData.setPlanView}
+                        onWorkoutPlanSelect={handleWorkoutPlanSelect}
+                        canAccessPlan={canAccessPlan}
+                    />
                 );
 
-            case 3: // Categories (moved to index 3)
+            case 3: // Categories
                 return (
-                    <div className="grid grid-cols-1 gap-3">
-                        {categories.map((category) => (
-                            <div
-                                key={category.id}
-                                className="group bg-gradient-to-r from-white to-gray-50 hover:from-blue-50 hover:to-purple-50 rounded-2xl border border-gray-200 hover:border-blue-300 p-4 hover:shadow-lg transition-all duration-300 cursor-pointer active:scale-[0.98]"
-                                onClick={() => handleCategorySelect(category.id)}
-                            >
-                                <div className="flex items-center">
-                                    <div
-                                        className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center text-2xl mr-4 group-hover:scale-110 transition-transform duration-300">
-                                        {category.emoji}
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-gray-900 text-lg group-hover:text-blue-900 transition-colors">
-                                            {category.name}
-                                        </h3>
-                                        <p className="text-sm text-gray-500 group-hover:text-blue-600 transition-colors">
-                                            {category.count} exercises available
-                                        </p>
-                                    </div>
-                                    <ChevronRightIcon
-                                        className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-300"/>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <CategoryGrid
+                        categories={selectorData.categories}
+                        onCategorySelect={handleCategorySelect}
+                    />
                 );
 
-            case 4: // Popular (moved to index 4, updated with favorites)
+            case 4: // Popular
                 return (
-                    <div className="space-y-2">
-                        {popularExercises.length > 0 ? (
-                            popularExercises.map((exercise) => (
-                                <ExerciseCard
-                                    key={exercise.id}
-                                    exercise={{
-                                        ...exercise,
-                                        isFavorite: userFavoriteIds.has(exercise.id)
-                                    }}
-                                    onSelect={() => handleExerciseSelect(exercise)}
-                                    onDragStart={() => onDragStart?.(exercise)}
-                                    onToggleFavorite={handleToggleFavorite}
-                                    disabled={!canAddToTargetDate()}
-                                    showPopularBadge
-                                    showFavoriteButton={user ? true : false}
-                                />
-                            ))
-                        ) : (
-                            <div className="text-center py-12">
-                                <div
-                                    className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full flex items-center justify-center">
-                                    <TrophyIcon className="w-10 h-10 text-yellow-500"/>
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                    {loading ? 'Loading popular exercises...' : 'No popular exercises found'}
-                                </h3>
-                                <p className="text-gray-500 max-w-sm mx-auto">
-                                    {loading ? 'Fetching from backend...' : 'Popular exercises will appear here when available'}
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                    <PopularGrid
+                        loading={selectorData.loading}
+                        popularExercises={selectorData.popularExercises}
+                        userFavoriteIds={selectorData.userFavoriteIds}
+                        canAddToTargetDate={canAddToTargetDate}
+                        user={user}
+                        onExerciseSelect={handleExerciseSelect}
+                        onDragStart={onDragStart}
+                        onToggleFavorite={selectorData.handleToggleFavorite}
+                    />
                 );
 
             default:
@@ -917,6 +441,473 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
 
     const dateInfo = getSelectedDateInfo();
     const canAddToDate = canAddToTargetDate();
+
+    if (selectorData.showConfig && selectorData.selectedExercise) {
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] flex flex-col">
+                    {/* Config Header */}
+                    <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Configure Exercise</h3>
+                            <p className="text-sm text-gray-600">
+                                {selectorData.selectedExercise.emoji} {selectorData.getExerciseName(selectorData.selectedExercise)}
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleCloseConfig}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            disabled={selectorData.addingExercise}
+                        >
+                            <XMarkIcon className="w-5 h-5"/>
+                        </button>
+                    </div>
+
+                    {/* Error Display */}
+                    {selectorData.error && (
+                        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-center">
+                                <ExclamationTriangleIcon className="w-4 h-4 text-red-400 mr-2"/>
+                                <span className="text-sm text-red-700">{selectorData.error}</span>
+                                <button
+                                    onClick={() => selectorData.setError(null)}
+                                    className="ml-auto text-red-400 hover:text-red-600"
+                                >
+                                    <XMarkIcon className="w-4 h-4"/>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Config Content */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {/* Exercise Info */}
+                        <div className="bg-gray-50 rounded-lg p-3">
+                            <div className="flex items-center space-x-2 mb-2">
+                                <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selectorData.getExerciseTypeColor(selectorData.selectedExercise.exerciseType)}`}>
+                                    {selectorData.selectedExercise.exerciseType}
+                                </span>
+                                <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selectorData.getDifficultyColor(selectorData.selectedExercise.difficultyLevel)}`}>
+                                    {selectorData.selectedExercise.difficultyLevel}
+                                </span>
+                                {selectorData.selectedExercise.createdByProfessional && (
+                                    <span
+                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        <StarIcon className="w-3 h-3 mr-1"/>
+                                        Pro
+                                    </span>
+                                )}
+                            </div>
+                            {selectorData.selectedExercise.description && (
+                                <p className="text-sm text-gray-600 mb-2">{selectorData.selectedExercise.description}</p>
+                            )}
+                            {selectorData.selectedExercise.targetMuscleGroups && selectorData.selectedExercise.targetMuscleGroups.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                    {selectorData.selectedExercise.targetMuscleGroups.slice(0, 3).map((muscle, index) => (
+                                        <span
+                                            key={index}
+                                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 text-purple-800"
+                                        >
+                                            {muscle}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Quick Presets */}
+                        {getPresetConfigs().length > 0 && (
+                            <div>
+                                <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                    <BoltIcon className="w-4 h-4 mr-1"/>
+                                    Quick Presets
+                                </h4>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {getPresetConfigs().map((preset, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => {
+                                                if (selectorData.exerciseConfig) {
+                                                    if (selectorData.exerciseConfig.trackingMode === 'strength') {
+                                                        selectorData.setExerciseConfig({
+                                                            ...selectorData.exerciseConfig,
+                                                            targetSets: preset.targetSets || 3,
+                                                            targetReps: preset.targetReps || 10,
+                                                            restSeconds: preset.restSeconds || 90,
+                                                            targetRpe: preset.targetRpe || 7
+                                                        });
+                                                    } else if (selectorData.exerciseConfig.trackingMode === 'cardio') {
+                                                        selectorData.setExerciseConfig({
+                                                            ...selectorData.exerciseConfig,
+                                                            targetDurationMinutes: preset.targetDurationMinutes || 20
+                                                        });
+                                                    } else if (selectorData.exerciseConfig.trackingMode === 'isometric') {
+                                                        selectorData.setExerciseConfig({
+                                                            ...selectorData.exerciseConfig,
+                                                            targetSets: preset.targetSets || 3,
+                                                            holdDurationSeconds: preset.holdDurationSeconds || 30,
+                                                            restSeconds: preset.restSeconds || 60
+                                                        });
+                                                    }
+                                                }
+                                            }}
+                                            className="p-2 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 text-left transition-colors"
+                                            disabled={selectorData.addingExercise}
+                                        >
+                                            <div className="text-sm font-medium">{preset.name}</div>
+                                            <div className="text-xs text-gray-600">
+                                                {preset.targetSets ? `${preset.targetSets} × ${preset.targetReps}` :
+                                                    preset.targetDurationMinutes ? `${preset.targetDurationMinutes} min` :
+                                                        preset.holdDurationSeconds ? `${preset.holdDurationSeconds}s hold` : ''}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Configuration Fields */}
+                        <div className="space-y-3">
+                            {/* Strength Configuration */}
+                            {selectorData.exerciseConfig?.trackingMode === 'strength' && (
+                                <>
+                                    {/* Sets */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Sets
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="10"
+                                            value={selectorData.exerciseConfig.targetSets || 1}
+                                            onChange={(e) => {
+                                                if (selectorData.exerciseConfig?.trackingMode === 'strength') {
+                                                    selectorData.setExerciseConfig({
+                                                        ...selectorData.exerciseConfig,
+                                                        targetSets: parseInt(e.target.value) || 1
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            disabled={selectorData.addingExercise}
+                                        />
+                                    </div>
+
+                                    {/* Reps */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Target Reps
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={selectorData.exerciseConfig.targetReps || 10}
+                                            onChange={(e) => {
+                                                if (selectorData.exerciseConfig?.trackingMode === 'strength') {
+                                                    selectorData.setExerciseConfig({
+                                                        ...selectorData.exerciseConfig,
+                                                        targetReps: parseInt(e.target.value) || 10
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            disabled={selectorData.addingExercise}
+                                        />
+                                    </div>
+
+                                    {/* Weight */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Target Weight (lbs) - Optional
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            value={selectorData.exerciseConfig.targetWeight || ''}
+                                            onChange={(e) => {
+                                                if (selectorData.exerciseConfig?.trackingMode === 'strength') {
+                                                    selectorData.setExerciseConfig({
+                                                        ...selectorData.exerciseConfig,
+                                                        targetWeight: parseFloat(e.target.value) || undefined
+                                                    });
+                                                }
+                                            }}
+                                            placeholder="Body weight, 135, etc."
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            disabled={selectorData.addingExercise}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Cardio Configuration */}
+                            {selectorData.exerciseConfig?.trackingMode === 'cardio' && (
+                                <>
+                                    {/* Duration */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Target Duration (minutes)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={selectorData.exerciseConfig.targetDurationMinutes || 20}
+                                            onChange={(e) => {
+                                                if (selectorData.exerciseConfig?.trackingMode === 'cardio') {
+                                                    selectorData.setExerciseConfig({
+                                                        ...selectorData.exerciseConfig,
+                                                        targetDurationMinutes: parseInt(e.target.value) || 20
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            disabled={selectorData.addingExercise}
+                                        />
+                                    </div>
+
+                                    {/* Distance (Optional) */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Target Distance - Optional
+                                        </label>
+                                        <div className="flex space-x-2">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={selectorData.exerciseConfig.targetDistance || ''}
+                                                onChange={(e) => {
+                                                    if (selectorData.exerciseConfig?.trackingMode === 'cardio') {
+                                                        selectorData.setExerciseConfig({
+                                                            ...selectorData.exerciseConfig,
+                                                            targetDistance: parseFloat(e.target.value) || undefined
+                                                        });
+                                                    }
+                                                }}
+                                                placeholder="e.g., 3.1"
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                disabled={selectorData.addingExercise}
+                                            />
+                                            <select
+                                                value={selectorData.exerciseConfig.targetDistanceUnit}
+                                                onChange={(e) => {
+                                                    if (selectorData.exerciseConfig?.trackingMode === 'cardio') {
+                                                        selectorData.setExerciseConfig({
+                                                            ...selectorData.exerciseConfig,
+                                                            targetDistanceUnit: e.target.value as 'km' | 'miles'
+                                                        });
+                                                    }
+                                                }}
+                                                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                disabled={selectorData.addingExercise}
+                                            >
+                                                <option value="miles">miles</option>
+                                                <option value="km">km</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Isometric Configuration */}
+                            {selectorData.exerciseConfig?.trackingMode === 'isometric' && (
+                                <>
+                                    {/* Sets */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Sets
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="10"
+                                            value={selectorData.exerciseConfig.targetSets || 1}
+                                            onChange={(e) => {
+                                                if (selectorData.exerciseConfig?.trackingMode === 'isometric') {
+                                                    selectorData.setExerciseConfig({
+                                                        ...selectorData.exerciseConfig,
+                                                        targetSets: parseInt(e.target.value) || 1
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            disabled={selectorData.addingExercise}
+                                        />
+                                    </div>
+
+                                    {/* Hold Duration */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Hold Duration (seconds)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="5"
+                                            value={selectorData.exerciseConfig.holdDurationSeconds || 30}
+                                            onChange={(e) => {
+                                                if (selectorData.exerciseConfig?.trackingMode === 'isometric') {
+                                                    selectorData.setExerciseConfig({
+                                                        ...selectorData.exerciseConfig,
+                                                        holdDurationSeconds: parseInt(e.target.value) || 30
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            disabled={selectorData.addingExercise}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Rest Time (for strength and isometric) */}
+                            {(selectorData.exerciseConfig?.trackingMode === 'strength' || selectorData.exerciseConfig?.trackingMode === 'isometric') && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Rest Time: {formatTime(selectorData.exerciseConfig.restSeconds || 90)}
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="30"
+                                        max="300"
+                                        step="15"
+                                        value={selectorData.exerciseConfig.restSeconds || 90}
+                                        onChange={(e) => {
+                                            if (selectorData.exerciseConfig) {
+                                                selectorData.setExerciseConfig({
+                                                    ...selectorData.exerciseConfig,
+                                                    restSeconds: parseInt(e.target.value)
+                                                });
+                                            }
+                                        }}
+                                        className="w-full"
+                                        disabled={selectorData.addingExercise}
+                                    />
+                                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                        <span>30s</span>
+                                        <span>5min</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Target RPE (for strength only) */}
+                            {selectorData.exerciseConfig?.trackingMode === 'strength' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Target RPE: {selectorData.exerciseConfig.targetRpe || 7}
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="10"
+                                        value={selectorData.exerciseConfig.targetRpe || 7}
+                                        onChange={(e) => {
+                                            if (selectorData.exerciseConfig?.trackingMode === 'strength') {
+                                                selectorData.setExerciseConfig({
+                                                    ...selectorData.exerciseConfig,
+                                                    targetRpe: parseInt(e.target.value)
+                                                });
+                                            }
+                                        }}
+                                        className="w-full"
+                                        disabled={selectorData.addingExercise}
+                                    />
+                                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                        <span>Easy</span>
+                                        <span>Max</span>
+                                    </div>
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        {selectorData.getRpeDescription(selectorData.exerciseConfig.targetRpe || 7)}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Notes (for all types) */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Notes - Optional
+                                </label>
+                                <textarea
+                                    value={selectorData.exerciseConfig?.notes || ''}
+                                    onChange={(e) => {
+                                        if (selectorData.exerciseConfig) {
+                                            selectorData.setExerciseConfig({
+                                                ...selectorData.exerciseConfig,
+                                                notes: e.target.value
+                                            });
+                                        }
+                                    }}
+                                    rows={2}
+                                    placeholder="Form cues, modifications, or reminders..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                    disabled={selectorData.addingExercise}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Estimated Time */}
+                        <div className="bg-green-50 rounded-lg p-3">
+                            <h4 className="text-sm font-medium text-green-800 mb-1 flex items-center">
+                                <ClockIcon className="w-4 h-4 mr-1"/>
+                                Estimated Time
+                            </h4>
+                            <div className="text-base font-semibold text-green-900">
+                                {(() => {
+                                    const exerciseTime = selectorData.selectedExercise.estimatedDurationMinutes || 2;
+                                    let totalTime = exerciseTime;
+
+                                    if (selectorData.exerciseConfig?.trackingMode === 'strength') {
+                                        const restTime = ((selectorData.exerciseConfig.restSeconds || 90) * (selectorData.exerciseConfig.targetSets - 1)) / 60;
+                                        totalTime = Math.ceil((exerciseTime * selectorData.exerciseConfig.targetSets) + restTime);
+                                    } else if (selectorData.exerciseConfig?.trackingMode === 'isometric') {
+                                        const restTime = ((selectorData.exerciseConfig.restSeconds || 60) * (selectorData.exerciseConfig.targetSets - 1)) / 60;
+                                        totalTime = Math.ceil((exerciseTime * selectorData.exerciseConfig.targetSets) + restTime);
+                                    } else if (selectorData.exerciseConfig?.trackingMode === 'cardio') {
+                                        totalTime = selectorData.exerciseConfig.targetDurationMinutes;
+                                    }
+
+                                    return `${totalTime} minutes`;
+                                })()}
+                            </div>
+                            <p className="text-xs text-green-700">
+                                Including rest periods between sets
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Config Footer */}
+                    <div className="flex items-center justify-between p-4 border-t border-gray-200">
+                        <button
+                            onClick={handleCloseConfig}
+                            className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+                            disabled={selectorData.addingExercise}
+                        >
+                            Back
+                        </button>
+                        <button
+                            onClick={handleAddToWorkout}
+                            disabled={selectorData.addingExercise || !selectorData.exerciseConfig}
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                        >
+                            {selectorData.addingExercise ? (
+                                <>
+                                    <div
+                                        className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                    Adding...
+                                </>
+                            ) : (
+                                <>
+                                    <PlusIcon className="w-4 h-4 mr-2"/>
+                                    Add to Workout
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
@@ -1024,12 +1015,12 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                         </div>
                         <input
                             type="text"
-                            placeholder={`Search ${selectedTab === 2 ? 'workout plans' : 'exercises'}...`}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder={`Search ${selectorData.selectedTab === 2 ? 'workout plans' : 'exercises'}...`}
+                            value={selectorData.searchTerm}
+                            onChange={(e) => selectorData.setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm transition-all duration-200 min-w-0"
                         />
-                        {searchTerm && (
+                        {selectorData.searchTerm && (
                             <button
                                 onClick={handleClearSearch}
                                 className="absolute inset-y-0 right-0 pr-3 flex items-center active:scale-95 z-10"
@@ -1039,18 +1030,19 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                         )}
                     </div>
                     <p className="text-xs text-gray-500 mt-2 px-1">
-                        {selectedTab === 2 ? 'Try "HIIT", "strength", "beginner"' : 'Try "cardio", "isometric", "planks"'}
+                        {selectorData.selectedTab === 2 ? 'Try "HIIT", "strength", "beginner"' : 'Try "cardio", "isometric", "planks"'}
                     </p>
                 </div>
 
                 {/* Error Display */}
-                {error && (
+                {selectorData.error && (
                     <div className="mx-4 sm:mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-2xl">
                         <div className="flex items-center">
                             <ExclamationTriangleIcon className="w-5 h-5 text-red-400 mr-3 flex-shrink-0"/>
-                            <span className="text-red-700 flex-1">{error}</span>
+                            <span className="text-red-700 flex-1">{selectorData.error}</span>
                             <button
-                                onClick={() => setError(null)}
+                                onClick={() => {
+                                }}
                                 className="ml-auto text-red-400 hover:text-red-600 flex-shrink-0 active:scale-95"
                             >
                                 <XMarkIcon className="w-5 h-5"/>
@@ -1067,19 +1059,19 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                     <nav className="flex space-x-1 overflow-x-auto py-2 scrollbar-hide">
                         {tabs.map((tab) => {
                             const IconComponent = tab.icon;
-                            const isActive = selectedTab === tab.id;
+                            const isActive = selectorData.selectedTab === tab.id;
 
                             let count = 0;
                             if (tab.id === 0) count = filteredExercises.length;
                             else if (tab.id === 1) count = filteredFavoriteExercises.length;
                             else if (tab.id === 2) count = filteredWorkoutPlans.length;
-                            else if (tab.id === 3) count = categories.length;
-                            else if (tab.id === 4) count = popularExercises.length;
+                            else if (tab.id === 3) count = selectorData.categories.length;
+                            else if (tab.id === 4) count = selectorData.popularExercises.length;
 
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setSelectedTab(tab.id)}
+                                    onClick={() => selectorData.setSelectedTab(tab.id)}
                                     className={`flex items-center px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all duration-200 flex-shrink-0 relative ${
                                         isActive
                                             ? tab.id === 1
@@ -1109,7 +1101,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                 <div className="border-t border-gray-200 bg-white rounded-b-3xl px-3 sm:px-4 py-3">
                     <div className="flex flex-col sm:flex-row items-center justify-between space-y-2 sm:space-y-0">
                         <div className="flex items-center space-x-3 text-xs text-gray-500">
-                            {selectedTab === 0 && (
+                            {selectorData.selectedTab === 0 && (
                                 <>
                                     <div className="flex items-center">
                                         <HeartIcon className="w-3 h-3 mr-1 text-red-500"/>
@@ -1125,7 +1117,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                     </div>
                                 </>
                             )}
-                            {selectedTab === 1 && (
+                            {selectorData.selectedTab === 1 && (
                                 <>
                                     <div className="flex items-center">
                                         <StarIcon className="w-3 h-3 mr-1 text-yellow-500"/>
@@ -1133,7 +1125,7 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                                     </div>
                                 </>
                             )}
-                            {selectedTab === 2 && (
+                            {selectorData.selectedTab === 2 && (
                                 <>
                                     <div className="flex items-center">
                                         <CheckCircleIcon className="w-3 h-3 mr-1 text-green-500"/>
@@ -1156,363 +1148,6 @@ const ExerciseSelector: React.FC<EnhancedExerciseSelectorProps> = ({
                         >
                             Close
                         </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ==================== EXERCISE CARD COMPONENT ====================
-
-interface ExerciseCardProps {
-    exercise: Exercise;
-    onSelect: () => void;
-    onDragStart?: () => void;
-    onToggleFavorite?: (exercise: Exercise, event?: React.MouseEvent) => void;
-    disabled?: boolean;
-    showPopularBadge?: boolean;
-    showFavoriteButton?: boolean;
-    isFavoritesTab?: boolean;
-}
-
-const ExerciseCard: React.FC<ExerciseCardProps> = ({
-                                                       exercise,
-                                                       onSelect,
-                                                       onDragStart,
-                                                       onToggleFavorite,
-                                                       disabled = false,
-                                                       showPopularBadge = false,
-                                                       showFavoriteButton = false,
-                                                       isFavoritesTab = false
-                                                   }) => {
-    const exerciseName = exercise.exerciseName || exercise.name || 'Unknown Exercise';
-    const isMobile = window.innerWidth < 768;
-    const isFavorited = exercise.isFavorite || false;
-
-    const getDifficultyColor = (difficulty: string | undefined) => {
-        const difficultyLevel = (difficulty || 'INTERMEDIATE').toLowerCase();
-        switch (difficultyLevel) {
-            case 'beginner':
-                return 'bg-green-100 text-green-700 border-green-200';
-            case 'intermediate':
-                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'advanced':
-                return 'bg-red-100 text-red-700 border-red-200';
-            default:
-                return 'bg-gray-100 text-gray-700 border-gray-200';
-        }
-    };
-
-    const getWorkoutTrackingBadge = () => {
-        if (exercise.isCardio) {
-            return (
-                <span
-                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                    <HeartIcon className="w-3 h-3 mr-1"/>
-                    Cardio
-                </span>
-            );
-        }
-        if (exercise.isIsometric) {
-            return (
-                <span
-                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                    <SparklesIcon className="w-3 h-3 mr-1"/>
-                    Hold
-                </span>
-            );
-        }
-        return (
-            <span
-                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
-                <FireIcon className="w-3 h-3 mr-1"/>
-                Reps
-            </span>
-        );
-    };
-
-    return (
-        <div
-            className={`
-                group bg-white rounded-2xl border border-gray-200 p-4 transition-all duration-300 relative
-                ${disabled
-                ? 'opacity-50 cursor-not-allowed'
-                : 'hover:shadow-lg hover:border-blue-300 cursor-pointer active:scale-[0.98] hover:-translate-y-1'
-            }
-            `}
-            draggable={!disabled && !isMobile}
-            onDragStart={disabled || isMobile ? undefined : onDragStart}
-            onClick={disabled ? undefined : onSelect}
-        >
-            {/* ✅ FIXED: Favorite Star Button - Always visible with correct colors */}
-            {showFavoriteButton && onToggleFavorite && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleFavorite(exercise, e);
-                    }}
-                    className={`
-            absolute top-3 right-3 z-10 p-2 rounded-full transition-all duration-200
-            active:scale-95 shadow-sm hover:shadow-md
-            ${isFavorited
-                        ? 'text-yellow-500 bg-yellow-100 hover:text-yellow-600 hover:bg-yellow-200 border border-yellow-300'
-                        : 'text-gray-400 bg-gray-100 hover:text-yellow-500 hover:bg-yellow-100 border border-gray-300'
-                    }
-        `}
-                    title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                    {/* ✅ FIXED: Use the correct star icon based on favorite status */}
-                    {isFavorited ? (
-                        <StarIconSolid className="w-5 h-5 text-yellow-500"/>
-                    ) : (
-                        <StarIcon className="w-5 h-5"/>
-                    )}
-                </button>
-            )}
-
-            <div className="flex items-start">
-                {!isMobile && (
-                    <div className="mr-3 text-gray-400 pt-1 group-hover:text-blue-500 transition-colors">
-                        <Bars3Icon className="w-5 h-5"/>
-                    </div>
-                )}
-
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center min-w-0 flex-1">
-                            <h3 className="font-bold text-gray-900 mr-2 text-base group-hover:text-blue-900 transition-colors truncate">
-                                {exercise.emoji || '💪'} {exerciseName}
-                            </h3>
-                            {showPopularBadge && (
-                                <span
-                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-800 border border-yellow-200 flex-shrink-0">
-                                    <StarIcon className="w-3 h-3 mr-1"/>
-                                    Popular
-                                </span>
-                            )}
-                            {/* Show small favorite indicator when not showing the button */}
-                            {isFavorited && !showFavoriteButton && (
-                                <StarIconSolid className="w-4 h-4 text-yellow-500 ml-2 flex-shrink-0"/>
-                            )}
-                        </div>
-                    </div>
-
-                    {exercise.description && (
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2 group-hover:text-gray-700 transition-colors">
-                            {exercise.description.length > 80
-                                ? `${exercise.description.substring(0, 80)}...`
-                                : exercise.description
-                            }
-                        </p>
-                    )}
-
-                    <div className="flex flex-wrap gap-2 mb-3">
-                        {getWorkoutTrackingBadge()}
-                        <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(exercise.difficultyLevel)}`}>
-                            {exercise.difficultyLevel || 'INTERMEDIATE'}
-                        </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3 text-xs text-gray-500">
-                            {exercise.estimatedDurationMinutes && (
-                                <div className="flex items-center">
-                                    <ClockIcon className="w-3 h-3 mr-1"/>
-                                    {exercise.estimatedDurationMinutes}min
-                                </div>
-                            )}
-                            {exercise.averageRating && exercise.averageRating > 0 && (
-                                <div className="flex items-center">
-                                    <StarIcon className="w-3 h-3 mr-1 text-yellow-500"/>
-                                    {exercise.averageRating.toFixed(1)}
-                                </div>
-                            )}
-                        </div>
-                        <div className="text-right">
-                            <span
-                                className="text-xs font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                                Tap to add →
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ==================== ENHANCED WORKOUT PLAN CARD COMPONENT ====================
-
-interface WorkoutPlanCardProps {
-    plan: WorkoutPlanInfo;
-    onSelect: () => void;
-    canAccess: boolean;
-    userTier: string;
-    disabled?: boolean;
-    viewMode?: 'grid' | 'list';
-}
-
-const WorkoutPlanCard: React.FC<WorkoutPlanCardProps> = ({
-                                                             plan,
-                                                             onSelect,
-                                                             canAccess,
-                                                             userTier,
-                                                             disabled = false,
-                                                             viewMode = 'grid'
-                                                         }) => {
-    const isLocked = !canAccess;
-    const isDisabled = disabled || isLocked;
-
-    const getDifficultyColor = (difficulty: string | undefined) => {
-        const difficultyLevel = (difficulty || 'INTERMEDIATE').toLowerCase();
-        switch (difficultyLevel) {
-            case 'beginner':
-                return 'bg-green-100 text-green-700 border-green-200';
-            case 'intermediate':
-                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'advanced':
-                return 'bg-red-100 text-red-700 border-red-200';
-            default:
-                return 'bg-gray-100 text-gray-700 border-gray-200';
-        }
-    };
-
-    const getTierColor = (tier: string | undefined) => {
-        const tierLevel = tier || 'FREE';
-        switch (tierLevel) {
-            case 'FREE':
-                return 'bg-green-100 text-green-700 border-green-200';
-            case 'PLUS':
-                return 'bg-blue-100 text-blue-700 border-blue-200';
-            case 'PRO':
-                return 'bg-purple-100 text-purple-700 border-purple-200';
-            default:
-                return 'bg-gray-100 text-gray-700 border-gray-200';
-        }
-    };
-
-    const getCardLayout = () => {
-        if (viewMode === 'list') {
-            return 'flex items-center p-4 space-x-4';
-        }
-        return 'flex flex-col p-6 space-y-4';
-    };
-
-    return (
-        <div
-            className={`
-                group bg-white rounded-2xl border border-gray-200 transition-all duration-300
-                ${isDisabled
-                ? 'opacity-50 cursor-not-allowed'
-                : 'hover:shadow-lg hover:border-purple-300 cursor-pointer active:scale-[0.98] hover:-translate-y-1'
-            }
-                ${isLocked ? 'bg-gray-50' : ''}
-            `}
-            onClick={isDisabled ? undefined : onSelect}
-        >
-            <div className={getCardLayout()}>
-                {/* Plan Icon/Image */}
-                <div className={`
-                    flex-shrink-0 rounded-xl flex items-center justify-center text-2xl font-bold
-                    ${viewMode === 'list' ? 'w-16 h-16' : 'w-20 h-20 mx-auto'}
-                    ${isLocked ? 'bg-gray-200 text-gray-500' : 'bg-gradient-to-br from-purple-100 to-blue-100 text-purple-600'}
-                `}>
-                    {isLocked ? <LockClosedIcon className="w-8 h-8"/> : '📋'}
-                </div>
-
-                {/* Plan Content */}
-                <div className={`${viewMode === 'list' ? 'flex-1' : ''}`}>
-                    <div className={`${viewMode === 'list' ? 'flex items-start justify-between' : 'text-center'}`}>
-                        <div className={`${viewMode === 'list' ? 'flex-1' : ''}`}>
-                            <h3 className={`font-bold text-gray-900 group-hover:text-purple-900 transition-colors
-                                ${viewMode === 'list' ? 'text-lg mb-1' : 'text-xl mb-2'}
-                            `}>
-                                {plan.name || plan.workoutName || 'Unnamed Workout Plan'}
-                            </h3>
-
-                            {plan.description && (
-                                <p className={`text-gray-600 group-hover:text-gray-700 transition-colors
-                                    ${viewMode === 'list' ? 'text-sm line-clamp-2' : 'text-sm mb-4 line-clamp-3'}
-                                `}>
-                                    {viewMode === 'list' && plan.description.length > 100
-                                        ? `${plan.description.substring(0, 100)}...`
-                                        : plan.description
-                                    }
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Quick Stats for List View */}
-                        {viewMode === 'list' && (
-                            <div className="flex items-center space-x-4 text-sm text-gray-500 ml-4">
-                                <div className="flex items-center">
-                                    <ClockIcon className="w-4 h-4 mr-1"/>
-                                    {plan.estimatedDurationMinutes || 0}min
-                                </div>
-                                <div className="flex items-center">
-                                    <UserGroupIcon className="w-4 h-4 mr-1"/>
-                                    {plan.exerciseCount || 0}
-                                </div>
-                                {plan.averageRating > 0 && (
-                                    <div className="flex items-center">
-                                        <StarIcon className="w-4 h-4 mr-1 text-yellow-500"/>
-                                        {plan.averageRating.toFixed(1)}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Plan Tags */}
-                    <div className={`flex flex-wrap gap-2 ${viewMode === 'list' ? 'mt-2' : 'mb-4'}`}>
-                        <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getTierColor(plan.subscriptionTierRequired)}`}>
-                            {plan.subscriptionTierRequired || 'FREE'}
-                        </span>
-                        <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(plan.difficulty)}`}>
-                            {plan.difficulty || plan.difficultyLevel || 'INTERMEDIATE'}
-                        </span>
-                        <span
-                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
-                            <UserGroupIcon className="w-3 h-3 mr-1"/>
-                            {plan.exerciseCount || 0} exercises
-                        </span>
-                    </div>
-
-                    {/* Grid View Stats */}
-                    {viewMode === 'grid' && (
-                        <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
-                            <div className="flex items-center">
-                                <ClockIcon className="w-4 h-4 mr-1"/>
-                                {plan.estimatedDurationMinutes || 0}min
-                            </div>
-                            {plan.averageRating && plan.averageRating > 0 && (
-                                <div className="flex items-center">
-                                    <StarIcon className="w-4 h-4 mr-1 text-yellow-500"/>
-                                    {plan.averageRating.toFixed(1)}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Action Hint */}
-                    <div className={`${viewMode === 'list' ? 'text-right mt-2' : 'text-center mt-4'}`}>
-                        {isLocked ? (
-                            <span className="text-xs font-medium text-gray-500">
-                                Upgrade to access →
-                            </span>
-                        ) : (
-                            <div className="flex items-center justify-center gap-2">
-                                <CogIcon className="w-4 h-4 text-purple-600"/>
-                                <span
-                                    className="text-xs font-medium text-gray-900 group-hover:text-purple-600 transition-colors">
-                                    Configure & Schedule →
-                                </span>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>

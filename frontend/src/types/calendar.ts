@@ -17,3 +17,10 @@ export interface WorkoutPlanExerciseConfig {
     substitute?: boolean;
     notes?: string;
 }
+
+export interface CalendarDay {
+    dateString: string;
+    date: Date;
+    isToday: boolean;
+    exercises: any[];
+}

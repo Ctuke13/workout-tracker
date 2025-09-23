@@ -19,7 +19,15 @@ import {Button} from '../ui/button';
 import {Card, CardContent, CardHeader, CardTitle} from '../ui/card';
 import {Badge} from '../ui/badge';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '../ui/tabs';
-import {WorkoutResults} from '../../types/exercise'; // Using your existing interface
+import {WorkoutResults} from '../../types/exercise';
+import {analyzeWorkout} from '../../utils/workoutPerformanceAnalyzer';
+import {
+    getPerformanceColor,
+    getPerformanceIcon,
+    getPerformanceMessage,
+    getStatusIcon,
+    getStatusColor
+} from '../../utils/workoutDisplayHelpers';
 
 interface PerformanceStatsModalProps {
     isOpen: boolean;
@@ -52,35 +60,6 @@ const PerformanceStatsModal: React.FC<PerformanceStatsModalProps> = ({
     const personalRecords = workoutResults.personalRecords || [];
     const improvements = workoutResults.improvements || [];
 
-    const getPerformanceColor = (rating: string) => {
-        switch (rating) {
-            case 'EXCEEDED':
-                return 'text-green-600 bg-green-100 border-green-300';
-            case 'MET':
-                return 'text-blue-600 bg-blue-100 border-blue-300';
-            case 'PARTIAL':
-                return 'text-yellow-600 bg-yellow-100 border-yellow-300';
-            case 'BELOW_TARGET':
-                return 'text-red-600 bg-red-100 border-red-300';
-            default:
-                return 'text-gray-600 bg-gray-100 border-gray-300';
-        }
-    };
-
-    const getPerformanceIcon = (rating: string) => {
-        switch (rating) {
-            case 'EXCEEDED':
-                return <TrendingUp className="w-4 h-4"/>;
-            case 'MET':
-                return <Target className="w-4 h-4"/>;
-            case 'PARTIAL':
-                return <Activity className="w-4 h-4"/>;
-            case 'BELOW_TARGET':
-                return <TrendingDown className="w-4 h-4"/>;
-            default:
-                return <Activity className="w-4 h-4"/>;
-        }
-    };
 
     const renderStrengthOverview = () => (
         <div className="space-y-6">
@@ -129,7 +108,10 @@ const PerformanceStatsModal: React.FC<PerformanceStatsModalProps> = ({
                         </div>
                         <div
                             className={`px-4 py-2 rounded-full border-2 flex items-center gap-2 ${getPerformanceColor(workoutResults.performanceRating)}`}>
-                            {getPerformanceIcon(workoutResults.performanceRating)}
+                            {(() => {
+                                const IconComponent = getPerformanceIcon(workoutResults.performanceRating);
+                                return <IconComponent className="w-4 h-4"/>;
+                            })()}
                             <span className="font-semibold capitalize">
                                 {workoutResults.performanceRating.toLowerCase().replace('_', ' ')}
                             </span>

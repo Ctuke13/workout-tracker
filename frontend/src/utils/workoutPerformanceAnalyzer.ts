@@ -498,3 +498,11 @@ export const createFallbackAnalysis = (exercise: ScheduledExercise, results: Wor
         summary
     };
 };
+
+export type {
+    WorkoutAnalysisResult,
+    CriterionDetail,
+    PerformanceEvaluation,
+    WorkoutQuickStats,
+    WorkoutSummary
+};

@@ -444,6 +444,10 @@ export interface Goal {
     count: number;
 }
 
+export interface CategoryWithDescription extends Goal {
+    description: string;
+}
+
 // Exercise Type option for dropdowns
 export interface ExerciseTypeOption {
     value: ExerciseType;

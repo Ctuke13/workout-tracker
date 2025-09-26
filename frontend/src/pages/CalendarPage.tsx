@@ -1,4 +1,4 @@
-import React, {useState, useRef} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {useNavigate, useLocation} from 'react-router-dom';
 import {Card, CardContent, CardHeader, CardTitle} from '../components/ui/card';
 import {Badge} from '../components/ui/badge';
@@ -98,6 +98,34 @@ const CalendarPage: React.FC = () => {
         closeWorkoutDetailsModal,
         handleModeChange
     } = useModalState();
+
+    useEffect(() => {
+        // Handle navigation back to calendar after workout completion
+        if (location.pathname === '/calendar' && previousLocation.current === '/workout') {
+            console.log('Returned to calendar from workout, refreshing data...');
+            refreshCalendarData(true);
+        }
+
+        // Also check session storage for workout completion flag
+        const workoutJustCompleted = sessionStorage.getItem('workoutJustCompleted');
+        const completedWorkoutDate = sessionStorage.getItem('completedWorkoutDate');
+
+        if (workoutJustCompleted === 'true' && completedWorkoutDate) {
+            console.log('Workout completion detected, ensuring calendar is up to date...');
+            refreshCalendarData(true, true); // showToast=true, forceCacheBust=true
+
+            // If the completed workout was for the currently viewed date, ensure we show it
+            if (completedWorkoutDate === viewingDateString) {
+                loadDayData(true); // force reload
+            }
+
+            // Clear the flags
+            sessionStorage.removeItem('workoutJustCompleted');
+            sessionStorage.removeItem('completedWorkoutDate');
+        }
+
+        previousLocation.current = location.pathname;
+    }, [location.pathname, refreshCalendarData, viewingDateString, loadDayData]);
 
     // Navigation handlers
     const navigateDay = (direction: 'prev' | 'next') => {

@@ -160,9 +160,29 @@ const analyzeIsometricPerformance = (
     achievedWeight: number
 ) => {
     if (exercise.holdDurationSeconds) {
-        // For isometric exercises, actualReps contains the hold time in seconds
-        const totalActualHold = results.sets.reduce((sum, set) => sum + (set.actualReps || 0), 0);
+        // 🔧 FIXED: Get hold time from the correct field with fallback logic
+        const totalActualHold = results.sets.reduce((sum, set) => {
+            let holdTime = 0;
+
+            // Try multiple field locations for hold time
+            if (set.isometricData?.holdDurationSeconds) {
+                holdTime = set.isometricData.holdDurationSeconds;
+            } else if ((set as any).actualHoldSeconds) {
+                holdTime = (set as any).actualHoldSeconds;
+            } else if ((set as any).holdTime) {
+                holdTime = (set as any).holdTime;
+            } else if (set.actualReps) {
+                // Legacy fallback - some old data might still use actualReps
+                holdTime = set.actualReps;
+            }
+
+            console.log(`🔍 ANALYZER: Set ${set.setNumber} hold time: ${holdTime}s`);
+            return sum + holdTime;
+        }, 0);
+
         const expectedTotalHold = exercise.holdDurationSeconds * (exercise.targetSets || 1);
+
+        console.log(`🔍 ANALYZER: Total hold - actual: ${totalActualHold}s, expected: ${expectedTotalHold}s`);
 
         const holdStatus = totalActualHold >= expectedTotalHold ?
             (totalActualHold >= expectedTotalHold * 1.1 ? 'EXCEEDED' : 'MET') :
@@ -184,7 +204,7 @@ const analyzeIsometricPerformance = (
         else if (holdStatus === 'MET') achievedWeight += 0.5;
         else if (holdStatus === 'PARTIAL') achievedWeight += 0.3;
 
-        // Average Hold Analysis
+        // Average Hold Analysis - FIXED
         if (results.sets.length > 0) {
             const avgActualHold = totalActualHold / results.sets.length;
             const avgPercentage = (avgActualHold / exercise.holdDurationSeconds) * 100;
@@ -337,9 +357,28 @@ export const generateQuickStats = (exercise: ScheduledExercise, results: Workout
         stats.averagePace = results.actualPace;
         stats.caloriesBurned = results.caloriesBurned;
     } else if (exercise.exercise.isIsometric) {
-        stats.totalHoldTime = results.sets.reduce((sum, set) => sum + (set.actualReps || 0), 0);
+        // 🔧 FIXED: Get hold time from the correct field with fallback logic
+        stats.totalHoldTime = results.sets.reduce((sum, set) => {
+            let holdTime = 0;
+
+            if (set.isometricData?.holdDurationSeconds) {
+                holdTime = set.isometricData.holdDurationSeconds;
+            } else if ((set as any).actualHoldSeconds) {
+                holdTime = (set as any).actualHoldSeconds;
+            } else if ((set as any).holdTime) {
+                holdTime = (set as any).holdTime;
+            } else if (set.actualReps) {
+                // Legacy fallback
+                holdTime = set.actualReps;
+            }
+
+            return sum + holdTime;
+        }, 0);
+
         stats.averageHoldTime = stats.totalHoldTime && results.sets.length > 0 ?
             Math.round(stats.totalHoldTime / results.sets.length) : undefined;
+
+        console.log(`🔍 QUICK STATS: totalHoldTime: ${stats.totalHoldTime}s, averageHoldTime: ${stats.averageHoldTime}s`);
     } else {
         // Strength exercise
         stats.totalReps = results.sets.reduce((sum, set) => sum + set.actualReps, 0);

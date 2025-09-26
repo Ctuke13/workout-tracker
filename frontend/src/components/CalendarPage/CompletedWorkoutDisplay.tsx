@@ -29,6 +29,60 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
         return <IconComponent className="w-3 h-3"/>;
     };
 
+    // 🔧 FIXED: Better isometric hold time calculation using correct field names
+    const calculateIsometricHoldTimes = () => {
+        if (!workoutResults?.sets) return {totalHold: 0, avgHold: 0};
+
+        console.log('🔍 DEBUG: Calculating hold times from sets:', workoutResults.sets);
+
+        let totalHold = 0;
+        let completedSets = 0;
+
+        workoutResults.sets.forEach((set, index) => {
+            console.log(`🔍 DEBUG: Set ${index + 1}:`, {
+                completed: set.completed,
+                isometricData: set.isometricData,
+                allFields: Object.keys(set)
+            });
+
+            if (set.completed) {
+                completedSets++;
+
+                // Use only fields that exist in the type definition
+                let holdTime = 0;
+
+                if (set.isometricData?.holdDurationSeconds) {
+                    holdTime = set.isometricData.holdDurationSeconds;
+                } else if ((set as any).actualHoldSeconds) {
+                    // Fallback to any field that might exist but isn't typed
+                    holdTime = (set as any).actualHoldSeconds;
+                } else if ((set as any).holdDurationSeconds) {
+                    holdTime = (set as any).holdDurationSeconds;
+                }
+
+                console.log(`🔍 DEBUG: Set ${index + 1} hold time: ${holdTime}s (from ${set.isometricData?.holdDurationSeconds ? 'isometricData.holdDurationSeconds' : 'fallback'})`);
+                totalHold += holdTime;
+            }
+        });
+
+        // Fallback: Check top-level actualHoldDurations array
+        if (totalHold === 0 && workoutResults.actualHoldDurations?.length) {
+            console.log('🔍 DEBUG: Using fallback actualHoldDurations:', workoutResults.actualHoldDurations);
+            totalHold = workoutResults.actualHoldDurations.reduce((sum, hold) => sum + (hold || 0), 0);
+            completedSets = workoutResults.actualHoldDurations.filter(hold => hold && hold > 0).length;
+        }
+
+        const avgHold = completedSets > 0 ? Math.round(totalHold / completedSets) : 0;
+
+        console.log('🔍 DEBUG: Final calculation:', {
+            totalHold,
+            completedSets,
+            avgHold
+        });
+
+        return {totalHold, avgHold};
+    };
+
     const renderEnhancedResults = () => {
         if (!workoutResults || !analysis) return null;
 
@@ -109,41 +163,13 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                         <>
                             <div className="text-center p-2 bg-purple-50 rounded-lg">
                                 <div className="text-lg font-bold text-purple-600">
-                                    {(() => {
-                                        let totalHold = 0;
-
-                                        // For isometric exercises, actualReps contains the hold time in seconds
-                                        if (workoutResults.sets && workoutResults.sets.length > 0) {
-                                            totalHold = workoutResults.sets.reduce((sum, set) => {
-                                                return sum + (set.actualReps || 0);
-                                            }, 0);
-                                        }
-
-                                        // Fallback to actualHoldDurations if available
-                                        if (totalHold === 0 && workoutResults.actualHoldDurations) {
-                                            totalHold = workoutResults.actualHoldDurations.reduce((sum, hold) => sum + (hold || 0), 0);
-                                        }
-
-                                        return totalHold;
-                                    })()}s
+                                    {calculateIsometricHoldTimes().totalHold}s
                                 </div>
                                 <div className="text-xs text-purple-700">Total Hold</div>
                             </div>
                             <div className="text-center p-2 bg-indigo-50 rounded-lg">
                                 <div className="text-lg font-bold text-indigo-600">
-                                    {(() => {
-                                        let totalHold = 0;
-                                        let setCount = 0;
-
-                                        if (workoutResults.sets && workoutResults.sets.length > 0) {
-                                            setCount = workoutResults.sets.length;
-                                            totalHold = workoutResults.sets.reduce((sum, set) => {
-                                                return sum + (set.actualReps || 0);
-                                            }, 0);
-                                        }
-
-                                        return setCount > 0 ? Math.round(totalHold / setCount) : 0;
-                                    })()}s
+                                    {calculateIsometricHoldTimes().avgHold}s
                                 </div>
                                 <div className="text-xs text-indigo-700">Avg Hold</div>
                             </div>

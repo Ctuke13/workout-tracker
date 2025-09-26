@@ -1,4 +1,5 @@
 import {useState, useEffect, useMemo} from 'react';
+import {useWorkoutEventListener} from './useWorkoutEventListener';
 import {toast} from 'react-hot-toast';
 import {calendarApi} from '../services/calendarApi';
 import {exerciseApi} from '../services/exerciseApi';
@@ -146,6 +147,19 @@ export const useCalendarData = (viewingDate: Date): UseCalendarDataReturn => {
             }
         }
     };
+
+    // Add workout completion event listener
+    useWorkoutEventListener((detail) => {
+        console.log('Calendar refreshing due to workout completion:', detail);
+
+        // Force refresh calendar data
+        refreshCalendarData(true, true); // showToast=true, forceCacheBust=true
+
+        // If the completed workout is for the currently viewed date, reload that day's data
+        if (detail.date === viewingDateString) {
+            loadDayData(true);
+        }
+    });
 
     useEffect(() => {
         loadDayData();

@@ -1,6 +1,7 @@
 # 🏋️‍♂️ Workout Tracker v2 - Complete Project File Tree
 
 ## 📊 Project Overview
+
 - **Total Java Files**: 277
 - **Total TypeScript/JavaScript Files** (excluding node_modules): 84
 - **Total SQL Migration Files**: 13
@@ -470,7 +471,6 @@ workout-tracker/
 │   │   │   │   ├── CompletedWorkoutDisplay.tsx
 │   │   │   │   ├── ExerciseConfigModal.tsx
 │   │   │   │   ├── ExerciseSelector.tsx
-│   │   │   │   ├── InWorkoutExerciseSelector.tsx
 │   │   │   │   ├── WorkoutPlanConfigModal.tsx
 │   │   │   │   └── index.ts
 │   │   │   ├── 💪 ExercisePage/ (4 files)
@@ -582,6 +582,7 @@ workout-tracker/
 ## 🚀 Recent Key Additions
 
 ### Backend Enhancements
+
 - **ExerciseFavoritesController.java** - Exercise favorites management endpoint
 - **ExerciseFavoritesService.java** - Exercise favorites business logic service
 - **V013__Create_Scheduled_Workouts.sql** - Scheduled workouts database schema
@@ -591,19 +592,22 @@ workout-tracker/
 - **ScheduleMultipleExercisesRequestDTO.java** - Bulk exercise scheduling
 
 ### Frontend Enhancements
+
 - **CompletedWorkoutDisplay.tsx** - Completed workout display component
 - **WorkoutPlanConfigModal.tsx** - Workout plan configuration modal
 - **WorkoutTrackingInterface.tsx** - New workout tracking component
 - **UI Components** (7 files) - Complete shadcn/ui component library:
-  - badge.tsx, button.tsx, card.tsx, input.tsx, label.tsx, select.tsx, textarea.tsx
+    - badge.tsx, button.tsx, card.tsx, input.tsx, label.tsx, select.tsx, textarea.tsx
 - **calendarApi.ts** - Calendar API integration
 - **workoutPlanApi.ts** - Workout plan API service
 - **utils.ts** - Utility functions library
 
 ### Documentation & Planning
+
 - **REFACTORING-PLAN.md** - Comprehensive 10-phase refactoring roadmap for optimization
 
 ### Infrastructure
+
 - **Scheduled Workouts System** - Complete scheduled workout management
 - **Exercise Favorites System** - User exercise favorites tracking
 - **Enhanced Calendar Features** - Advanced calendar functionality with workout planning
@@ -612,6 +616,7 @@ workout-tracker/
 ## 📈 Architecture Summary
 
 ### Backend (Spring Boot)
+
 - **🔐 Security Layer**: JWT authentication, role-based access control
 - **🎮 Controller Layer**: 18 REST controllers with comprehensive API endpoints
 - **🔧 Service Layer**: 20 business logic services with modular architecture
@@ -621,6 +626,7 @@ workout-tracker/
 - **🗺️ Mapping Layer**: 13 mappers for DTO transformations
 
 ### Frontend (TypeScript React)
+
 - **🧩 Component Architecture**: 41 reusable components with modern patterns
 - **📄 Page Structure**: 15 pages covering all user workflows
 - **🔄 State Management**: Context-based state with custom hooks
@@ -628,4 +634,6 @@ workout-tracker/
 - **🎨 UI Framework**: Modern design system with Tailwind CSS + shadcn/ui
 - **📝 Type Safety**: Full TypeScript implementation with strict typing
 
-This represents a comprehensive full-stack fitness tracking application with enterprise-level architecture, modern development practices, and a complete feature set for workout management, social interaction, and professional coaching capabilities.
+This represents a comprehensive full-stack fitness tracking application with enterprise-level architecture, modern
+development practices, and a complete feature set for workout management, social interaction, and professional coaching
+capabilities.

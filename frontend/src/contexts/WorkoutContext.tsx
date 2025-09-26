@@ -44,7 +44,7 @@ export interface WorkoutContextType {
     // Exercise management
     skipExercise: (exerciseId: string) => void;
     completeExercise: (exerciseId: string) => void;
-    addExerciseToCurrentWorkout: (exercise: any, config: any) => void;
+    addExerciseToCurrentWorkout: (exercise: any, config: any) => Promise<void>;
 
     // Session data
     getTotalDuration: () => number;
@@ -598,55 +598,43 @@ function workoutReducer(
 
             const {exercise, config} = action.payload;
 
-            console.log('Adding exercise to current workout:', exercise.name || exercise.exerciseName, config);
+            console.log('Adding exercise to current workout session:', exercise.name || exercise.exerciseName);
 
-            // Robust configuration handling with defaults and weight units
-            const setsCount = config.targetSets || (exercise.isCardio ? 1 : exercise.isIsometric ? 3 : 3);
-            const targetReps = config.targetReps || (exercise.isCardio ? config.targetDurationMinutes || 20 :
-                exercise.isIsometric ? config.holdDurationSeconds || 30 : 10);
-            const restSeconds = config.restSeconds || (exercise.isCardio ? 0 : exercise.isIsometric ? 60 : 90);
-            const weightUnit = config.targetWeightUnit || 'lbs';
+            // Use the real scheduled exercise from the database
+            const scheduledExercise = config.scheduledExercise;
 
-            // Create sets based on configuration
+            if (!scheduledExercise) {
+                console.error('No scheduled exercise provided from database');
+                return state;
+            }
+
+            // Create sets based on the database record
+            const setsCount = scheduledExercise.targetSets || 3;
+            const targetReps = scheduledExercise.targetReps || 10;
+            const restSeconds = scheduledExercise.restSeconds || 90;
+            const weightUnit = scheduledExercise.targetWeightUnit || 'lbs';
+
             const sets: WorkoutSet[] = Array.from({length: setsCount}, (_, setIndex) => ({
-                id: `added-exercise-${Date.now()}-set-${setIndex + 1}`,
+                id: `${scheduledExercise.id}-set-${setIndex + 1}`, // Use real DB ID
                 setNumber: setIndex + 1,
                 targetReps,
-                targetWeight: config.targetWeight ? parseFloat(config.targetWeight) : undefined,
+                targetWeight: scheduledExercise.targetWeight,
                 targetWeightUnit: weightUnit,
-                targetRpe: config.targetRpe,
+                targetRpe: scheduledExercise.targetRpe,
                 restSeconds,
                 completed: false,
             }));
 
-            // Create a ScheduledExercise object to match your existing structure
-            const scheduledExercise: ScheduledExercise = {
-                id: `scheduled-${Date.now()}`,
-                exerciseId: exercise.id,
-                exercise: exercise,
-                scheduledDate: state.currentWorkout.date,
-                targetSets: setsCount,
-                targetReps: targetReps,
-                targetWeight: config.targetWeight ? parseFloat(config.targetWeight) : undefined,
-                targetWeightUnit: weightUnit,
-                restSeconds,
-                targetRpe: config.targetRpe,
-                notes: config.notes,
-                completed: false,
-                createdAt: new Date().toISOString(),
-                userId: 'current_user'
-            };
-
-            // Create the workout exercise
+            // Create the workout exercise using the real scheduled exercise
             const workoutExercise: WorkoutExercise = {
-                id: `workout-exercise-${Date.now()}`,
+                id: scheduledExercise.id, // Use real DB ID
                 scheduledExercise,
                 sets,
                 completed: false,
                 skipped: false,
             };
 
-            console.log('Created workout exercise with', sets.length, 'sets');
+            console.log('Created workout exercise with', sets.length, 'sets using database ID:', scheduledExercise.id);
 
             return {
                 currentWorkout: {
@@ -1185,6 +1173,12 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
 
             if (saveSuccessful) {
                 console.log('Workout results saved successfully');
+                window.dispatchEvent(new CustomEvent('workoutCompleted', {
+                    detail: {
+                        date: completedWorkout.date,
+                        exerciseIds: completedWorkout.exercises.map(ex => ex.scheduledExercise.id)
+                    }
+                }));
 
                 // Set session storage flags AFTER successful save
                 sessionStorage.setItem('workoutJustCompleted', 'true');
@@ -1268,17 +1262,63 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
         dispatch({type: 'COMPLETE_EXERCISE', payload: exerciseId});
     };
 
-    const addExerciseToCurrentWorkout = (exercise: any, config: any) => {
+    const addExerciseToCurrentWorkout = useCallback(async (exercise: any, config: any) => {
         console.log('Adding exercise to current workout:', exercise.name || exercise.exerciseName, config);
 
-        // Validate exercise and config before adding
-        if (!exercise || !config) {
-            console.error('Invalid exercise or config provided:', {exercise, config});
-            return;
+        if (!exercise || !config || !state.currentWorkout) {
+            console.error('Invalid exercise, config, or no active workout:', {
+                exercise,
+                config,
+                hasWorkout: !!state.currentWorkout
+            });
+            throw new Error('Invalid exercise data or no active workout');
         }
 
-        dispatch({type: 'ADD_EXERCISE_TO_WORKOUT', payload: {exercise, config}});
-    };
+        try {
+            // Step 1: Create the scheduled exercise in the database FIRST
+            const exerciseData = {
+                exerciseId: exercise.id,
+                scheduledDate: state.currentWorkout.date,
+                sets: config.targetSets || (exercise.isCardio ? 1 : exercise.isIsometric ? 3 : 3),
+                reps: config.targetReps?.toString() || (exercise.isCardio ? config.targetDurationMinutes?.toString() || '20' :
+                    exercise.isIsometric ? config.holdDurationSeconds?.toString() || '30' : '10'),
+                weight: config.targetWeight ? parseFloat(config.targetWeight) : undefined,
+                restSeconds: config.restSeconds || (exercise.isCardio ? 0 : exercise.isIsometric ? 60 : 90),
+                targetRpe: config.targetRpe,
+                targetDurationMinutes: config.targetDurationMinutes,
+                targetDistanceKm: config.targetDistance && config.targetDistanceUnit === 'km' ? config.targetDistance :
+                    config.targetDistance && config.targetDistanceUnit === 'miles' ? config.targetDistance * 1.60934 : undefined,
+                targetPace: config.targetPace,
+                holdDurationSeconds: config.holdDurationSeconds,
+                notes: config.notes,
+            };
+
+            console.log('Creating scheduled exercise in database:', exerciseData);
+
+            // Step 2: Call the API to create the scheduled exercise
+            const createdScheduledExercise = await calendarApi.scheduleIndividualExercise(exerciseData);
+
+            console.log('Successfully created scheduled exercise:', createdScheduledExercise.id);
+
+            // Step 3: Add to workout session using the REAL database ID
+            dispatch({
+                type: 'ADD_EXERCISE_TO_WORKOUT', payload: {
+                    exercise,
+                    config: {
+                        ...config,
+                        databaseId: createdScheduledExercise.id,
+                        scheduledExercise: createdScheduledExercise
+                    }
+                }
+            });
+
+            console.log('Successfully added exercise to workout session');
+
+        } catch (error) {
+            console.error('Failed to add exercise to workout:', error);
+            throw new Error(`Failed to add ${exercise.name || exercise.exerciseName} to workout. Please try again.`);
+        }
+    }, [state.currentWorkout]);
 
     // ==================== SESSION DATA ====================
 

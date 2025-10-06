@@ -83,6 +83,13 @@ export interface WorkoutResults {
     completedAt: string;
     totalDurationMinutes: number;
 
+    // ==================== CALORIE TRACKING ====================
+    totalCaloriesCalculated?: number;
+    actualCaloriesBurned?: number;
+    calorieCalculationStatus?: string;
+    calorieAccuracyRating?: number;
+    userReportedCalories?: number;
+
     // Performance rating
     performanceRating: 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL';
 
@@ -97,6 +104,7 @@ export interface WorkoutResults {
         rpe?: number;
         formRating?: number;
         restSeconds?: number;
+        actualRestSeconds?: number;
         setDurationSeconds?: number;
         completed: boolean;
         performanceVsTarget?: 'EXCEEDED' | 'MET' | 'BELOW_TARGET' | 'PARTIAL';

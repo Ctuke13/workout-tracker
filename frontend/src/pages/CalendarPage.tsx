@@ -161,9 +161,12 @@ const CalendarPage: React.FC = () => {
     };
 
     const handleViewWorkoutDetailsWithModal = (exerciseId: string) => {
-        handleViewWorkoutDetails(exerciseId);
-        if (selectedExerciseForDetails && selectedWorkoutResults) {
-            openWorkoutDetailsModal();
+        const hasData = handleViewWorkoutDetails(exerciseId);
+        if (hasData) {
+            // Small delay to ensure state updates
+            setTimeout(() => {
+                openWorkoutDetailsModal();
+            }, 50);
         }
     };
 

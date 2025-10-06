@@ -526,6 +526,7 @@ public class WorkoutExecutionService {
                 setData.put("completed", record.getIsExerciseCompleted() != null ? record.getIsExerciseCompleted() : true);
                 setData.put("rpe", record.getPerceivedExertion());
                 setData.put("restSeconds", record.getRestTimeBeforeSetSeconds());
+                setData.put("actualRestSeconds", record.getActualRestSeconds());
                 setData.put("notes", record.getNotes());
 
                 sets.add(setData);
@@ -691,6 +692,7 @@ public class WorkoutExecutionService {
                 record.setTargetWeightPlanned(setData.getTargetWeight());
                 record.setPerceivedExertion(setData.getRpe());
                 record.setRestTimeBeforeSetSeconds(setData.getRestSeconds());
+                record.setActualRestSeconds(setData.getActualRestSeconds());
                 record.setIsExerciseCompleted(setData.getCompleted());
                 record.setNotes(setData.getNotes());
 
@@ -762,6 +764,7 @@ public class WorkoutExecutionService {
         private String targetWeightUnit;
         private Integer rpe;
         private Integer restSeconds;
+        private Integer actualRestSeconds;
         private Boolean completed;
         private Integer actualDurationMinutes;
         private Integer actualHoldSeconds;

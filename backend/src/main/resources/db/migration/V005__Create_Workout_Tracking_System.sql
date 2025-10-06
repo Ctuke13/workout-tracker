@@ -9,14 +9,14 @@
 -- =====================================================
 
 -- Add soft delete columns to existing scheduled_workouts table
-ALTER TABLE scheduled_workouts
-    ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT FALSE,
-ADD COLUMN deleted_at TIMESTAMP,
-ADD COLUMN deleted_by VARCHAR(255);
-
--- Add indexes for soft delete queries
-CREATE INDEX idx_scheduled_workouts_deleted ON scheduled_workouts(deleted);
-CREATE INDEX idx_scheduled_workouts_user_status_deleted ON scheduled_workouts(user_id, status, deleted);
+-- ALTER TABLE scheduled_workouts
+--     ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT FALSE,
+-- ADD COLUMN deleted_at TIMESTAMP,
+-- ADD COLUMN deleted_by VARCHAR(255);
+--
+-- -- Add indexes for soft delete queries
+-- CREATE INDEX idx_scheduled_workouts_deleted ON scheduled_workouts(deleted);
+-- CREATE INDEX idx_scheduled_workouts_user_status_deleted ON scheduled_workouts(user_id, status, deleted);
 
 -- =====================================================
 -- WORKOUT_SESSIONS TABLE (matches WorkoutSession.java exactly)
@@ -63,10 +63,10 @@ CREATE TABLE workout_sessions (
                                   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    -- Foreign key constraints
+-- Foreign key constraints
                                   CONSTRAINT fk_workout_sessions_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-                                  CONSTRAINT fk_workout_sessions_workout_plan FOREIGN KEY (workout_plan_id) REFERENCES workout_plans(workout_plan_id) ON DELETE CASCADE,
-                                  CONSTRAINT fk_workout_sessions_scheduled_workout FOREIGN KEY (scheduled_workout_id) REFERENCES scheduled_workouts(scheduled_workout_id) ON DELETE CASCADE
+                                  CONSTRAINT fk_workout_sessions_workout_plan FOREIGN KEY (workout_plan_id) REFERENCES workout_plans(workout_plan_id) ON DELETE CASCADE
+-- CONSTRAINT fk_workout_sessions_scheduled_workout FOREIGN KEY (scheduled_workout_id) REFERENCES scheduled_workouts(scheduled_workout_id) ON DELETE CASCADE
 );
 
 -- Add constraints for WorkoutSession enum values and validation
@@ -123,6 +123,7 @@ CREATE TABLE performance_records (
                                      perceived_exertion INTEGER,
                                      form_rating INTEGER,
                                      rest_seconds INTEGER,
+                                     actual_rest_seconds INTEGER,
                                      tempo VARCHAR(20),
 
     -- Rest time tracking and set timing
@@ -196,6 +197,9 @@ ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_form_rati
 
 ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_rest_seconds
     CHECK (rest_seconds IS NULL OR rest_seconds >= 0);
+
+ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_actual_rest_seconds
+    CHECK (actual_rest_seconds IS NULL OR actual_rest_seconds >= 0);
 
 ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_hold_duration_seconds
     CHECK (hold_duration_seconds IS NULL OR hold_duration_seconds >= 0);
@@ -283,6 +287,7 @@ CREATE INDEX idx_performance_records_exercise_completed ON performance_records(i
 CREATE INDEX idx_performance_records_performance_vs_target ON performance_records(performance_vs_target);
 CREATE INDEX idx_performance_records_set_timing ON performance_records(set_start_time, set_end_time);
 CREATE INDEX idx_performance_records_rest_time ON performance_records(rest_time_before_set_seconds);
+CREATE INDEX idx_performance_records_actual_rest_seconds ON performance_records(actual_rest_seconds);
 CREATE INDEX idx_performance_records_target_analysis ON performance_records(exercise_id, target_reps_planned, target_weight_planned, performance_vs_target);
 
 -- Composite indexes for complex queries

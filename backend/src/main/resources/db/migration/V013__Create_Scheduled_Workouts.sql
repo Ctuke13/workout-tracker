@@ -236,6 +236,20 @@ CREATE UNIQUE INDEX idx_unique_user_date_exercise_workout
     ON scheduled_workouts(user_id, scheduled_date, exercise_id, workout_plan_id);
 
 -- =====================================================
+-- ADD SOFT DELETE SUPPORT (FROM V005)
+-- =====================================================
+
+-- Add soft delete columns that V005 couldn't add
+ALTER TABLE scheduled_workouts
+    ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN deleted_at TIMESTAMP,
+    ADD COLUMN deleted_by VARCHAR(255);
+
+-- Add indexes for soft delete queries
+CREATE INDEX idx_scheduled_workouts_deleted ON scheduled_workouts(deleted);
+CREATE INDEX idx_scheduled_workouts_user_status_deleted ON scheduled_workouts(user_id, status, deleted);
+
+-- =====================================================
 -- SAMPLE TEST DATA FOR EXERCISE TYPE DETECTION
 -- =====================================================
 

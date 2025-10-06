@@ -241,6 +241,7 @@ public class User implements UserDetails {
 
     /**
      * Check if user has a specific role
+     *
      * @param roleName the role to check (e.g., "ADMIN", "PROFESSIONAL", "REGULAR")
      * @return true if user has the role
      */
@@ -253,6 +254,7 @@ public class User implements UserDetails {
 
     /**
      * Check if user is a professional (has PROFESSIONAL user type)
+     *
      * @return true if user has professional user type
      */
     public boolean isProfessional() {
@@ -261,6 +263,7 @@ public class User implements UserDetails {
 
     /**
      * Check if user is an admin (has ADMIN user type)
+     *
      * @return true if user has admin user type
      */
     public boolean isAdmin() {
@@ -269,6 +272,7 @@ public class User implements UserDetails {
 
     /**
      * Check if user has pending verification request
+     *
      * @return true if verification is pending
      */
     public boolean hasPendingVerification() {
@@ -734,6 +738,23 @@ public class User implements UserDetails {
     @Builder.Default
     private Boolean autoAcceptFollowRequests = true;
 
+    // ==================== CALORIE TRACKING PREFERENCES ====================
+
+    @Column(name = "calorie_adjustment_factor")
+    @Builder.Default
+    private Double calorieAdjustmentFactor = 1.0;
+
+    @Column(name = "calorie_tracking_enabled")
+    @Builder.Default
+    private Boolean calorieTrackingEnabled = true;
+
+    @Column(name = "preferred_calorie_unit")
+    @Builder.Default
+    private String preferredCalorieUnit = "CALORIES"; // or "KILOJOULES"
+
+    @Column(name = "calorie_goal_daily")
+    private Integer calorieGoalDaily;
+
     // ==================== ADD THESE METHODS TO USER ENTITY ====================
     // (Add these methods to your existing User.java class)
 
@@ -1001,7 +1022,7 @@ public class User implements UserDetails {
         }
 
         // Engagement rate contribution (max 15 points)
-        score += Math.min(15, (int)(getEngagementRate() * 3));
+        score += Math.min(15, (int) (getEngagementRate() * 3));
 
         return Math.min(100, score);
     }

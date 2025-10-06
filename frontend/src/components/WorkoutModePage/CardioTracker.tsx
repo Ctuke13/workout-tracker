@@ -32,20 +32,11 @@ export const CardioTracker: React.FC<CardioTrackerProps> = ({
         let interval: NodeJS.Timeout;
         if (isRunning && isActive) {
             interval = setInterval(() => {
-                setDuration((prev: number) => {
-                    const newDuration = prev + 1;
-                    onUpdateSetData({
-                        ...currentSetData,
-                        duration: newDuration,
-                        distance: currentSetData?.distance || 0,
-                        calories: currentSetData?.calories || 0
-                    });
-                    return newDuration;
-                });
+                setDuration((prev: number) => prev + 1); // ✅ Just update local state
             }, 1000);
         }
         return () => clearInterval(interval);
-    }, [isRunning, isActive, currentSetData, onUpdateSetData]);
+    }, [isRunning, isActive]); // ✅ Remove currentSetData and onUpdateSetData from dependencies
 
     const formatTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
@@ -65,9 +56,9 @@ export const CardioTracker: React.FC<CardioTrackerProps> = ({
         setIsRunning(false);
         if (duration > 0) {
             onSetComplete({
-                duration,
-                distance: currentSetData?.distance || 0,
-                calories: currentSetData?.calories || 0
+                actualDurationMinutes: Math.round(duration / 60),  // ✅ Convert seconds to minutes
+                actualDistance: currentSetData?.distance || 0,
+                caloriesBurned: currentSetData?.calories || 0
             });
         }
     };
@@ -204,9 +195,9 @@ export const CardioTracker: React.FC<CardioTrackerProps> = ({
                         <div className="mt-4 text-center">
                             <Button
                                 onClick={() => onSetComplete({
-                                    duration: parseInt(manualDuration) * 60 || 0,
-                                    distance: currentSetData?.distance || 0,
-                                    calories: currentSetData?.calories || 0
+                                    actualDurationMinutes: parseInt(manualDuration) || 0,  // ✅ Already in minutes
+                                    actualDistance: currentSetData?.distance || 0,
+                                    caloriesBurned: currentSetData?.calories || 0
                                 })}
                                 className={`${typeStyle.button} w-full md:w-auto`}
                                 disabled={!manualDuration || parseInt(manualDuration) === 0}

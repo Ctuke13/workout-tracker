@@ -30,6 +30,57 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                                                               onViewDetails,
                                                               onFavoriteToggle
                                                           }) => {
+    const parseReps = (repsValue?: string | number): number => {
+        if (!repsValue) return 10;
+
+        // If it's already a number, return it
+        if (typeof repsValue === 'number') return repsValue;
+
+        try {
+            // Handle string formats like "8-10"
+            if (repsValue.includes('-')) {
+                const parts = repsValue.split('-');
+                const min = parseInt(parts[0].trim());
+                const max = parseInt(parts[1].trim());
+                return Math.floor((min + max) / 2);
+            }
+            return parseInt(repsValue.trim());
+        } catch {
+            return 10;
+        }
+    };
+
+    const calculateEstimatedDuration = (exercise: ScheduledExercise): number => {
+        const ex = exercise.exercise;
+
+        if (ex.isCardio) {
+            return exercise.targetDurationMinutes || ex.estimatedDurationMinutes || 30;
+        } else if (ex.isIsometric) {
+            const sets = exercise.targetSets || 3;
+            const holdSeconds = exercise.holdDurationSeconds || 30;
+            const restSeconds = exercise.restSeconds || 60;
+            return Math.max(1, Math.ceil((sets * (holdSeconds + restSeconds)) / 60));
+        } else {
+            const sets = exercise.targetSets || 3;
+            const reps = parseReps(exercise.targetReps);
+            const restSeconds = exercise.restSeconds || 90;
+
+            const secondsPerSet = (reps * 3) + 15;
+            const workTime = sets * secondsPerSet;
+            const restTime = (sets - 1) * restSeconds;
+
+            return Math.max(3, Math.ceil((workTime + restTime) / 60));
+        }
+    };
+
+    const calculateEstimatedCalories = (exercise: ScheduledExercise): number => {
+        const ex = exercise.exercise;
+        const duration = calculateEstimatedDuration(exercise);
+
+        const baseCaloriesPerMin = (ex.estimatedCalories || 60) / (ex.estimatedDurationMinutes || 15);
+        return Math.round(baseCaloriesPerMin * duration);
+    };
+
     const getConfigurationDisplay = (exercise: ScheduledExercise) => {
         const exerciseType = exercise.exercise;
 
@@ -258,11 +309,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4">
                         <div className="flex items-center gap-1">
                             <Clock className="w-3 h-3 sm:w-4 sm:h-4"/>
-                            <span>{exercise.exercise.estimatedDurationMinutes} min</span>
+                            <span>{calculateEstimatedDuration(exercise)} min</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <Target className="w-3 h-3 sm:w-4 sm:h-4"/>
-                            <span>{exercise.exercise.estimatedCalories} cal</span>
+                            <span>{calculateEstimatedCalories(exercise)} cal</span>
                         </div>
                         {exercise.exercise.averageRating > 0 && (
                             <div className="flex items-center gap-1">

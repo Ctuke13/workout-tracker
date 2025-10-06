@@ -411,7 +411,16 @@ public class WorkoutSchedulingService {
         temporaryPlan.setWorkoutName(exercise.getExerciseName());
         temporaryPlan.setWorkoutDescription("Individual exercise from workout plan");
         temporaryPlan.setDifficultyLevel(WorkoutPlan.DifficultyLevel.INTERMEDIATE);
-        temporaryPlan.setEstimatedDurationMinutes(calculateIndividualExerciseDuration(exercise, request));
+
+        // Calculate duration and ensure it's at least 1 minute
+        Integer duration = calculateIndividualExerciseDuration(exercise, request);
+        if (duration == null || duration <= 0) {
+            duration = exercise.getEstimatedDurationMinutes() != null && exercise.getEstimatedDurationMinutes() > 0
+                    ? exercise.getEstimatedDurationMinutes()
+                    : 15; // Default fallback
+            log.debug("Using fallback duration of {} minutes for exercise {}", duration, exercise.getId());
+        }
+        temporaryPlan.setEstimatedDurationMinutes(duration);
 
         // Set category based on exercise
         if (exercise.getTargetMuscleGroups() != null && !exercise.getTargetMuscleGroups().isEmpty()) {
@@ -459,7 +468,14 @@ public class WorkoutSchedulingService {
         scheduledWorkout.setWorkoutPlan(workoutPlan);
         scheduledWorkout.setScheduledDate(request.getScheduledDate());
         scheduledWorkout.setCustomNotes(request.getNotes());
-        scheduledWorkout.setEstimatedDurationMinutes(workoutPlan.getEstimatedDurationMinutes());
+
+        // Ensure estimated duration is never 0
+        Integer estimatedDuration = workoutPlan.getEstimatedDurationMinutes();
+        if (estimatedDuration == null || estimatedDuration <= 0) {
+            estimatedDuration = 15; // Default to 15 minutes minimum
+            log.debug("Using default duration of 15 minutes for workout plan {}", workoutPlan.getId());
+        }
+        scheduledWorkout.setEstimatedDurationMinutes(estimatedDuration);
 
         return scheduledWorkout;
     }
@@ -582,13 +598,39 @@ public class WorkoutSchedulingService {
         } else if (exercise.getIsIsometric() != null && exercise.getIsIsometric()) {
             Integer sets = request.getSets() != null ? request.getSets() : 3;
             Integer holdDuration = request.getHoldDurationSeconds() != null ? request.getHoldDurationSeconds() : 30;
-            return sets * (holdDuration + 60) / 60;
+            return Math.max(1, sets * (holdDuration + 60) / 60);
         } else {
+            // Strength exercises - calculate based on actual reps
             Integer sets = request.getSets() != null ? request.getSets() : 3;
+            Integer reps = parseReps(request.getReps()); // Get actual rep count
             Integer restSeconds = request.getRestSeconds() != null ? request.getRestSeconds() : 90;
-            int workTime = sets * 45;
+
+            // More realistic calculation:
+            // - Each rep takes ~3 seconds
+            // - Add setup/transition time per set
+            int secondsPerSet = (reps * 3) + 15; // 3 sec per rep + 15 sec setup
+            int workTime = sets * secondsPerSet;
             int restTime = (sets - 1) * restSeconds;
-            return (workTime + restTime) / 60;
+
+            return Math.max(3, (workTime + restTime) / 60); // Minimum 3 minutes
+        }
+    }
+
+    private Integer parseReps(String repsString) {
+        if (repsString == null || repsString.isEmpty()) {
+            return 10; // default
+        }
+        try {
+            // Handle "8-10" format - use the average
+            if (repsString.contains("-")) {
+                String[] parts = repsString.split("-");
+                int min = Integer.parseInt(parts[0].trim());
+                int max = Integer.parseInt(parts[1].trim());
+                return (min + max) / 2;
+            }
+            return Integer.parseInt(repsString.trim());
+        } catch (NumberFormatException e) {
+            return 10; // default on parse error
         }
     }
 

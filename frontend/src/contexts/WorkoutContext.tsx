@@ -27,7 +27,7 @@ export interface WorkoutContextType {
     startWorkout: (exercises: ScheduledExercise[], date: string) => void;
     pauseWorkout: () => void;
     resumeWorkout: () => void;
-    completeWorkout: () => void;
+    completeWorkout: () => Promise<{ workoutId: string; date: string; exercises: any[] } | null>;
     cancelWorkout: () => void;
 
     // Exercise navigation
@@ -57,6 +57,10 @@ export interface WorkoutContextType {
     isPaused: boolean;
     canGoNext: boolean;
     canGoPrevious: boolean;
+
+    setRestTimeForNextSet: (seconds: number) => void;
+    getRestTimeForNextSet: () => number | undefined;
+    clearRestTimeForNextSet: () => void;
 }
 
 interface WorkoutCompletionData {
@@ -917,6 +921,7 @@ async function saveWorkoutResultsToBackend(completedWorkout: WorkoutSession): Pr
                                 targetWeightUnit: set.targetWeightUnit || 'lbs',
                                 rpe: set.actualRpe || set.targetRpe || 7,
                                 restSeconds: set.restSeconds || 90,
+                                actualRestSeconds: set.actualRestSeconds,
                                 completed: set.completed,
                                 actualDurationMinutes: set.actualDurationMinutes,
                                 actualHoldSeconds: set.actualHoldSeconds,
@@ -939,6 +944,9 @@ async function saveWorkoutResultsToBackend(completedWorkout: WorkoutSession): Pr
                         personalRecords: [],
                         improvements: []
                     };
+
+                    console.log('📡 SENDING TO BACKEND API:', JSON.stringify(completionData, null, 2));
+
 
                     // Use the enhanced completion endpoint
                     await calendarApi.markExerciseCompletedWithPerformance(
@@ -1067,6 +1075,7 @@ interface WorkoutProviderProps {
 export function WorkoutProvider({children}: WorkoutProviderProps) {
     const [state, dispatch] = useReducer(workoutReducer, initialState);
     const [completingExercises, setCompletingExercises] = useState<Set<string>>(new Set());
+    const [restTimeForNextSet, setRestTimeForNextSet] = useState<number | undefined>(undefined);
 
     // ==================== WORKOUT CONTROLS ====================
 
@@ -1143,15 +1152,19 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
         dispatch({type: 'RESUME_WORKOUT'});
     };
 
-    const completeWorkout = useCallback(async () => {
-        if (!state.currentWorkout) return;
+    const completeWorkout = useCallback(async (): Promise<{
+        workoutId: string;
+        date: string;
+        exercises: any[]
+    } | null> => {
+        if (!state.currentWorkout) return null;
 
         const workoutId = state.currentWorkout.id;
 
         // Prevent duplicate completion attempts
         if (completingExercises.has(workoutId)) {
             console.log('Workout completion already in progress:', workoutId);
-            return;
+            return null;
         }
 
         setCompletingExercises(prev => new Set(prev).add(workoutId));
@@ -1180,7 +1193,6 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
                     }
                 }));
 
-                // Set session storage flags AFTER successful save
                 sessionStorage.setItem('workoutJustCompleted', 'true');
                 sessionStorage.setItem('completedWorkoutDate', completedWorkout.date);
             } else {
@@ -1188,18 +1200,24 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
                 sessionStorage.setItem('workoutNeedsRetry', 'true');
             }
 
-            // Save to local storage for history regardless of backend success
             saveWorkoutToHistory(completedWorkout);
 
             // Clear the workout state
             dispatch({type: 'COMPLETE_WORKOUT'});
 
+            // Return workout data BEFORE state is cleared
+            return {
+                workoutId: completedWorkout.id,
+                date: completedWorkout.date,
+                exercises: completedWorkout.exercises.map(ex => ex.scheduledExercise.id)
+            };
+
         } catch (error) {
             console.error('Error in workout completion process:', error);
             sessionStorage.setItem('workoutNeedsRetry', 'true');
 
-            // Still allow completion but flag for retry
             dispatch({type: 'COMPLETE_WORKOUT'});
+            return null;
         } finally {
             setCompletingExercises(prev => {
                 const newSet = new Set(prev);
@@ -1232,6 +1250,7 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
 
     const completeSet = (setId: string, actualData: Partial<WorkoutSet>) => {
         console.log('Completing set:', setId, actualData);
+        console.log('🔥🔥🔥 COMPLETING SET - DATA BEING SENT:', JSON.stringify(actualData, null, 2));
         dispatch({type: 'COMPLETE_SET', payload: {setId, actualData}});
     };
 
@@ -1404,6 +1423,9 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
         isPaused,
         canGoNext,
         canGoPrevious,
+        setRestTimeForNextSet: (seconds: number) => setRestTimeForNextSet(seconds),
+        getRestTimeForNextSet: () => restTimeForNextSet,
+        clearRestTimeForNextSet: () => setRestTimeForNextSet(undefined),
     };
 
     return (

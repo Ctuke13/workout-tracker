@@ -214,7 +214,7 @@
                 <artifactId>flyway-maven-plugin</artifactId>
                 <version>${flyway.version}</version>
                 <configuration>
-                    <url>jdbc:postgresql://localhost:5432/workout_tracker</url>
+                    <url>jdbc:postgresql://localhost:5432/workout_tracker_dev</url>
                     <user>workout_user</user>
                     <password>myPassword123</password>
                     <locations>

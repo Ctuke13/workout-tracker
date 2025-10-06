@@ -8,10 +8,12 @@ export interface SetData {
     // Common fields
     actualReps?: number;
     notes?: string;
+    actualRestSeconds?: number;
 
     // Strength-specific
     actualWeight?: number;
     actualRpe?: number;
+
 
     // Cardio-specific
     actualDurationMinutes?: number;
@@ -25,6 +27,7 @@ export interface SetData {
 }
 
 export const useWorkoutMode = () => {
+
     const navigate = useNavigate();
     const {
         currentWorkout,
@@ -46,7 +49,10 @@ export const useWorkoutMode = () => {
         isPaused,
         canGoNext,
         canGoPrevious,
-        addExerciseToCurrentWorkout
+        addExerciseToCurrentWorkout,
+        setRestTimeForNextSet,
+        getRestTimeForNextSet,
+        clearRestTimeForNextSet
     } = useWorkout();
 
     // Current exercise and set tracking
@@ -69,6 +75,9 @@ export const useWorkoutMode = () => {
     // UI states
     const [showSetDialog, setShowSetDialog] = useState(false);
     const [showConfetti, setShowConfetti] = useState(false);
+
+    const [restStartTime, setRestStartTime] = useState<Date | null>(null);
+    const [currentRestSeconds, setCurrentRestSeconds] = useState(0);
 
     // Redirect if no workout is active - Enhanced with better error handling
     useEffect(() => {
@@ -112,6 +121,21 @@ export const useWorkoutMode = () => {
             }
         }
     }, [currentSet?.id, currentExercise?.id]);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout | null = null;
+
+        if (restStartTime && !isRestTimer) {
+            interval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - restStartTime.getTime()) / 1000);
+                setCurrentRestSeconds(elapsed);
+            }, 1000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [restStartTime, isRestTimer]);
 
 // Main timer effect - Enhanced with better cleanup
     useEffect(() => {
@@ -189,6 +213,9 @@ export const useWorkoutMode = () => {
         canGoNext,
         canGoPrevious,
         addExerciseToCurrentWorkout,
+        setRestTimeForNextSet,
+        getRestTimeForNextSet,
+        clearRestTimeForNextSet,
 
         // Existing state
         setData,
@@ -205,5 +232,11 @@ export const useWorkoutMode = () => {
         setShowSetDialog,
         showConfetti,
         setShowConfetti,
+
+        restStartTime,
+        setRestStartTime,
+        currentRestSeconds,
+        setCurrentRestSeconds,
+
     };
 };

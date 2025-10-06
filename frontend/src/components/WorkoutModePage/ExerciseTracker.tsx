@@ -7,6 +7,7 @@ interface ExerciseTrackerProps {
     exerciseType: string;
     isActive: boolean;
     currentSetData: any;
+    isLastSet?: boolean;
     onSetComplete: (setData: any) => void;
     onUpdateSetData: (setData: any) => void;
     typeStyle: {
@@ -21,6 +22,7 @@ export const ExerciseTracker: React.FC<ExerciseTrackerProps> = ({
                                                                     exerciseType,
                                                                     isActive,
                                                                     currentSetData,
+                                                                    isLastSet,
                                                                     onSetComplete,
                                                                     onUpdateSetData,
                                                                     typeStyle
@@ -45,6 +47,7 @@ export const ExerciseTracker: React.FC<ExerciseTrackerProps> = ({
             <IsometricTracker
                 isActive={isActive}
                 currentSetData={currentSetData}
+                isLastSet={isLastSet}
                 onSetComplete={onSetComplete}
                 onUpdateSetData={onUpdateSetData}
                 typeStyle={typeStyle}
@@ -56,6 +59,7 @@ export const ExerciseTracker: React.FC<ExerciseTrackerProps> = ({
     return (
         <StrengthTracker
             currentSetData={currentSetData}
+            isLastSet={isLastSet}
             onSetComplete={onSetComplete}
             onUpdateSetData={onUpdateSetData}
             typeStyle={typeStyle}

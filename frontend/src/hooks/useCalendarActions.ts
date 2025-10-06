@@ -383,7 +383,9 @@ export const useCalendarActions = (
                 userId: scheduledExercise.userId || 'current_user'
             }));
 
-            startWorkout(compatibleExercises, viewingDateString);
+            const exercisesInOrder = [...compatibleExercises].reverse();
+
+            startWorkout(exercisesInOrder, viewingDateString);
             navigate('/workout');
             toast.success(`Started workout with ${compatibleExercises.length} exercises!`);
         } catch (error) {
@@ -452,6 +454,7 @@ export const useCalendarActions = (
         if (exercise && results) {
             setSelectedExerciseForDetails(exercise);
             setSelectedWorkoutResults(results);
+            return true; // ✅ Signal that data is ready
         } else {
             const fetchResults = async () => {
                 try {
@@ -473,6 +476,7 @@ export const useCalendarActions = (
             } else {
                 toast.error('Exercise not found');
             }
+            return false; // ✅ Data not immediately available
         }
     };
 

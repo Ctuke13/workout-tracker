@@ -107,6 +107,25 @@ public class WorkoutSession {
     @JoinColumn(name = "scheduled_workout_id")
     private ScheduledWorkout scheduledWorkout;
 
+    // ==================== ENHANCED CALORIE TRACKING ====================
+
+    @Column(name = "total_calories_calculated")
+    private Integer totalCaloriesCalculated;
+
+    @Column(name = "actual_calories_burned")
+    private Integer actualCaloriesBurned;
+
+    @Column(name = "calorie_calculation_status", length = 30)
+    private String calorieCalculationStatus; // "NOT_CALCULATED", "CALCULATED", etc.
+
+    @Column(name = "calorie_accuracy_rating")
+    @Min(value = 1, message = "Rating must be between 1-5")
+    @Max(value = 5, message = "Rating must be between 1-5")
+    private Integer calorieAccuracyRating;
+
+    @Column(name = "user_reported_calories")
+    private Integer userReportedCalories;
+
     public boolean isFromScheduledWorkout() {
         return scheduledWorkout != null;
     }

@@ -291,6 +291,11 @@ export interface WorkoutSessionResponse {
     date: string; // ISO date string
     totalDurationMinutes?: number;
     estimatedCalories?: number;
+    totalCaloriesCalculated?: number;
+    actualCaloriesBurned?: number;
+    calorieCalculationStatus?: string;
+    calorieAccuracyRating?: number;
+    userReportedCalories?: number;
     difficultyRating?: number;
     overallEffort?: number;
     mood?: string;
@@ -306,6 +311,8 @@ export interface WorkoutSessionResponse {
     isShared: boolean;
     createdAt: string;
     updatedAt: string;
+
+
 }
 
 export interface WorkoutStatsResponse {
@@ -463,13 +470,18 @@ export interface PerformanceResponse {
     durationSeconds?: number;
     totalDurationSeconds?: number;
     distanceKm?: number;
-    caloriesBurned?: number;
+
     pace?: number; // Calculated: minutes per km
     speed?: number; // Calculated: km per hour
 
+    // Calorie tracking fields
+    caloriesBurned?: number;
+    metValueUsed?: number;
+    intensityLevel?: 'LIGHT' | 'MODERATE' | 'VIGOROUS' | 'CUSTOM';
+    calorieCalculationMethod?: string;
+
     // Advanced metrics
     perceivedExertion?: number;
-    intensityLevel?: 'LOW' | 'MODERATE' | 'HIGH' | 'MAXIMUM';
     formRating?: number;
     restSeconds?: number;
     tempo?: string;
@@ -511,6 +523,7 @@ export interface WorkoutSet {
     completedAt?: Date;
     actualDurationMinutes?: number;
     actualHoldSeconds?: number;
+    actualRestSeconds?: number;
 }
 
 export interface WorkoutExercise {

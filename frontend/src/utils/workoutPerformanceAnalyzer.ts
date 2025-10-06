@@ -265,6 +265,7 @@ const analyzeStrengthPerformance = (
         else if (repsStatus === 'PARTIAL') achievedWeight += 0.25;
 
         // Rep Consistency Analysis
+        // Rep Consistency Analysis
         const setConsistency = results.sets.filter(set => set.actualReps >= targetReps).length;
         const consistencyPercentage = (setConsistency / results.sets.length) * 100;
 

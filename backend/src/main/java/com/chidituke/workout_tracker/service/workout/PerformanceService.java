@@ -28,6 +28,7 @@ import org.springframework.validation.annotation.Validated;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -52,6 +53,7 @@ public class PerformanceService {
     private final UserRepository userRepository;
     private final ExerciseRepository exerciseRepository;
     private final PerformanceMapper performanceMapper;
+    private final CalorieCalculationService calorieCalculationService;
 
     // ==============================================
     // BASIC PERFORMANCE RECORD OPERATIONS
@@ -162,7 +164,26 @@ public class PerformanceService {
         // Map request fields to entity
         performanceMapper.mapRequestToEntity(request, performanceRecord);
 
+        if (Boolean.TRUE.equals(user.getCalorieTrackingEnabled())) {
+            try {
+                Integer calories = calorieCalculationService.calculateCalories(performanceRecord, user);
+                log.debug("Calculated {} calories for performance record", calories);
+            } catch (Exception e) {
+                log.warn("Failed to calculate calories for performance record: {}", e.getMessage());
+                // Continue saving the record even if calorie calculation fails
+            }
+        }
+
         PerformanceRecord savedPerformance = performanceRecordRepository.save(performanceRecord);
+
+
+        try {
+            Integer sessionCalories = calorieCalculationService.calculateSessionCalories(workoutSession, user);
+            workoutSessionRepository.save(workoutSession);
+            log.debug("Updated workout session {} with {} total calories", workoutSession.getId(), sessionCalories);
+        } catch (Exception e) {
+            log.warn("Failed to update session calories: {}", e.getMessage());
+        }
 
         log.info("Successfully created performance record with ID: {}", savedPerformance.getId());
         return performanceMapper.mapEntityToResponse(savedPerformance);

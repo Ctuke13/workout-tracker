@@ -131,6 +131,19 @@ public class ScheduledWorkout {
     @Column(name = "created_by_user_id")
     private Long createdByUserId;
 
+    // ==================== CALORIE PREDICTIONS ====================
+
+    @Column(name = "predicted_calories")
+    private Integer predictedCalories;
+
+    @Column(name = "calorie_prediction_method", length = 50)
+    private String caloriePredictionMethod; // "EXERCISE_HISTORY", "MET_BASED", etc.
+
+    @Column(name = "calorie_prediction_confidence")
+    @DecimalMin(value = "0.0")
+    @DecimalMax(value = "1.0")
+    private Double caloriePredictionConfidence;
+
     // =============================================================================
     // EXERCISE RESOLUTION METHODS (Key business logic!)
     // =============================================================================

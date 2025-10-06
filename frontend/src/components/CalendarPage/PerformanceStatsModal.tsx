@@ -96,6 +96,18 @@ const PerformanceStatsModal: React.FC<PerformanceStatsModalProps> = ({
                         <div className="text-sm text-gray-600">Minutes</div>
                     </CardContent>
                 </Card>
+
+                {workoutResults.totalCaloriesCalculated && (
+                    <Card>
+                        <CardContent className="p-4 text-center">
+                            <Flame className="w-6 h-6 mx-auto mb-2 text-orange-600"/>
+                            <div className="text-2xl font-bold text-gray-900">
+                                {workoutResults.totalCaloriesCalculated}
+                            </div>
+                            <div className="text-sm text-gray-600">Calories</div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
             {/* Overall Performance Rating */}

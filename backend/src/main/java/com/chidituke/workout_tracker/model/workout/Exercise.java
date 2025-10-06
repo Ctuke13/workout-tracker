@@ -3,6 +3,7 @@ package com.chidituke.workout_tracker.model.workout;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Data;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -115,6 +116,24 @@ public class Exercise {
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "exercise_id") // Use JoinColumn instead of mappedBy for composite keys
     private List<ExerciseGoalMapping> goalMappings;
+
+    // ==================== MET VALUES FOR CALORIE CALCULATION ====================
+
+    @Column(name = "met_value_light")
+    @DecimalMin(value = "0.0", message = "MET value cannot be negative")
+    private Double metValueLight;
+
+    @Column(name = "met_value_moderate")
+    @DecimalMin(value = "0.0", message = "MET value cannot be negative")
+    private Double metValueModerate;
+
+    @Column(name = "met_value_vigorous")
+    @DecimalMin(value = "0.0", message = "MET value cannot be negative")
+    private Double metValueVigorous;
+
+    @Column(name = "base_calories_per_minute")
+    @Min(value = 0, message = "Base calories cannot be negative")
+    private Integer baseCaloriesPerMinute;
 
     // 📱 ENUMS
     public enum ExerciseType {

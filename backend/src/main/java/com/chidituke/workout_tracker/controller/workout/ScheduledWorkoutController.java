@@ -254,7 +254,7 @@ public class ScheduledWorkoutController {
             Authentication authentication) {
 
         String username = authentication.getName();
-        
+
         User user = userService.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
@@ -1403,6 +1403,7 @@ public class ScheduledWorkoutController {
                             .targetWeightUnit(setRequest.getTargetWeightUnit())
                             .rpe(setRequest.getRpe())
                             .restSeconds(setRequest.getRestSeconds())
+                            .actualRestSeconds(setRequest.getActualRestSeconds())
                             .completed(setRequest.getCompleted())
                             .actualDurationMinutes(setRequest.getActualDurationMinutes())
                             .actualHoldSeconds(setRequest.getActualHoldSeconds())

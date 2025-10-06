@@ -14,6 +14,7 @@ import {Button} from '../components/ui/button';
 import {Card, CardContent} from '../components/ui/card';
 import {Badge} from '../components/ui/badge';
 import toast from 'react-hot-toast';
+import {calorieApi} from '../services/calorieApi';
 
 // Extracted Components
 import {WorkoutHeader} from '../components/WorkoutModePage/WorkoutHeader';
@@ -28,10 +29,11 @@ const WorkoutModePage: React.FC = () => {
     const workoutMode = useWorkoutMode();
     const modalState = useModalState();
     const [showSetCompletionDialog, setShowSetCompletionDialog] = useState(false);
+    const [completedLastSet, setCompletedLastSet] = useState(false);
 
     useEffect(() => {
         if (!workoutMode.isWorkoutActive) {
-            navigate('/');
+            navigate('/calendar');
         }
     }, [workoutMode.isWorkoutActive, navigate]);
 
@@ -44,7 +46,7 @@ const WorkoutModePage: React.FC = () => {
     }
 
     const isLastExercise = workoutMode.currentWorkout?.exercises.length === 1 || !workoutMode.canGoNext;
-    const isLastSet = currentExercise?.sets.length === 1 || currentExercise?.sets.every(set => set.completed);
+    const isLastSet = currentExercise?.sets.filter(set => !set.completed).length === 1;
 
     // Exercise type detection - using actual exercise properties
     const exerciseType = currentExercise.scheduledExercise?.exercise?.isCardio ? 'cardio' :
@@ -117,24 +119,42 @@ const WorkoutModePage: React.FC = () => {
 
     // Set completion handlers
     const handleSetComplete = (setData: SetData) => {
-        // Get the current set ID from the workout context
         const currentSetId = workoutMode.currentSet?.id;
-        if (currentSetId) {
-            // Convert SetData to Partial<WorkoutSet> format expected by context
-            const workoutSetData: Partial<WorkoutSet> = {
-                actualReps: setData.actualReps,
-                actualWeight: setData.actualWeight,
-                actualRpe: setData.actualRpe,
-                actualDurationMinutes: setData.actualDurationMinutes,
-                actualHoldSeconds: setData.actualHoldSeconds,
-                notes: setData.notes
-            };
 
-            workoutMode.completeSet(currentSetId, workoutSetData);
-        }
+        if (!currentSetId) return;
 
-        if (isLastSet) {
-            setShowSetCompletionDialog(true);
+        // Calculate if this is the last set BEFORE completing
+        const remainingUncompletedSets = currentExercise?.sets.filter(set =>
+            !set.completed && set.id !== currentSetId
+        ).length || 0;
+
+        const wasLastSet = remainingUncompletedSets === 0;
+
+        // ✅ Get the rest time that was stored for THIS set
+        const restTimeForThisSet = workoutMode.getRestTimeForNextSet();
+        console.log('🔥 RETRIEVING rest time for this set:', restTimeForThisSet);
+
+        // Complete the set
+        const workoutSetData: Partial<WorkoutSet> = {
+            actualReps: setData.actualReps,
+            actualWeight: setData.actualWeight,
+            actualRpe: setData.actualRpe,
+            actualDurationMinutes: setData.actualDurationMinutes,
+            actualHoldSeconds: setData.actualHoldSeconds,
+            actualRestSeconds: restTimeForThisSet, // ✅ Use stored rest time
+            notes: setData.notes
+        };
+
+        workoutMode.completeSet(currentSetId, workoutSetData);
+
+        // ✅ Clear the stored rest time after using it
+        workoutMode.clearRestTimeForNextSet();
+
+        if (wasLastSet) {
+            setCompletedLastSet(true);
+            setTimeout(() => {
+                setShowSetCompletionDialog(true);
+            }, 100);
         }
     };
 
@@ -162,14 +182,30 @@ const WorkoutModePage: React.FC = () => {
         setShowSetCompletionDialog(false);
     };
 
-    const handleCompleteWorkout = () => {
-        // Show confetti first
+    const handleCompleteWorkout = async () => {
+        // Show confetti
         workoutMode.setShowConfetti(true);
         setShowSetCompletionDialog(false);
 
-        // Complete workout after confetti starts
+        try {
+            // Complete workout and get the data back
+            const workoutData = await workoutMode.completeWorkout();
+
+            // Show simple success message
+            toast.success('Workout complete! Great job!', {duration: 3000});
+
+            // Optional: Log the workout data for debugging
+            if (workoutData) {
+                console.log('Completed workout:', workoutData);
+            }
+
+        } catch (error) {
+            console.error('Error completing workout:', error);
+            toast.error('Error saving workout. Please try again.');
+        }
+
+        // Navigate after delay
         setTimeout(() => {
-            workoutMode.completeWorkout();
             navigate('/calendar');
         }, 3000);
     };
@@ -188,7 +224,7 @@ const WorkoutModePage: React.FC = () => {
     };
 
     // Current set data
-    const currentSetData = workoutMode.setData || {};
+    const currentSetData = workoutMode.currentSet || workoutMode.setData || {};
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
@@ -202,13 +238,16 @@ const WorkoutModePage: React.FC = () => {
             {/* Set Completion Dialog */}
             <SetCompletionDialog
                 show={showSetCompletionDialog}
-                isLastSet={isLastSet}
+                isLastSet={completedLastSet}
                 isLastExercise={isLastExercise}
                 exerciseName={currentExercise.scheduledExercise?.exercise?.name || 'Exercise'}
                 onNextExercise={handleNextExercise}
                 onAddSet={handleAddSet}
                 onCompleteWorkout={handleCompleteWorkout}
-                onClose={() => setShowSetCompletionDialog(false)}
+                onClose={() => {
+                    setShowSetCompletionDialog(false);
+                    setCompletedLastSet(false);
+                }}
             />
 
             {/* Exercise Selector Modal */}
@@ -284,6 +323,7 @@ const WorkoutModePage: React.FC = () => {
                     exerciseType={exerciseType}
                     isActive={workoutMode.isWorkoutActive}
                     currentSetData={currentSetData}
+                    isLastSet={isLastSet}
                     onSetComplete={handleSetComplete}
                     onUpdateSetData={handleUpdateSetData}
                     typeStyle={typeStyle}

@@ -24,6 +24,7 @@ public class CompletedSetRequest {
     private String targetWeightUnit;
     private Integer rpe;
     private Integer restSeconds;
+    private Integer actualRestSeconds;
     private Boolean completed;
     private Integer actualDurationMinutes;
     private Integer actualHoldSeconds;

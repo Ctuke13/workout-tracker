@@ -15,7 +15,7 @@ const PerformanceOverview: React.FC<PerformanceOverviewProps> = ({workoutResults
                 Performance Overview
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div className="text-center p-3 bg-white rounded-lg border">
                     <div className="text-2xl font-bold text-blue-600">
                         {workoutResults.sets.filter(s => s.completed).length}
@@ -29,6 +29,15 @@ const PerformanceOverview: React.FC<PerformanceOverviewProps> = ({workoutResults
                     </div>
                     <div className="text-sm text-gray-600">Total Duration</div>
                 </div>
+
+                {workoutResults.totalCaloriesCalculated && (
+                    <div className="text-center p-3 bg-white rounded-lg border">
+                        <div className="text-2xl font-bold text-orange-600">
+                            {workoutResults.totalCaloriesCalculated}
+                        </div>
+                        <div className="text-sm text-gray-600">Calories Burned</div>
+                    </div>
+                )}
 
                 <div className="text-center p-3 bg-white rounded-lg border">
                     <div

@@ -106,6 +106,9 @@ public class PerformanceRecord {
     @Min(value = 0, message = "Rest time cannot be negative")
     private Integer restSeconds;
 
+    @Column(name = "actual_rest_seconds")
+    private Integer actualRestSeconds;
+
     @Column(name = "tempo", length = 20)
     @Pattern(regexp = "^\\d{1,2}-\\d{1,2}-\\d{1,2}-\\d{1,2}$|^$",
             message = "Tempo must be in format '3-1-2-1' (eccentric-pause-concentric-pause)")
@@ -221,6 +224,19 @@ public class PerformanceRecord {
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    // ==================== CALORIE CALCULATION METADATA ====================
+
+    @Column(name = "met_value_used")
+    @DecimalMin(value = "0.0", message = "MET value cannot be negative")
+    private Double metValueUsed;
+
+    @Column(name = "intensity_level", length = 20)
+    @Enumerated(EnumType.STRING)
+    private IntensityLevel intensityLevel;
+
+    @Column(name = "calorie_calculation_method", length = 50)
+    private String calorieCalculationMethod; // "MET_BASED", "DURATION_BASED", etc.
 
     // ==============================================
     // BUSINESS LOGIC METHODS
@@ -500,6 +516,23 @@ public class PerformanceRecord {
         private final String description;
 
         PerformanceVsTarget(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+    }
+
+    public enum IntensityLevel {
+        LIGHT("Light intensity - comfortable pace"),
+        MODERATE("Moderate intensity - challenging but sustainable"),
+        VIGOROUS("Vigorous intensity - hard effort"),
+        CUSTOM("Custom intensity level");
+
+        private final String description;
+
+        IntensityLevel(String description) {
             this.description = description;
         }
 

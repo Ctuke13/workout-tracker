@@ -150,10 +150,10 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                                 </div>
                                 <div className="text-xs text-red-700">Duration</div>
                             </div>
-                            {workoutResults.caloriesBurned && (
+                            {workoutResults.totalCaloriesCalculated && (
                                 <div className="text-center p-2 bg-orange-50 rounded-lg">
                                     <div className="text-lg font-bold text-orange-600">
-                                        {workoutResults.caloriesBurned}
+                                        {workoutResults.totalCaloriesCalculated}
                                     </div>
                                     <div className="text-xs text-orange-700">Calories</div>
                                 </div>
@@ -189,6 +189,14 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                                         {workoutResults.sets[0]?.targetWeightUnit || 'lbs'}
                                     </div>
                                     <div className="text-xs text-purple-700">Max Weight</div>
+                                </div>
+                            )}
+                            {workoutResults.totalCaloriesCalculated && (
+                                <div className="text-center p-2 bg-orange-50 rounded-lg">
+                                    <div className="text-lg font-bold text-orange-600">
+                                        {workoutResults.totalCaloriesCalculated}
+                                    </div>
+                                    <div className="text-xs text-orange-700">Calories</div>
                                 </div>
                             )}
                         </>

@@ -20,6 +20,14 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                                                                              workoutResults,
                                                                              onViewDetails
                                                                          }) => {
+
+    console.log('🔥 Workout Results Data:', {
+        totalCaloriesCalculated: workoutResults?.totalCaloriesCalculated,
+        caloriesBurned: workoutResults?.caloriesBurned,
+        allFields: workoutResults ? Object.keys(workoutResults) : []
+    });
+
+
     // Enhanced performance evaluation
     const analysis = workoutResults ?
         analyzeWorkout(exercise, workoutResults) : null;
@@ -132,6 +140,22 @@ const CompletedWorkoutDisplay: React.FC<CompletedWorkoutDisplayProps> = ({
                         ))}
                     </div>
                 </div>
+
+                {/* Estimated Calories Section*/}
+                {workoutResults?.caloriesBurned && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="text-2xl">🔥</div>
+                            <div className="flex-1">
+                                <div className="text-sm text-gray-600">Estimated Calories Burned</div>
+                                <div className="text-xl font-bold text-gray-900">
+                                    {workoutResults.caloriesBurned} cal
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
 
                 {/* Quick Stats Grid */}
                 <div className="grid grid-cols-3 gap-3">

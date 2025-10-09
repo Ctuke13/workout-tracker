@@ -80,6 +80,10 @@ public class ScheduledWorkoutResponse {
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime completedAt;
 
+    private Integer caloriesBurned;
+    private Integer totalCaloriesCalculated;
+    private String performanceRating;
+
     // =============================================================================
     // METADATA & AUDIT FIELDS
     // =============================================================================

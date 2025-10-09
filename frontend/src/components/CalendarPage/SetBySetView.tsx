@@ -154,6 +154,7 @@ const SetBySetView: React.FC<SetBySetViewProps> = ({exercise, workoutResults}) =
                     </div>
                 ))}
             </div>
+
         </div>
     );
 };

@@ -51,6 +51,10 @@ public class ScheduledWorkoutMapper {
                     .reminderTime(entity.getReminderTime())
                     .estimatedDurationMinutes(entity.getEstimatedDurationMinutes())
                     .completedAt(entity.getCompletedAt())
+                    .caloriesBurned(entity.getCompletedSession() != null ?
+                            entity.getCompletedSession().getActualCaloriesBurned() : null)
+                    .totalCaloriesCalculated(entity.getCompletedSession() != null ?
+                            entity.getCompletedSession().getTotalCaloriesCalculated() : null)
                     .createdAt(entity.getCreatedAt())
                     .updatedAt(entity.getUpdatedAt())
                     .createdByUserId(entity.getCreatedByUserId())

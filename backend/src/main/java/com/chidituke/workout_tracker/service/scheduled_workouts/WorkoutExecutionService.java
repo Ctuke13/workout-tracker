@@ -495,8 +495,12 @@ public class WorkoutExecutionService {
         workoutResults.put("totalDurationMinutes", scheduledWorkout.getActualDurationMinutes());
         workoutResults.put("performanceRating", "MET");
         workoutResults.put("notes", scheduledWorkout.getCustomNotes());
+        workoutResults.put("caloriesBurned", scheduledWorkout.getCompletedSession() != null ?
+                scheduledWorkout.getCompletedSession().getActualCaloriesBurned() : null);
+        workoutResults.put("totalCaloriesCalculated", scheduledWorkout.getCompletedSession() != null ?
+                scheduledWorkout.getCompletedSession().getTotalCaloriesCalculated() : null);
 
-        // ✅ NEW: Retrieve actual performance records (sets data)
+        //  Retrieve actual performance records (sets data)
         List<Map<String, Object>> sets = new ArrayList<>();
 
         // Try to find workout session for this scheduled workout

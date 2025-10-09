@@ -153,6 +153,11 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/recommended").authenticated(); // Personal recommendations
 
                     // ===================================================================
+                    // 🏆 PROGRESS &    GAMIFICATION - Requires authentication
+                    // ===================================================================
+                    auth.requestMatchers("/api/progress/**").authenticated();
+
+                    // ===================================================================
                     // 💼 PROFESSIONAL ROLE - Content creation
                     // ===================================================================
                     auth.requestMatchers(HttpMethod.POST, "/api/exercises").hasRole("PROFESSIONAL");       // Create exercises

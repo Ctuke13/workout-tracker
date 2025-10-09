@@ -153,8 +153,21 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.GET, "/api/workout-plans/recommended").authenticated(); // Personal recommendations
 
                     // ===================================================================
-                    // 🏆 PROGRESS &    GAMIFICATION - Requires authentication
+                    // 🏆 PROGRESS & GAMIFICATION - Mixed access
                     // ===================================================================
+
+                    // 🌍 PUBLIC - Discovery & motivation (no auth)
+                    auth.requestMatchers(
+                            "/api/progress/seasons/**",               // Browse seasons
+                            "/api/progress/achievements",             // View all achievements
+                            "/api/progress/achievements/category/**", // Achievements by category
+                            "/api/progress/leaderboard/seasonal",     // Seasonal leaderboard
+                            "/api/progress/leaderboard/lifetime",     // Lifetime leaderboard
+                            "/api/progress/history/season/*/top",     // Top performers per season
+                            "/api/progress/history/season/*/stats"    // Season statistics
+                    ).permitAll();
+
+                    // 🔒 PROTECTED - User-specific data (requires auth)
                     auth.requestMatchers("/api/progress/**").authenticated();
 
                     // ===================================================================

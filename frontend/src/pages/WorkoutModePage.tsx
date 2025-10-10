@@ -14,7 +14,7 @@ import {Button} from '../components/ui/button';
 import {Card, CardContent} from '../components/ui/card';
 import {Badge} from '../components/ui/badge';
 import toast from 'react-hot-toast';
-import {calorieApi} from '../services/calorieApi';
+import {progressApi, WorkoutCompletionRequest} from '../services/progressApi';
 
 // Extracted Components
 import {WorkoutHeader} from '../components/WorkoutModePage/WorkoutHeader';
@@ -191,23 +191,135 @@ const WorkoutModePage: React.FC = () => {
             // Complete workout and get the data back
             const workoutData = await workoutMode.completeWorkout();
 
-            // Show simple success message
-            toast.success('Workout complete! Great job!', {duration: 3000});
-
-            // Optional: Log the workout data for debugging
             if (workoutData) {
-                console.log('Completed workout:', workoutData);
+                console.log('✅ Completed workout:', workoutData);
+
+                // 🆕 Calculate workout statistics for progression
+                const totalSets = workoutData.exercises?.reduce((sum, ex) =>
+                    sum + (ex.sets?.length || 0), 0
+                ) || 0;
+
+                const totalVolume = workoutData.exercises?.reduce((sum, ex) =>
+                        sum + (ex.sets?.reduce((setSum: number, set: any) =>
+                            setSum + ((set.actualWeight || 0) * (set.actualReps || 0)), 0
+                        ) || 0), 0
+                ) || 0;
+
+                const totalDistance = workoutData.exercises?.reduce((sum, ex) =>
+                        sum + (ex.sets?.reduce((setSum: number, set: any) =>
+                            setSum + (set.actualDistanceKm || 0), 0
+                        ) || 0), 0
+                ) || 0;
+
+                const totalHoldTime = workoutData.exercises?.reduce((sum, ex) =>
+                        sum + (ex.sets?.reduce((setSum: number, set: any) =>
+                            setSum + (set.actualHoldSeconds || 0), 0
+                        ) || 0), 0
+                ) || 0;
+
+                const uniqueExercises = new Set(
+                    workoutData.exercises?.map(ex => ex.scheduledExercise?.exercise?.exerciseId)
+                ).size;
+
+                const totalDuration = workoutData.exercises?.reduce((sum, ex) =>
+                        sum + (ex.sets?.reduce((setSum: number, set: any) =>
+                            setSum + (set.actualDurationMinutes || 0), 0
+                        ) || 0), 0
+                ) || 30;
+
+                // Determine workout type
+                const hasCardio = workoutData.exercises?.some(ex =>
+                    ex.scheduledExercise?.exercise?.isCardio
+                );
+                const hasIsometric = workoutData.exercises?.some(ex =>
+                    ex.scheduledExercise?.exercise?.isIsometric
+                );
+                const workoutType = hasCardio ? 'CARDIO' :
+                    hasIsometric ? 'ISOMETRIC' : 'STRENGTH';
+
+                console.log('📊 Workout stats:', {
+                    duration: totalDuration,
+                    sets: totalSets,
+                    volume: totalVolume,
+                    distance: totalDistance,
+                    holdTime: totalHoldTime,
+                    uniqueExercises,
+                    workoutType
+                });
+
+                // 🆕 Submit to progression system
+                const progressRequest: WorkoutCompletionRequest = {
+                    durationMinutes: totalDuration,
+                    setsCompleted: totalSets,
+                    volumeLifted: totalVolume,
+                    distanceKm: totalDistance > 0 ? totalDistance : undefined,
+                    holdSeconds: totalHoldTime > 0 ? totalHoldTime : undefined,
+                    uniqueExercisesCount: uniqueExercises,
+                    workoutType: workoutType
+                };
+
+                console.log('🚀 Submitting to progression API:', progressRequest);
+
+                const progressResponse = await progressApi.completeWorkout(progressRequest);
+
+                console.log('🎉 Progression response:', progressResponse);
+
+                // 🆕 Show XP gained
+                if (progressResponse.xpGained > 0) {
+                    toast.success(
+                        `+${progressResponse.xpGained} XP earned! ⚡`,
+                        {duration: 3000}
+                    );
+                }
+
+                // 🆕 Show rank up notification
+                if (progressResponse.rankedUp) {
+                    setTimeout(() => {
+                        toast.success(
+                            `🏆 Rank Up! You're now ${progressResponse.seasonalRank}!`,
+                            {duration: 5000, icon: '👑'}
+                        );
+                    }, 1000);
+                }
+
+                // 🆕 Show streak milestone
+                if (progressResponse.streakMilestone) {
+                    setTimeout(() => {
+                        toast.success(
+                            `🔥 ${progressResponse.currentStreak} day streak! Keep it going!`,
+                            {duration: 4000}
+                        );
+                    }, 2000);
+                }
+
+                // 🆕 Show achievement unlocks
+                if (progressResponse.achievementsUnlocked.length > 0) {
+                    progressResponse.achievementsUnlocked.forEach((achievement, index) => {
+                        setTimeout(() => {
+                            toast.success(
+                                `🏅 Achievement Unlocked: ${achievement.icon} ${achievement.name} (+${achievement.bonusXp} XP)`,
+                                {duration: 6000}
+                            );
+                        }, 3000 + (index * 1500));
+                    });
+                }
+
+                // Final success message
+                setTimeout(() => {
+                    toast.success('💪 Workout complete! Great job!', {duration: 3000});
+                }, 500);
+
             }
 
         } catch (error) {
-            console.error('Error completing workout:', error);
+            console.error('❌ Error completing workout:', error);
             toast.error('Error saving workout. Please try again.');
         }
 
-        // Navigate after delay
+        // Navigate after delay (increased to show all toasts)
         setTimeout(() => {
             navigate('/calendar');
-        }, 3000);
+        }, 6000); // Increased from 3000 to 6000 to show all notifications
     };
 
     // Workout control handlers

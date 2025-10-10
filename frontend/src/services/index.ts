@@ -8,6 +8,7 @@
 export * from './exerciseApi';
 export * from './calendarApi';
 export * from './workoutPlanApi';
+export {progressApi} from './progressApi';
 
 // ==================== DATA TRANSFORMATION SERVICES ====================
 export * from './transformers';

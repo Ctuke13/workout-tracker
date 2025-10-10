@@ -6,7 +6,9 @@
 // export { useExerciseData } from './useExerciseData';
 
 // Common utility hooks
-import { useState, useEffect, useRef, useCallback } from 'react';
+export {useUserProgression} from './useUserProgression';
+
+import {useState, useEffect, useRef, useCallback} from 'react';
 
 export const useLocalStorage = <T>(key: string, initialValue: T) => {
     const [storedValue, setStoredValue] = useState<T>(() => {
@@ -73,7 +75,7 @@ export const useToggle = (initialValue = false) => {
     const setTrue = useCallback(() => setValue(true), []);
     const setFalse = useCallback(() => setValue(false), []);
 
-    return { value, toggle, setTrue, setFalse, setValue };
+    return {value, toggle, setTrue, setFalse, setValue};
 };
 
 export const usePrevious = <T>(value: T): T | undefined => {

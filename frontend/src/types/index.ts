@@ -2,6 +2,7 @@
 // ✅ FIXED: Export exercise types first, then API types that depend on them
 export * from './exercise';
 export * from './api';
+export * from './gamification';
 
 // Common shared types
 export interface ApiResponse<T> {

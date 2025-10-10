@@ -42,7 +42,7 @@ public class UserProgressionDTO {
     // Core statistics
     private Integer totalWorkoutsCompleted;
     private Integer totalSetsCompleted;
-    private BigDecimal totalVolumLifted;
+    private BigDecimal totalVolumeLifted;
     private Integer totalWorkoutMinutes;
 
     // Achievement tracking
@@ -87,7 +87,7 @@ public class UserProgressionDTO {
                 .streakActive(progression.isStreakActive())
                 .totalWorkoutsCompleted(progression.getTotalWorkoutsCompleted())
                 .totalSetsCompleted(progression.getTotalSetsCompleted())
-                .totalVolumLifted(progression.getTotalVolumLifted())
+                .totalVolumeLifted(progression.getTotalVolumLifted())
                 .totalWorkoutMinutes(progression.getTotalWorkoutMinutes())
                 .totalDistanceKm(progression.getTotalDistanceKm())
                 .totalHoldSeconds(progression.getTotalHoldSeconds())

@@ -60,6 +60,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "(u.zipcode IS NOT NULL OR (u.city IS NOT NULL AND u.state IS NOT NULL))")
     List<User> findUsersWithLocationInfo();
 
+    @Query("SELECT u.id, u.username FROM User u WHERE u.id IN :userIds")
+    List<Object[]> findUsernamesByUserIds(@Param("userIds") List<Long> userIds);
+
     // ==================== USER TYPE QUERIES ====================
 
     List<User> findByUserType(UserType userType);

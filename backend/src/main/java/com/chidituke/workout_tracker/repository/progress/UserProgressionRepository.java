@@ -2,6 +2,7 @@ package com.chidituke.workout_tracker.repository.progress;
 
 import com.chidituke.workout_tracker.model.progress.UserProgression;
 import com.chidituke.workout_tracker.model.progress.enums.Rank;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -128,12 +129,10 @@ public interface UserProgressionRepository extends JpaRepository<UserProgression
     List<UserProgression> findByCurrentSeasonId(Integer seasonId);
 
     /**
-     * Count users in a specific season.
-     *
-     * @param seasonId The season ID
-     * @return Count of users
+     * Count total users in a season (for percentile calculations).
      */
-    Long countByCurrentSeasonId(Integer seasonId);
+    @Query("SELECT COUNT(up) FROM UserProgression up WHERE up.currentSeasonId = :seasonId")
+    long countByCurrentSeasonId(@Param("seasonId") Integer seasonId);
 
     // ========== RANK QUERIES ==========
 
@@ -170,4 +169,21 @@ public interface UserProgressionRepository extends JpaRepository<UserProgression
      */
     @Query("SELECT SUM(up.totalWorkoutsCompleted) FROM UserProgression up")
     Long getTotalWorkoutsAllUsers();
+
+    /**
+     * Get seasonal leaderboard with user info (real-time).
+     * Fetches top N users by seasonal XP for the current season.
+     */
+    @Query("""
+            SELECT up 
+            FROM UserProgression up 
+            WHERE up.currentSeasonId = :seasonId 
+            ORDER BY up.seasonalXp DESC, up.userId ASC
+            """)
+    List<UserProgression> findTopBySeasonalXpWithLimit(
+            @Param("seasonId") Integer seasonId,
+            Pageable pageable
+    );
+
+
 }

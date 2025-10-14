@@ -6,6 +6,8 @@ import com.chidituke.workout_tracker.model.progress.enums.Rank;
 import com.chidituke.workout_tracker.repository.progress.UserProgressionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -549,18 +551,6 @@ public class UserProgressionService {
     // ========== LEADERBOARD QUERIES ==========
 
     /**
-     * Get top users by seasonal XP.
-     *
-     * @param seasonId Season ID
-     * @param limit    Max results
-     * @return List of top users
-     */
-    @Transactional(readOnly = true)
-    public List<UserProgression> getSeasonalLeaderboard(Integer seasonId, int limit) {
-        return userProgressionRepository.findTopBySeasonalXp(seasonId, limit);
-    }
-
-    /**
      * Get top users by lifetime XP.
      *
      * @param limit Max results
@@ -592,5 +582,27 @@ public class UserProgressionService {
     @Transactional(readOnly = true)
     public Long getUserLifetimeRankPosition(Long userId) {
         return userProgressionRepository.findLifetimeRankPosition(userId);
+    }
+
+    /**
+     * Get seasonal leaderboard with user details (real-time).
+     * This is the MAIN method for displaying current season rankings.
+     *
+     * @param seasonId Season ID
+     * @param limit    Max results
+     * @return List of user progressions sorted by seasonal XP
+     */
+    @Transactional(readOnly = true)
+    public List<UserProgression> getSeasonalLeaderboard(Integer seasonId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return userProgressionRepository.findTopBySeasonalXpWithLimit(seasonId, pageable);
+    }
+
+    /**
+     * Get total user count for a season (for percentile calculations).
+     */
+    @Transactional(readOnly = true)
+    public long getSeasonUserCount(Integer seasonId) {
+        return userProgressionRepository.countByCurrentSeasonId(seasonId);
     }
 }

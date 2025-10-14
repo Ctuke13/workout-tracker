@@ -10,6 +10,7 @@ import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.security.CurrentUser;
 import com.chidituke.workout_tracker.security.UserPrincipal;
 import com.chidituke.workout_tracker.service.progress.*;
+import com.chidituke.workout_tracker.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +19,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -41,7 +44,8 @@ public class ProgressController {
     private final UserProgressionService userProgressionService;
     private final AchievementService achievementService;
     private final LeaderboardService leaderboardService;
-    private final SeasonTransitionService seasonTransitionService;  // 🆕 ADDED
+    private final SeasonTransitionService seasonTransitionService;
+    private final UserRepository userRepository;
 
     // ========== HELPER METHOD ==========
 
@@ -432,13 +436,75 @@ public class ProgressController {
     // ========================================================================
 
     /**
-     * Get seasonal leaderboard (current season).
+     * Get seasonal leaderboard (REAL-TIME from user_progression).
+     * This is the primary endpoint for current season rankings.
+     * Always shows up-to-date positions.
      * <p>
      * GET /api/progress/leaderboard/seasonal
      * Query params: limit (default 100)
      */
     @GetMapping("/leaderboard/seasonal")
     public ResponseEntity<List<LeaderboardEntryDTO>> getSeasonalLeaderboard(
+            @RequestParam(defaultValue = "100") int limit) {
+
+        Season activeSeason = seasonService.getActiveSeason();
+
+        // Get top users by seasonal XP
+        List<UserProgression> progressions = userProgressionService
+                .getSeasonalLeaderboard(activeSeason.getSeasonId(), limit);
+
+        if (progressions.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        // Get total users for percentile calculation
+        long totalUsers = userProgressionService.getSeasonUserCount(activeSeason.getSeasonId());
+
+        // Get usernames for all users in bulk
+        List<Long> userIds = progressions.stream()
+                .map(UserProgression::getUserId)
+                .collect(Collectors.toList());
+
+        Map<Long, String> usernameMap = getUsernameMap(userIds);
+
+        // Build DTOs with positions and percentiles
+        List<LeaderboardEntryDTO> dtos = new ArrayList<>();
+        for (int i = 0; i < progressions.size(); i++) {
+            UserProgression progression = progressions.get(i);
+            int position = i + 1;
+
+            // Calculate percentile: ((totalUsers - position + 1) / totalUsers) * 100
+            double percentile = totalUsers > 0
+                    ? Math.round(((totalUsers - position + 1.0) / totalUsers) * 10000.0) / 100.0
+                    : 0.0;
+
+            String username = usernameMap.getOrDefault(
+                    progression.getUserId(),
+                    "User" + progression.getUserId()
+            );
+
+            LeaderboardEntryDTO dto = LeaderboardEntryDTO.fromUserProgression(
+                    progression, username, position, percentile
+            );
+
+            dtos.add(dto);
+        }
+
+        log.debug("Returned {} leaderboard entries for season {}",
+                dtos.size(), activeSeason.getSeasonId());
+
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Get seasonal leaderboard snapshot (HISTORICAL from leaderboard_entries).
+     * Shows archived rankings with rank change tracking.
+     * <p>
+     * GET /api/progress/leaderboard/seasonal/snapshot
+     * Query params: limit (default 100)
+     */
+    @GetMapping("/leaderboard/seasonal/snapshot")
+    public ResponseEntity<List<LeaderboardEntryDTO>> getSeasonalLeaderboardSnapshot(
             @RequestParam(defaultValue = "100") int limit) {
 
         Season activeSeason = seasonService.getActiveSeason();
@@ -450,6 +516,56 @@ public class ProgressController {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Manually create a leaderboard snapshot (ADMIN ONLY).
+     * Useful for testing and manual updates.
+     * <p>
+     * POST /api/progress/leaderboard/snapshot
+     */
+    @PostMapping("/leaderboard/snapshot")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> createLeaderboardSnapshot() {
+        try {
+            Season activeSeason = seasonService.getActiveSeason();
+            int count = leaderboardService.createLeaderboardSnapshot(activeSeason.getSeasonId());
+
+            log.info("✅ Leaderboard snapshot created: {} entries", count);
+
+            return ResponseEntity.ok(
+                    String.format("Leaderboard snapshot created successfully with %d entries", count)
+            );
+        } catch (Exception e) {
+            log.error("❌ Failed to create leaderboard snapshot", e);
+            return ResponseEntity.internalServerError()
+                    .body("Failed to create snapshot: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Helper method to get usernames in bulk.
+     */
+    private Map<Long, String> getUsernameMap(List<Long> userIds) {
+        // This assumes you have a UserRepository injected
+        // Add this field at the top of the class if not present:
+        // private final UserRepository userRepository;
+
+        try {
+            List<Object[]> results = userRepository.findUsernamesByUserIds(userIds);
+            return results.stream()
+                    .collect(Collectors.toMap(
+                            row -> (Long) row[0],
+                            row -> (String) row[1]
+                    ));
+        } catch (Exception e) {
+            log.warn("Failed to fetch usernames, using fallback", e);
+            return userIds.stream()
+                    .collect(Collectors.toMap(
+                            id -> id,
+                            id -> "User" + id
+                    ));
+        }
     }
 
     /**

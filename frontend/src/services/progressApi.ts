@@ -1,7 +1,7 @@
 // services/progressApi.ts
 import apiClient from './apiClient';
 import {Achievement, UnlockedAchievement, UserProgression} from '../types/gamification';
-import {WorkoutCompletionResponse} from "@/services/workoutCompletionResponse";
+import {WorkoutCompletionResponse} from "@/types/workoutCompletionResponse";
 
 export interface WorkoutCompletionRequest {
     durationMinutes: number;
@@ -52,10 +52,10 @@ class ProgressApi {
     }
 
     /**
-     * Get seasonal leaderboard
+     * Get seasonal leaderboard (real-time)
      */
-    async getSeasonalLeaderboard(limit?: number): Promise<any[]> {
-        return apiClient.get<any[]>('/api/progress/leaderboard/seasonal', {limit});
+    async getSeasonalLeaderboard(limit: number = 10): Promise<any[]> {
+        return apiClient.get<any[]>(`/api/progress/leaderboard/seasonal?limit=${limit}`);
     }
 
     /**
@@ -64,6 +64,21 @@ class ProgressApi {
     async getLifetimeLeaderboard(limit?: number): Promise<any[]> {
         return apiClient.get<any[]>('/api/progress/leaderboard/lifetime', {limit});
     }
+
+    /**
+     * Get user's rank information
+     */
+    async getUserRankInfo(): Promise<any> {
+        return apiClient.get<any>('/api/progress/me/rank');
+    }
+
+    /**
+     * Get user's progress toward a specific achievement
+     */
+    async getAchievementProgress(achievementId: number): Promise<any> {
+        return apiClient.get<any>(`/api/progress/achievements/${achievementId}/progress`);
+    }
+
 }
 
 export const progressApi = new ProgressApi();

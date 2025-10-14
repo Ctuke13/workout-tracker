@@ -1,6 +1,7 @@
 package com.chidituke.workout_tracker.dto.response.progress;
 
 import com.chidituke.workout_tracker.model.progress.LeaderboardEntry;
+import com.chidituke.workout_tracker.model.progress.UserProgression;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -72,6 +73,36 @@ public class LeaderboardEntryDTO {
                 .percentile(entry.getPercentile())
                 .rankChange(entry.getRankChange())
                 .rankChangeDirection(changeDirection)
+                .build();
+    }
+
+    /**
+     * Create from UserProgression (for real-time leaderboard).
+     * Used when querying user_progression directly instead of snapshots.
+     */
+    public static LeaderboardEntryDTO fromUserProgression(
+            UserProgression progression,
+            String username,
+            int position,
+            double percentile) {
+
+        return LeaderboardEntryDTO.builder()
+                .userId(progression.getUserId())
+                .username(username)
+                .profileImageUrl(null) // Not fetched in real-time queries for performance
+                .seasonId(progression.getCurrentSeasonId())
+                .snapshotDate(LocalDate.now()) // Current date for real-time
+                .rankPosition(position)
+                .seasonalXp(progression.getSeasonalXp())
+                .seasonalRank(progression.getSeasonalRank().name())
+                .seasonalTier(progression.getSeasonalTier())
+                .rankIcon(progression.getSeasonalRank().getIcon())
+                .workoutsCompleted(progression.getTotalWorkoutsCompleted())
+                .currentStreak(progression.getCurrentStreakDays())
+                .achievementsCount(0) // Not fetched in real-time for performance
+                .percentile(percentile)
+                .rankChange(0) // Real-time doesn't track changes (use snapshots for that)
+                .rankChangeDirection("same")
                 .build();
     }
 }

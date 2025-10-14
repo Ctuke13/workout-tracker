@@ -1209,7 +1209,7 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
             return {
                 workoutId: completedWorkout.id,
                 date: completedWorkout.date,
-                exercises: completedWorkout.exercises.map(ex => ex.scheduledExercise.id)
+                exercises: completedWorkout.exercises
             };
 
         } catch (error) {

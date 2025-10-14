@@ -13,6 +13,7 @@ import com.chidituke.workout_tracker.service.progress.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -40,6 +41,7 @@ public class ProgressController {
     private final UserProgressionService userProgressionService;
     private final AchievementService achievementService;
     private final LeaderboardService leaderboardService;
+    private final SeasonTransitionService seasonTransitionService;  // 🆕 ADDED
 
     // ========== HELPER METHOD ==========
 
@@ -109,6 +111,55 @@ public class ProgressController {
                 .map(SeasonDTO::fromEntity)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Force an immediate season transition (ADMIN ONLY).
+     * <p>
+     * ⚠️ WARNING: This will immediately transition to the next season
+     * and reset all users' seasonal stats with the 3-tier drop system.
+     * Use with caution - primarily for testing purposes.
+     * <p>
+     * POST /api/progress/seasons/force-transition
+     *
+     * @return Success message or error details
+     */
+    @PostMapping("/seasons/force-transition")
+    @PreAuthorize("hasRole('ADMIN')")  // 🆕 ADMIN ONLY
+    public ResponseEntity<SeasonTransitionDTO> forceSeasonTransition() {
+        try {
+            log.warn("🚨 Admin manually triggered season transition!");
+
+            // Get current season before transition
+            Season currentSeason = seasonService.getActiveSeason();
+            String oldSeasonName = currentSeason.getSeasonName();
+
+            // Force the transition
+            seasonTransitionService.forceSeasonTransition();
+
+            // Get new active season after transition
+            Season newSeason = seasonService.getActiveSeason();
+            String newSeasonName = newSeason.getSeasonName();
+
+            log.info("✅ Manual season transition complete: {} → {}",
+                    oldSeasonName, newSeasonName);
+
+            return ResponseEntity.ok(SeasonTransitionDTO.builder()
+                    .success(true)
+                    .message("Season transition completed successfully")
+                    .previousSeason(oldSeasonName)
+                    .newSeason(newSeasonName)
+                    .transitionDate(LocalDate.now())
+                    .build());
+
+        } catch (Exception e) {
+            log.error("❌ Failed to force season transition", e);
+            return ResponseEntity.internalServerError()
+                    .body(SeasonTransitionDTO.builder()
+                            .success(false)
+                            .message("Season transition failed: " + e.getMessage())
+                            .build());
+        }
     }
 
     // ========================================================================
@@ -196,7 +247,13 @@ public class ProgressController {
 
         log.info("Processing workout completion for user {}", userId);
 
-        // 1. Update user progression
+        // 🆕 STEP 1: Get CURRENT progression and save OLD rank
+        UserProgression progressionBefore = userProgressionService.getOrCreateUserProgression(userId);
+        Rank oldSeasonalRank = progressionBefore.getSeasonalRank();
+        int oldSeasonalTier = progressionBefore.getSeasonalTier();
+        int oldSeasonalXp = progressionBefore.getSeasonalXp();
+
+        // 🆕 STEP 2: Update user progression (this awards XP and updates rank)
         UserProgression progression = userProgressionService.handleWorkoutCompletion(
                 userId,
                 request.getDurationMinutes(),
@@ -208,26 +265,43 @@ public class ProgressController {
                 request.getWorkoutType()
         );
 
-        // 2. Check for newly unlocked achievements
+        // 🆕 STEP 3: Calculate XP gained and check if ranked up
+        int xpGained = progression.getSeasonalXp() - oldSeasonalXp;
+        boolean rankedUp = !progression.getSeasonalRank().equals(oldSeasonalRank);
+        boolean tieredUp = !rankedUp && (progression.getSeasonalTier() < oldSeasonalTier);
+
+        if (rankedUp) {
+            log.info("🎊 USER RANKED UP! {} → {} (+{} XP)",
+                    oldSeasonalRank, progression.getSeasonalRank(), xpGained);
+        } else if (tieredUp) {  // 🆕 ADD THIS
+            log.info("📈 USER TIERED UP! {} {} → {} {}",
+                    oldSeasonalRank, oldSeasonalTier, progression.getSeasonalRank(), progression.getSeasonalTier());
+        }
+
+        // STEP 4: Check for newly unlocked achievements
         List<UserAchievement> newAchievements = achievementService.checkAndUnlockAchievements(userId);
 
-        // 3. Build response
+        // STEP 5: Build response
         ProgressionUpdateResponse response = ProgressionUpdateResponse.builder()
-                .xpGained(calculateXpGained(progression)) // XP from this workout
+                .xpGained(xpGained)
                 .newSeasonalXp(progression.getSeasonalXp())
                 .newLifetimeXp(progression.getLifetimeXp())
                 .seasonalRank(progression.getSeasonalRank().name())
                 .lifetimeRank(progression.getLifetimeRank().name())
                 .currentStreak(progression.getCurrentStreakDays())
-                .rankedUp(checkIfRankedUp(progression))
+                .rankedUp(rankedUp)
+                .tieredUp(tieredUp)
+                .oldRank(rankedUp ? oldSeasonalRank.name() : null)
+                .oldTier(rankedUp || tieredUp ? oldSeasonalTier : null)
+                .newSeasonalTier(progression.getSeasonalTier())
                 .streakMilestone(checkStreakMilestone(progression))
                 .achievementsUnlocked(newAchievements.stream()
                         .map(UserAchievementDTO::fromEntity)
                         .collect(Collectors.toList()))
                 .build();
 
-        log.info("Workout completion processed: +{} XP, {} achievements unlocked",
-                response.getXpGained(), response.getAchievementsUnlocked().size());
+        log.info("Workout completion processed: +{} XP, {} achievements unlocked, ranked up: {}",
+                response.getXpGained(), response.getAchievementsUnlocked().size(), rankedUp);
 
         return ResponseEntity.ok(response);
     }
@@ -510,24 +584,6 @@ public class ProgressController {
     // HELPER METHODS
     // ========================================================================
 
-    /**
-     * Calculate XP gained from this specific workout.
-     * This is a simplified calculation - actual implementation would track previous XP.
-     */
-    private int calculateXpGained(UserProgression progression) {
-        // TODO: Track XP before/after workout to calculate exact gain
-        // For now, return base XP estimate
-        return 10; // Placeholder
-    }
-
-    /**
-     * Check if user ranked up during this workout.
-     */
-    private boolean checkIfRankedUp(UserProgression progression) {
-        // TODO: Track rank before/after workout
-        // For now, return false
-        return false; // Placeholder
-    }
 
     /**
      * Check if user hit a streak milestone (3, 7, 14, 30 days).

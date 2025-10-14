@@ -20,6 +20,8 @@ import {ExerciseConfigModal} from '../components/CalendarPage/index';
 import EnhancedExerciseSelector from '../components/CalendarPage/ExerciseSelector';
 import WorkoutPlanConfigModal from '../components/CalendarPage/WorkoutPlanConfigModal';
 import WorkoutDetailsModal from '../components/CalendarPage/WorkoutDetailsModal';
+import {PostWorkoutOrchestrator} from '../components/gamification/PostWorkoutOrchestrator';
+import toast from "react-hot-toast";
 
 const CalendarPage: React.FC = () => {
     const navigate = useNavigate();
@@ -28,6 +30,8 @@ const CalendarPage: React.FC = () => {
 
     // Core state
     const [viewingDate, setViewingDate] = useState(new Date());
+    const [showCelebration, setShowCelebration] = useState(false);
+    const [celebrationData, setCelebrationData] = useState<any>(null);
 
     // Use extracted data management hook
     const {
@@ -106,22 +110,36 @@ const CalendarPage: React.FC = () => {
             refreshCalendarData(true);
         }
 
-        // Also check session storage for workout completion flag
+        // Check session storage for workout completion flag
         const workoutJustCompleted = sessionStorage.getItem('workoutJustCompleted');
         const completedWorkoutDate = sessionStorage.getItem('completedWorkoutDate');
+        const celebrationDataStr = sessionStorage.getItem('celebrationData'); // 🆕
 
         if (workoutJustCompleted === 'true' && completedWorkoutDate) {
             console.log('Workout completion detected, ensuring calendar is up to date...');
-            refreshCalendarData(true, true); // showToast=true, forceCacheBust=true
+            refreshCalendarData(true, true);
 
             // If the completed workout was for the currently viewed date, ensure we show it
             if (completedWorkoutDate === viewingDateString) {
-                loadDayData(true); // force reload
+                loadDayData(true);
             }
 
-            // Clear the flags
+            // 🆕 Show celebration if data exists
+            if (celebrationDataStr) {
+                try {
+                    const data = JSON.parse(celebrationDataStr);
+                    setCelebrationData(data);
+                    setShowCelebration(true);
+                    console.log('🎉 Showing celebration modals:', data);
+                } catch (error) {
+                    console.error('Failed to parse celebration data:', error);
+                }
+            }
+
+            // Clean up flags (but keep celebrationData until modals dismissed)
             sessionStorage.removeItem('workoutJustCompleted');
             sessionStorage.removeItem('completedWorkoutDate');
+            // Don't remove celebrationData yet - wait for modal dismissal
         }
 
         previousLocation.current = location.pathname;
@@ -188,6 +206,36 @@ const CalendarPage: React.FC = () => {
         closeWorkoutDetailsModal();
         setSelectedExerciseForDetails(null);
         setSelectedWorkoutResults(null);
+    };
+
+    const handleCelebrationComplete = () => {
+        console.log('🎉 Celebration sequence complete!');
+
+        // 🆕 CHECK FOR TIER CHANGE BEFORE CLEANING UP
+        if (celebrationData?.tieredUp) {
+            console.log('📈 Tier change detected, notifying MiniProgressWidget', {
+                oldTier: celebrationData.oldTier,
+                newTier: celebrationData.newSeasonalTier
+            });
+
+            sessionStorage.setItem('recentTierChange', JSON.stringify({
+                timestamp: Date.now(),
+                oldTier: celebrationData.oldTier,
+                newTier: celebrationData.newSeasonalTier
+            }));
+
+            // 🆕 Dispatch custom event to notify MiniProgressWidget
+            window.dispatchEvent(new CustomEvent('tierChanged'));
+        }
+
+        setShowCelebration(false);
+        setCelebrationData(null);
+
+        // Clean up sessionStorage
+        sessionStorage.removeItem('celebrationData');
+
+        // Show final toast
+        toast.success('Welcome back! 💪', {duration: 2000});
     };
 
     // Utility functions
@@ -358,6 +406,14 @@ const CalendarPage: React.FC = () => {
                     onClose={handleWorkoutDetailsModalClose}
                     exercise={selectedExerciseForDetails}
                     workoutResults={selectedWorkoutResults}
+                />
+            )}
+
+            {/* 🆕 Post-Workout Celebration Sequence */}
+            {showCelebration && celebrationData && (
+                <PostWorkoutOrchestrator
+                    data={celebrationData}
+                    onComplete={handleCelebrationComplete}
                 />
             )}
         </div>

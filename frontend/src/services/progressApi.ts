@@ -1,6 +1,7 @@
 // services/progressApi.ts
 import apiClient from './apiClient';
-import {UserProgression, ProgressionUpdate, Achievement, UnlockedAchievement} from '../types/gamification';
+import {Achievement, UnlockedAchievement, UserProgression} from '../types/gamification';
+import {WorkoutCompletionResponse} from "@/services/workoutCompletionResponse";
 
 export interface WorkoutCompletionRequest {
     durationMinutes: number;
@@ -10,25 +11,6 @@ export interface WorkoutCompletionRequest {
     holdSeconds?: number;
     uniqueExercisesCount: number;
     workoutType: 'STRENGTH' | 'CARDIO' | 'ISOMETRIC';
-}
-
-export interface WorkoutCompletionResponse {
-    xpGained: number;
-    newSeasonalXp: number;
-    newLifetimeXp: number;
-    seasonalRank: string;
-    lifetimeRank: string;
-    currentStreak: number;
-    rankedUp: boolean;
-    streakMilestone: boolean;
-    achievementsUnlocked: Array<{
-        achievementId: number;
-        name: string;
-        description: string;
-        icon: string;
-        rarity: string;
-        bonusXp: number;
-    }>;
 }
 
 class ProgressApi {

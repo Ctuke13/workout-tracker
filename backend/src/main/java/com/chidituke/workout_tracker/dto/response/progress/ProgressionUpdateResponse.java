@@ -26,7 +26,11 @@ public class ProgressionUpdateResponse {
     private String seasonalRank;
     private String lifetimeRank;
     private Boolean rankedUp;
-    private String newRank; // If ranked up
+    private Boolean tieredUp;
+    private String newRank;
+    private String oldRank;
+    private Integer oldTier;
+    private Integer newSeasonalTier;
 
     // Streak info
     private Integer currentStreak;

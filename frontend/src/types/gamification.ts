@@ -78,7 +78,6 @@ export interface UnlockedAchievement extends Achievement {
 
 export interface RankInfo {
     name: string;
-    tier: number;
     minXp: number;
     maxXp: number;
     icon: string;
@@ -89,67 +88,73 @@ export interface RankInfo {
 export const RANK_THRESHOLDS: Record<string, RankInfo> = {
     NOVICE: {
         name: 'NOVICE',
-        tier: 3,
         minXp: 0,
-        maxXp: 99,
+        maxXp: 1500,
         icon: '🌱',
         color: 'gray'
     },
     APPRENTICE: {
         name: 'APPRENTICE',
-        tier: 3,
-        minXp: 100,
-        maxXp: 499,
-        icon: '👤',
-        color: 'blue'
+        minXp: 1500,
+        maxXp: 4000,
+        icon: '🟠',
+        color: 'orange'
     },
     DEVOTEE: {
         name: 'DEVOTEE',
-        tier: 2,
-        minXp: 500,
-        maxXp: 1499,
-        icon: '⭐',
+        minXp: 4000,
+        maxXp: 8000,
+        icon: '🟡',
         color: 'yellow'
     },
     WARRIOR: {
         name: 'WARRIOR',
-        tier: 2,
-        minXp: 1500,
-        maxXp: 3499,
-        icon: '⚔️',
+        minXp: 8000,
+        maxXp: 14000,
+        icon: '🟢',
         color: 'green'
     },
     CHAMPION: {
         name: 'CHAMPION',
-        tier: 2,
-        minXp: 3500,
-        maxXp: 6999,
-        icon: '🏆',
+        minXp: 14000,
+        maxXp: 22000,
+        icon: '🔵',
         color: 'blue'
     },
     ELITE: {
         name: 'ELITE',
-        tier: 1,
-        minXp: 7000,
-        maxXp: 11999,
-        icon: '💎',
+        minXp: 22000,
+        maxXp: 32000,
+        icon: '💜',
         color: 'purple'
     },
     MASTER: {
         name: 'MASTER',
-        tier: 1,
-        minXp: 12000,
-        maxXp: 19999,
-        icon: '👑',
+        minXp: 32000,
+        maxXp: 44000,
+        icon: '🔴',
         color: 'red'
     },
     LEGEND: {
         name: 'LEGEND',
-        tier: 1,
-        minXp: 20000,
-        maxXp: 999999,
-        icon: '⚡',
+        minXp: 44000,
+        maxXp: 60000,
+        icon: '⚪',
+        color: 'white'
+    },
+    ICON: {
+        name: 'ICON',
+        minXp: 60000,
+        maxXp: 90000,
+        icon: '🌟',
         color: 'gold'
+    },
+    IMMORTAL: {
+        name: 'IMMORTAL',
+        minXp: 90000,
+        maxXp: 999999,
+        icon: '💎',
+        color: 'diamond'
     }
 };
 
@@ -165,4 +170,20 @@ export const getNextRank = (currentRank: string): RankInfo | null => {
         return null; // Already at max rank
     }
     return RANK_THRESHOLDS[ranks[currentIndex + 1]];
+};
+
+/**
+ * Convert tier number to Roman numeral display
+ */
+export const getTierDisplay = (tier: number): string => {
+    switch (tier) {
+        case 3:
+            return 'III';
+        case 2:
+            return 'II';
+        case 1:
+            return 'I';
+        default:
+            return 'III';
+    }
 };

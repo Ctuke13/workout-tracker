@@ -2,12 +2,12 @@
 
 ## 📊 Project Overview
 
-- **Total Java Files**: 330
-- **Total TypeScript/JavaScript Files**: 131
+- **Total Java Files**: 317
+- **Total TypeScript/JavaScript Files**: 129
 - **Total Configuration Files**: 20
 - **Total Test Files**: 13
 - **Total SQL Migration Files**: 16
-- **Total HTTP Test Files**: 6
+- **Total HTTP Test Files**: 5
 - **Backend Structure**: Spring Boot application with comprehensive modular architecture
 - **Frontend Structure**: TypeScript React application with modern component architecture
 
@@ -25,14 +25,14 @@ workout-tracker/
 ├── backend-workout-modules-diagram.md
 ├── project-file-tree.md
 │
-├── 🧪 api-tests/ (6 files)
+├── 🧪 api-tests/ (5 files)
 │   ├── 🔐 auth-tests.http
 │   ├── 💪 exercise-library-tests.http
 │   ├── 📊 performance-tests.http
 │   ├── 💳 subscription-tests.http
 │   └── 🏋️ workout-tests.http
 │
-├── backend/ (Spring Boot - 330 Java files)
+├── backend/ (Spring Boot - 317 Java files)
 │   ├── 🐳 docker-compose.yml
 │   ├── 🛠️ mvnw
 │   ├── 🛠️ mvnw.cmd
@@ -587,7 +587,7 @@ workout-tracker/
 │   │
 │   └── 🎯 target/ (build directory)
 │
-└── frontend/ (TypeScript React - 131 source files)
+└── frontend/ (TypeScript React - 129 source files)
     ├── 📖 README.md
     ├── 📦 package.json
     ├── 🔒 package-lock.json
@@ -781,11 +781,16 @@ workout-tracker/
 
 ## 🚀 Last Updated
 
-January 9, 2025
+October 10, 2025
 
 ## 🔄 Recent Changes
 
-### Latest Updates (January 9, 2025)
+### Latest Updates (October 10, 2025)
+- **📊 Updated File Tree**: Refreshed file counts and structure to reflect current state
+- **🔢 Accurate Counts**: Updated to 317 Java files, 129 TypeScript/JavaScript files
+- **📁 Current Structure**: Complete overview of all modules and components
+
+### Previous Updates (January 9, 2025)
 - **🎯 Added Gamification System**: Complete achievement, ranking, and leaderboard functionality
 - **📊 Progress Tracking Module**: New progress controller, models, DTOs, services, and repositories
 - **🏆 Achievement System**: 10 new model files including Achievement, UserAchievement, Season, LeaderboardEntry
@@ -793,9 +798,6 @@ January 9, 2025
 - **🗄️ New Migrations**: V015 (Gamification System) and V016 (Achievement System)
 - **📈 Enhanced DTOs**: 13 new progress response DTOs for comprehensive stats tracking
 - **🔧 Progress Services**: 4 new services (Achievement, Leaderboard, Season, UserProgression)
-
-### Previous Updates
-- Updated file tree structure to reflect current state
 - Added new CalorieController and calorie tracking functionality
 - Added comprehensive workout mode components
 - Enhanced performance tracking with execution summaries
@@ -806,7 +808,7 @@ January 9, 2025
 
 ## 📈 Architecture Summary
 
-### Backend (Spring Boot) - 330 Java Files
+### Backend (Spring Boot) - 317 Java Files
 
 #### Layer Breakdown:
 - **🔐 Security Layer**: 6 files - JWT authentication, role-based access control
@@ -859,7 +861,7 @@ January 9, 2025
 - **🆕 Gamification System**: Achievements, ranks, seasons, leaderboards, user progression
 - **Multi-tier Subscription**: Feature gating, limits enforcement
 
-### Frontend (TypeScript React) - 131 Source Files
+### Frontend (TypeScript React) - 129 Source Files
 
 #### Component Architecture:
 - **🧩 Components**: 71 files

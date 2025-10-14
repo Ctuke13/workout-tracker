@@ -6,6 +6,18 @@ import lombok.Getter;
  * Enum representing the 10 rank tiers in the progression system.
  * Each rank has 3 sub-tiers (III, II, I).
  * <p>
+ * Rank Structure (from spec v1.0):
+ * - NOVICE:     0 - 1,500 XP    (Levels 1-10)
+ * - APPRENTICE: 1,500 - 4,000   (Levels 11-20)
+ * - DEVOTEE:    4,000 - 8,000   (Levels 21-30)
+ * - WARRIOR:    8,000 - 14,000  (Levels 31-40)
+ * - CHAMPION:   14,000 - 22,000 (Levels 41-50)
+ * - ELITE:      22,000 - 32,000 (Levels 51-60)
+ * - MASTER:     32,000 - 44,000 (Levels 61-70)
+ * - LEGEND:     44,000 - 60,000 (Levels 71-80)
+ * - ICON:       60,000 - 90,000 (Levels 81-90) - Lifetime only
+ * - IMMORTAL:   90,000+         (Levels 91-100) - Lifetime only
+ * <p>
  * Data Flow:
  * - User earns XP from workouts
  * - When XP threshold reached, rank increases
@@ -13,16 +25,19 @@ import lombok.Getter;
  */
 @Getter
 public enum Rank {
-    NOVICE(0, 99, "🥉"),           // 0-99 XP
-    APPRENTICE(100, 299, "🥈"),    // 100-299 XP
-    DEVOTEE(300, 599, "🥇"),       // 300-599 XP
-    WARRIOR(600, 999, "⚔️"),       // 600-999 XP
-    CHAMPION(1000, 1499, "🏆"),    // 1000-1499 XP
-    ELITE(1500, 2099, "💎"),       // 1500-2099 XP
-    MASTER(2100, 2799, "👑"),      // 2100-2799 XP
-    LEGEND(2800, 3599, "⭐"),      // 2800-3599 XP
-    ICON(3600, 4499, "🔥"),        // 3600-4499 XP
-    IMMORTAL(4500, Integer.MAX_VALUE, "🌟"); // 4500+ XP
+    // Seasonal Ranks (achievable in one 3-month season)
+    NOVICE(0, 1500, "🌱"),           // 0-1,500 XP
+    APPRENTICE(1500, 4000, "🟠"),    // 1,500-4,000 XP
+    DEVOTEE(4000, 8000, "🟡"),       // 4,000-8,000 XP
+    WARRIOR(8000, 14000, "🟢"),      // 8,000-14,000 XP
+    CHAMPION(14000, 22000, "🔵"),    // 14,000-22,000 XP
+    ELITE(22000, 32000, "💜"),       // 22,000-32,000 XP
+    MASTER(32000, 44000, "🔴"),      // 32,000-44,000 XP
+    LEGEND(44000, 60000, "⚪"),      // 44,000-60,000 XP
+
+    // Lifetime Exclusive Ranks (not achievable in single season)
+    ICON(60000, 90000, "🌟"),        // 60,000-90,000 XP
+    IMMORTAL(90000, Integer.MAX_VALUE, "💎"); // 90,000+ XP
 
     private final int minXp;
     private final int maxXp;
@@ -42,7 +57,7 @@ public enum Rank {
      */
     public static Rank fromXp(int xp) {
         for (Rank rank : Rank.values()) {
-            if (xp >= rank.minXp && xp <= rank.maxXp) {
+            if (xp >= rank.minXp && xp < rank.maxXp) {
                 return rank;
             }
         }
@@ -87,8 +102,36 @@ public enum Rank {
         if (this == IMMORTAL) {
             return 100.0;
         }
-        int rankXpRange = maxXp - minXp + 1;
+
+        // For other ranks, calculate % through the rank
+        int rankXpRange = maxXp - minXp;
         int xpIntoRank = currentXp - minXp;
-        return (xpIntoRank / (double) rankXpRange) * 100.0;
+
+        // Clamp between 0-100
+        double percentage = (xpIntoRank / (double) rankXpRange) * 100.0;
+        return Math.max(0.0, Math.min(100.0, percentage));
+    }
+
+    /**
+     * Calculate tier (III, II, I) within current rank.
+     *
+     * @param currentXp Current XP amount
+     * @return Tier number (3=III, 2=II, 1=I)
+     */
+    public int calculateTier(int currentXp) {
+        if (this == IMMORTAL) {
+            // Special handling for IMMORTAL
+            if (currentXp < 120000) return 3; // III
+            if (currentXp < 150000) return 2; // II
+            return 1; // I
+        }
+
+        int rankXpRange = maxXp - minXp;
+        int xpIntoRank = currentXp - minXp;
+        int tierSize = rankXpRange / 3;
+
+        if (xpIntoRank < tierSize) return 3;        // Tier III
+        if (xpIntoRank < tierSize * 2) return 2;   // Tier II
+        return 1;                                    // Tier I
     }
 }

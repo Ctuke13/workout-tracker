@@ -43,13 +43,21 @@ public class UserProgressionService {
     private final UserProgressionRepository userProgressionRepository;
     private final SeasonService seasonService;
 
-    // ========== XP CONSTANTS ==========
-    private static final int BASE_WORKOUT_XP = 10;
-    private static final int XP_PER_5_MINUTES = 1;
-    private static final int STREAK_BONUS_XP = 5;
-    private static final int STREAK_BONUS_THRESHOLD = 3;
-    private static final int WEEKLY_7_WORKOUT_BONUS = 20;
-    private static final int PERFECT_WEEK_BONUS = 50;
+    // ========== XP CONSTANTS (from spec v1.0) ==========
+    private static final int BASE_WORKOUT_XP = 100;         // Base XP per workout (was 10)
+    private static final int XP_PER_SET = 20;               // NEW: 20 XP per set
+    private static final int VOLUME_DIVISOR = 100;          // NEW: 1 XP per 100 lbs
+    private static final int XP_PER_5_MINUTES = 10;         // Duration bonus (was 1)
+    private static final int STREAK_BONUS_XP = 50;          // Streak bonus (was 5)
+    private static final int STREAK_BONUS_THRESHOLD = 3;    // Days needed for bonus
+    private static final int WEEKLY_7_WORKOUT_BONUS = 200;  // 7-workout bonus (was 20)
+    private static final int PERFECT_WEEK_BONUS = 500;      // Perfect week bonus (was 50)
+
+    // Streak multipliers (weekly workout count)
+    private static final double STREAK_4_DAYS = 1.10;  // 10% bonus
+    private static final double STREAK_5_DAYS = 1.20;  // 20% bonus
+    private static final double STREAK_6_DAYS = 1.35;  // 35% bonus
+    private static final double STREAK_7_DAYS = 1.50;  // 50% bonus
 
     // ========== CORE OPERATIONS ==========
 
@@ -177,7 +185,7 @@ public class UserProgressionService {
         updateWeeklyTracking(progression, today);
 
         // 8. Calculate and award XP
-        int xpAwarded = calculateWorkoutXp(progression, workoutDurationMinutes);
+        int xpAwarded = calculateWorkoutXp(progression, workoutDurationMinutes, setsCompleted, volumeLifted);
         progression.addXp(xpAwarded);
         log.info("Awarded {} XP to user {} (seasonal: {}, lifetime: {})",
                 xpAwarded, userId, progression.getSeasonalXp(), progression.getLifetimeXp());
@@ -198,45 +206,93 @@ public class UserProgressionService {
     // ========== XP CALCULATION ==========
 
     /**
-     * Calculate XP to award for a workout.
+     * Calculate XP to award for a workout (UPDATED to spec v1.0).
      * <p>
-     * Formula:
-     * - Base: 10 XP
-     * - Duration: +1 XP per 5 minutes
-     * - Streak Bonus: +5 XP if 3+ day streak
-     * - Weekly Progress: +20 XP for 7th workout of week
-     * - Perfect Week: Additional +50 XP if 7 consecutive days
+     * Formula: (Base + Sets + Volume + Duration) × Streak Multiplier
+     * <p>
+     * Components:
+     * - Base: 100 XP
+     * - Sets: 20 XP per set
+     * - Volume: 1 XP per 100 lbs lifted
+     * - Duration: +10 XP per 5 minutes
+     * - Streak Multipliers: 4 days=1.1×, 5 days=1.2×, 6 days=1.35×, 7 days=1.5×
+     * - Weekly Bonus: +200 XP for 7th workout
+     * - Perfect Week: +500 XP for 7 consecutive days
      *
      * @param progression     User progression
      * @param durationMinutes Workout duration
+     * @param setsCompleted   Number of sets completed
+     * @param volumeLifted    Total volume lifted (lbs)
      * @return Total XP to award
      */
-    private int calculateWorkoutXp(UserProgression progression, int durationMinutes) {
+    private int calculateWorkoutXp(
+            UserProgression progression,
+            int durationMinutes,
+            int setsCompleted,
+            BigDecimal volumeLifted) {
+
+        // 1. Base XP
         int xp = BASE_WORKOUT_XP;
+        log.debug("Base XP: {}", xp);
 
-        // Duration bonus: +1 XP per 5 minutes
-        xp += (durationMinutes / 5) * XP_PER_5_MINUTES;
+        // 2. Set bonus: +20 XP per set
+        int setBonus = setsCompleted * XP_PER_SET;
+        xp += setBonus;
+        log.debug("Set bonus (+{} sets): +{} XP", setsCompleted, setBonus);
 
-        // Streak bonus: +5 XP if 3+ day streak
-        if (progression.getCurrentStreakDays() >= STREAK_BONUS_THRESHOLD) {
-            xp += STREAK_BONUS_XP;
-            log.debug("Streak bonus applied: +{} XP", STREAK_BONUS_XP);
+        // 3. Volume bonus: +1 XP per 100 lbs
+        int volumeBonus = volumeLifted.intValue() / VOLUME_DIVISOR;
+        xp += volumeBonus;
+        log.debug("Volume bonus ({} lbs): +{} XP", volumeLifted.intValue(), volumeBonus);
+
+        // 4. Duration bonus: +10 XP per 5 minutes
+        int durationBonus = (durationMinutes / 5) * XP_PER_5_MINUTES;
+        xp += durationBonus;
+        log.debug("Duration bonus ({} min): +{} XP", durationMinutes, durationBonus);
+
+        // 5. Weekly streak multiplier
+        int weeklyCount = progression.getWeeklyWorkoutCount() + 1; // Include current workout
+        double multiplier = getStreakMultiplier(weeklyCount);
+
+        if (multiplier > 1.0) {
+            int xpBeforeMultiplier = xp;
+            xp = (int) (xp * multiplier);
+            log.debug("Streak multiplier ({} workouts): {}× (+{} XP)",
+                    weeklyCount, multiplier, xp - xpBeforeMultiplier);
         }
 
-        // Weekly bonus: +20 XP for 7th workout
-        int weeklyCount = progression.getWeeklyWorkoutCount() + 1;
+        // 6. Weekly milestone bonuses
         if (weeklyCount == 7) {
             xp += WEEKLY_7_WORKOUT_BONUS;
-            log.debug("Weekly 7-workout bonus: +{} XP", WEEKLY_7_WORKOUT_BONUS);
+            log.debug("7-workout weekly bonus: +{} XP", WEEKLY_7_WORKOUT_BONUS);
+
+            // Perfect week bonus (7 consecutive days)
+            if (progression.getCurrentStreakDays() >= 6) {
+                xp += PERFECT_WEEK_BONUS;
+                log.debug("Perfect week bonus: +{} XP", PERFECT_WEEK_BONUS);
+            }
         }
 
-        // Perfect week bonus: +50 XP if 7 consecutive days
-        if (progression.getCurrentStreakDays() >= 6 && weeklyCount == 7) {
-            xp += PERFECT_WEEK_BONUS;
-            log.debug("Perfect week bonus: +{} XP", PERFECT_WEEK_BONUS);
-        }
+        log.info("Total XP calculated: {} (base: {}, sets: {}, volume: {}, duration: {}, multiplier: {}×)",
+                xp, BASE_WORKOUT_XP, setBonus, volumeBonus, durationBonus, multiplier);
 
         return xp;
+    }
+
+    /**
+     * Get streak multiplier based on weekly workout count.
+     *
+     * @param weeklyCount Number of workouts this week
+     * @return Multiplier (1.0 - 1.5)
+     */
+    private double getStreakMultiplier(int weeklyCount) {
+        return switch (weeklyCount) {
+            case 7 -> STREAK_7_DAYS;  // 1.5×
+            case 6 -> STREAK_6_DAYS;  // 1.35×
+            case 5 -> STREAK_5_DAYS;  // 1.2×
+            case 4 -> STREAK_4_DAYS;  // 1.1×
+            default -> 1.0;           // No multiplier
+        };
     }
 
     // ========== RANK CALCULATION ==========
@@ -248,30 +304,55 @@ public class UserProgressionService {
      * @param progression User progression
      */
     private void recalculateRanks(UserProgression progression) {
-        // Recalculate seasonal rank
+        // Recalculate seasonal rank and tier
         Rank oldSeasonalRank = progression.getSeasonalRank();
+        int oldSeasonalTier = progression.getSeasonalTier();
+
         Rank newSeasonalRank = Rank.fromXp(progression.getSeasonalXp());
+        int newSeasonalTier = calculateTier(progression.getSeasonalXp(), newSeasonalRank);
 
         if (newSeasonalRank != oldSeasonalRank) {
             progression.setSeasonalRank(newSeasonalRank);
             progression.setSeasonalTier(3); // Reset to tier III on rank up
             log.info("User {} ranked up (seasonal): {} → {}",
                     progression.getUserId(), oldSeasonalRank, newSeasonalRank);
+        } else if (newSeasonalTier != oldSeasonalTier) {
+            // Tier changed within same rank
+            progression.setSeasonalTier(newSeasonalTier);
+            log.info("User {} tiered up (seasonal): {} Tier {} → Tier {}",
+                    progression.getUserId(), newSeasonalRank, oldSeasonalTier, newSeasonalTier);
         }
 
-        // Recalculate lifetime rank
+        // Recalculate lifetime rank and tier
         Rank oldLifetimeRank = progression.getLifetimeRank();
+        int oldLifetimeTier = progression.getLifetimeTier();
+
         Rank newLifetimeRank = Rank.fromXp(progression.getLifetimeXp());
+        int newLifetimeTier = calculateTier(progression.getLifetimeXp(), newLifetimeRank);
 
         if (newLifetimeRank != oldLifetimeRank) {
             progression.setLifetimeRank(newLifetimeRank);
             progression.setLifetimeTier(3); // Reset to tier III on rank up
             log.info("User {} ranked up (lifetime): {} → {}",
                     progression.getUserId(), oldLifetimeRank, newLifetimeRank);
+        } else if (newLifetimeTier != oldLifetimeTier) {
+            // Tier changed within same rank
+            progression.setLifetimeTier(newLifetimeTier);
+            log.info("User {} tiered up (lifetime): {} Tier {} → Tier {}",
+                    progression.getUserId(), newLifetimeRank, oldLifetimeTier, newLifetimeTier);
         }
+    }
 
-        // TODO: Tier progression logic (require 3 workouts per tier?)
-        // For now, users stay at tier III until rank changes
+    /**
+     * Calculate tier (I, II, or III) based on XP within current rank.
+     * Delegates to the Rank enum's calculateTier method.
+     *
+     * @param xp   Current XP
+     * @param rank Current rank
+     * @return Tier (3=III, 2=II, 1=I)
+     */
+    private int calculateTier(int xp, Rank rank) {
+        return rank.calculateTier(xp);
     }
 
     // ========== STREAK TRACKING ==========

@@ -34,4 +34,10 @@ public interface SeasonRepository extends JpaRepository<Season, Integer> {
     List<Season> findPastSeasons(@Param("today") LocalDate today);
 
     boolean existsBySeasonName(String seasonName);
+
+    /**
+     * Find season by start date.
+     * Used during season transitions to check if next season exists.
+     */
+    Optional<Season> findByStartDate(LocalDate startDate);
 }

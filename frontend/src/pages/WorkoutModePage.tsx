@@ -189,7 +189,8 @@ const WorkoutModePage: React.FC = () => {
 
         try {
             // Complete workout and get the data back
-            const workoutData = await workoutMode.completeWorkout();
+            const workoutData = await workoutMode.completeWorkout(workoutMode.workoutDuration);
+            console.log(`⏱️ Passing timer duration to workout completion: ${workoutMode.workoutDuration} seconds`);
 
             if (workoutData) {
                 console.log('✅ Completed workout:', workoutData);
@@ -221,11 +222,8 @@ const WorkoutModePage: React.FC = () => {
                     workoutData.exercises?.map(ex => ex.scheduledExercise?.exercise?.exerciseId)
                 ).size;
 
-                const totalDuration = workoutData.exercises?.reduce((sum, ex) =>
-                        sum + (ex.sets?.reduce((setSum: number, set: any) =>
-                            setSum + (set.actualDurationMinutes || 0), 0
-                        ) || 0), 0
-                ) || 30;
+                const totalDuration = Math.max(1, Math.ceil(workoutMode.workoutDuration / 60));
+                console.log(`⏱️ Actual workout duration: ${totalDuration} minutes (${workoutMode.workoutDuration} seconds)`);
 
                 const hasCardio = workoutData.exercises?.some(ex =>
                     ex.scheduledExercise?.exercise?.isCardio
@@ -365,6 +363,7 @@ const WorkoutModePage: React.FC = () => {
                     totalExercises={workoutMode.currentWorkout?.exercises.length || 1}
                     completionPercentage={workoutMode.getCompletionPercentage()}
                     gradientClass={typeStyle.gradient}
+                    workoutDuration={workoutMode.workoutDuration}
                 />
 
                 {/* Exercise Navigation */}

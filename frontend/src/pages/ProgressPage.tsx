@@ -3,6 +3,7 @@ import {HeroStatsCard} from '../components/ProgressPage/HeroStatsCard';
 import {CurrentSeasonCard} from "../components/ProgressPage/CurrentSeasonCard";
 import {AchievementGalleryPreview} from "../components/ProgressPage/AchievementGalleryPreview";
 import {LeaderboardPreview} from "../components/ProgressPage/LeaderboardPreview";
+import {AnalyticsPreview} from '../components/ProgressPage/AnalyticsPreview';
 
 const ProgressPage: React.FC = () => {
     return (
@@ -15,15 +16,16 @@ const ProgressPage: React.FC = () => {
                 {/* Current Season Card */}
                 <CurrentSeasonCard/>
 
+                <AnalyticsPreview/>
+
                 <AchievementGalleryPreview/>
 
-
                 <LeaderboardPreview/>
-                {/* TODO: Add remaining components */}
 
-                {/* <AnalyticsPreview /> */}
+
+                {/* TODO: Add remaining components */}
                 {/* <PersonalRecordsPreview /> */}
-                 
+
             </div>
         </div>
     );

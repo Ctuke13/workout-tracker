@@ -33,6 +33,7 @@ interface SeasonTheme {
     orb2: string;
     accentLight: string;
     accentGradient: string;
+    accentBg: string;
 }
 
 interface SeasonContextType {
@@ -64,7 +65,8 @@ const defaultTheme: SeasonTheme = {
     orb1: 'bg-slate-300/40',
     orb2: 'bg-gray-300/40',
     accentLight: 'bg-slate-300/40',
-    accentGradient: 'bg-gradient-to-br from-slate-500 to-gray-600'
+    accentGradient: 'bg-gradient-to-br from-slate-500 to-gray-600',
+    accentBg: 'bg-slate-500'
 };
 
 // Get season theme based on season name
@@ -92,7 +94,8 @@ const getSeasonTheme = (seasonName: string): SeasonTheme => {
             orb1: 'bg-blue-300/40',
             orb2: 'bg-cyan-300/40',
             accentLight: 'bg-blue-300/40',
-            accentGradient: 'bg-gradient-to-br from-blue-500 to-cyan-600'
+            accentGradient: 'bg-gradient-to-br from-blue-500 to-cyan-600',
+            accentBg: 'bg-blue-500'
         };
     } else if (lowerName.includes('spring')) {
         return {
@@ -115,7 +118,8 @@ const getSeasonTheme = (seasonName: string): SeasonTheme => {
             orb1: 'bg-green-300/40',
             orb2: 'bg-emerald-300/40',
             accentLight: 'bg-green-300/40',
-            accentGradient: 'bg-gradient-to-br from-green-500 to-emerald-600'
+            accentGradient: 'bg-gradient-to-br from-green-500 to-emerald-600',
+            accentBg: 'bg-green-500'
         };
     } else if (lowerName.includes('summer')) {
         return {
@@ -138,7 +142,8 @@ const getSeasonTheme = (seasonName: string): SeasonTheme => {
             orb1: 'bg-orange-300/40',
             orb2: 'bg-amber-300/40',
             accentLight: 'bg-orange-300/40',
-            accentGradient: 'bg-gradient-to-br from-orange-500 to-amber-600'
+            accentGradient: 'bg-gradient-to-br from-orange-500 to-amber-600',
+            accentBg: 'bg-orange-500'
         };
     } else { // Fall/Autumn (default)
         return {
@@ -161,7 +166,8 @@ const getSeasonTheme = (seasonName: string): SeasonTheme => {
             orb1: 'bg-amber-300/40',
             orb2: 'bg-orange-300/40',
             accentLight: 'bg-amber-300/40',
-            accentGradient: 'bg-gradient-to-br from-amber-500 to-orange-600'
+            accentGradient: 'bg-gradient-to-br from-amber-500 to-orange-600',
+            accentBg: 'bg-amber-500'
         };
     }
 };

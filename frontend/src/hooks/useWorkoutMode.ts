@@ -79,6 +79,9 @@ export const useWorkoutMode = () => {
     const [restStartTime, setRestStartTime] = useState<Date | null>(null);
     const [currentRestSeconds, setCurrentRestSeconds] = useState(0);
 
+    const [workoutStartTime, setWorkoutStartTime] = useState<number | null>(null);
+    const [workoutDuration, setWorkoutDuration] = useState(0);
+
     // Redirect if no workout is active - Enhanced with better error handling
     useEffect(() => {
         if (!isWorkoutActive) {
@@ -86,6 +89,55 @@ export const useWorkoutMode = () => {
             return;
         }
     }, [isWorkoutActive, navigate]);
+
+    // Cleanup timers on unmount
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (restTimerRef.current) clearInterval(restTimerRef.current);
+        };
+    }, []);
+
+// ✅ ADD THIS ENTIRE useEffect:
+// Track total workout duration
+    useEffect(() => {
+        console.log('🔍 Timer effect running:', {
+            isWorkoutActive,
+            workoutStartTime,
+            currentDuration: workoutDuration,
+            hasStartTime: workoutStartTime !== null
+        });
+
+        // Start timer when workout becomes active
+        if (isWorkoutActive && workoutStartTime === null) {
+            const startTime = Date.now();
+            setWorkoutStartTime(startTime);
+            console.log('✅ TIMER STARTED at:', new Date(startTime).toLocaleTimeString(), 'timestamp:', startTime);
+        }
+
+        // Stop timer when workout is no longer active
+        if (!isWorkoutActive && workoutStartTime !== null) {
+            console.log('⏹️ TIMER STOPPED. Final duration:', workoutDuration, 'seconds');
+            setWorkoutStartTime(null);
+            setWorkoutDuration(0);
+        }
+
+        // Update duration every second while workout is active
+        if (isWorkoutActive && workoutStartTime !== null) {
+            console.log('⏱️ Starting interval timer. Current duration:', workoutDuration);
+
+            const interval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
+                setWorkoutDuration(elapsed);
+                console.log('⏱️ TICK:', elapsed, 'seconds'); // Will log every second
+            }, 1000);
+
+            return () => {
+                console.log('🧹 Cleaning up timer interval');
+                clearInterval(interval);
+            };
+        }
+    }, [isWorkoutActive, workoutStartTime]);
 
 // Initialize set data when current set changes - Improved with better defaults
     useEffect(() => {
@@ -182,14 +234,6 @@ export const useWorkoutMode = () => {
         };
     }, [isRestTimer, restTimeRemaining]);
 
-// Cleanup timers on unmount
-    useEffect(() => {
-        return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
-            if (restTimerRef.current) clearInterval(restTimerRef.current);
-        };
-    }, []);
-
     return {
         // Context data
         navigate,
@@ -238,5 +282,7 @@ export const useWorkoutMode = () => {
         currentRestSeconds,
         setCurrentRestSeconds,
 
+        workoutStartTime,
+        workoutDuration,
     };
 };

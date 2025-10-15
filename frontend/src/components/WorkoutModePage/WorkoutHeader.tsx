@@ -1,4 +1,5 @@
 import React from 'react';
+import {Clock} from 'lucide-react';
 
 interface WorkoutHeaderProps {
     exerciseName: string;
@@ -7,7 +8,19 @@ interface WorkoutHeaderProps {
     totalExercises: number;
     completionPercentage: number;
     gradientClass: string;
+    workoutDuration?: number;  // ✅ NEW
 }
+
+const formatDuration = (seconds: number): string => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hrs > 0) {
+        return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
 
 export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
                                                                 exerciseName,
@@ -15,16 +28,19 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
                                                                 currentExerciseIndex,
                                                                 totalExercises,
                                                                 completionPercentage,
-                                                                gradientClass
+                                                                gradientClass,
+                                                                workoutDuration = 0  // ✅ NEW - Must be in the parameter list!
                                                             }) => {
     return (
         <div className={`bg-gradient-to-r ${gradientClass} text-white p-4 shadow-lg`}>
-            <div className="max-w-4xl mx-auto">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="text-2xl">{exerciseIcon}</div>
-                        <div>
-                            <h1 className="text-xl font-bold">
+            <div className="max-w-4xl mx-auto space-y-4">
+                {/* Top Row - Exercise Info and Stats */}
+                <div className="flex items-start justify-between gap-4">
+                    {/* Left - Exercise Name */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="text-2xl flex-shrink-0">{exerciseIcon}</div>
+                        <div className="min-w-0">
+                            <h1 className="text-xl font-bold truncate">
                                 {exerciseName}
                             </h1>
                             <p className="text-sm opacity-90">
@@ -32,9 +48,31 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
                             </p>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <div className="text-lg font-bold">{completionPercentage}%</div>
-                        <div className="text-sm opacity-90">Complete</div>
+
+                    {/* Right - Timer and Completion */}
+                    <div className="flex items-center gap-3 sm:gap-6 flex-shrink-0">
+                        {/* ✅ WORKOUT TIMER - NEW! */}
+                        <div className="flex items-center gap-2 bg-white/20 px-3 py-2 rounded-lg">
+                            <Clock className="w-5 h-5"/>
+                            <div className="text-right">
+                                <div className="text-xl sm:text-2xl font-mono font-bold leading-none">
+                                    {formatDuration(workoutDuration)}
+                                </div>
+                                <div className="text-[10px] sm:text-xs opacity-75 mt-0.5">
+                                    Duration
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Completion Percentage */}
+                        <div className="text-right">
+                            <div className="text-xl sm:text-2xl font-bold leading-none">
+                                {completionPercentage}%
+                            </div>
+                            <div className="text-[10px] sm:text-xs opacity-75 mt-0.5">
+                                Complete
+                            </div>
+                        </div>
                     </div>
                 </div>
 

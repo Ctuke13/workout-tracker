@@ -27,7 +27,11 @@ export interface WorkoutContextType {
     startWorkout: (exercises: ScheduledExercise[], date: string) => void;
     pauseWorkout: () => void;
     resumeWorkout: () => void;
-    completeWorkout: () => Promise<{ workoutId: string; date: string; exercises: any[] } | null>;
+    completeWorkout: (actualDurationSeconds?: number) => Promise<{
+        workoutId: string;
+        date: string;
+        exercises: any[]
+    } | null>;
     cancelWorkout: () => void;
 
     // Exercise navigation
@@ -1152,7 +1156,7 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
         dispatch({type: 'RESUME_WORKOUT'});
     };
 
-    const completeWorkout = useCallback(async (): Promise<{
+    const completeWorkout = useCallback(async (actualDurationSeconds?: number): Promise<{
         workoutId: string;
         date: string;
         exercises: any[]
@@ -1172,13 +1176,24 @@ export function WorkoutProvider({children}: WorkoutProviderProps) {
         try {
             console.log('Starting workout completion process...');
 
+            // Use timer duration if provided, otherwise calculate from timestamps
+            const durationMinutes = actualDurationSeconds
+                ? Math.max(1, Math.ceil(actualDurationSeconds / 60))
+                : (state.currentWorkout.startedAt
+                    ? Math.round((Date.now() - state.currentWorkout.startedAt.getTime()) / 1000 / 60)
+                    : 0);
+
+            console.log('⏱️ Using duration for workout completion:', {
+                actualDurationSeconds,
+                calculatedMinutes: durationMinutes,
+                source: actualDurationSeconds ? 'TIMER' : 'TIMESTAMP'
+            });
+
             const completedWorkout = {
                 ...state.currentWorkout,
                 status: 'completed' as const,
                 completedAt: new Date(),
-                totalDurationMinutes: state.currentWorkout.startedAt
-                    ? Math.round((Date.now() - state.currentWorkout.startedAt.getTime()) / 1000 / 60)
-                    : 0,
+                totalDurationMinutes: durationMinutes,
             };
 
             // Wait for backend save to complete

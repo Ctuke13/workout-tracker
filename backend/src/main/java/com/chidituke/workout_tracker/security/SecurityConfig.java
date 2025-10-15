@@ -170,6 +170,8 @@ public class SecurityConfig {
                     // 🔒 PROTECTED - User-specific data (requires auth)
                     auth.requestMatchers("/api/progress/**").authenticated();
 
+                    // 📊 ANALYTICS - User-specific analytics (requires auth)
+                    auth.requestMatchers("/api/analytics/**").authenticated();
                     // ===================================================================
                     // 💼 PROFESSIONAL ROLE - Content creation
                     // ===================================================================

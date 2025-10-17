@@ -64,7 +64,11 @@ CREATE TABLE users (
 
     -- Timestamps
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- User Preferences (for unit conversion)
+                       preferred_distance_unit VARCHAR(10) DEFAULT 'miles',
+                       preferred_weight_unit VARCHAR(10) DEFAULT 'lbs'
 );
 
 -- Add constraints for User enum values
@@ -97,6 +101,13 @@ ALTER TABLE users ADD CONSTRAINT chk_fitness_level
 
 ALTER TABLE users ADD CONSTRAINT chk_workout_frequency
     CHECK (workout_frequency IN ('RARELY', 'ONCE_WEEK', 'TWICE_WEEK', 'REGULARLY', 'DAILY', 'MULTIPLE_DAILY'));
+
+-- User preference constraints
+ALTER TABLE users ADD CONSTRAINT chk_preferred_distance_unit
+    CHECK (preferred_distance_unit IN ('km', 'miles'));
+
+ALTER TABLE users ADD CONSTRAINT chk_preferred_weight_unit
+    CHECK (preferred_weight_unit IN ('kg', 'lbs'));
 
 -- =====================================================
 -- SUBSCRIPTIONS TABLE (matches Subscription.java exactly)
@@ -301,6 +312,8 @@ CREATE INDEX idx_users_zipcode ON users(zipcode);
 CREATE INDEX idx_users_enabled ON users(enabled);
 CREATE INDEX idx_users_email_verified ON users(email_verified);
 CREATE INDEX idx_users_created_at ON users(created_at);
+CREATE INDEX idx_users_distance_unit ON users(preferred_distance_unit);
+CREATE INDEX idx_users_weight_unit ON users(preferred_weight_unit);
 
 -- Subscriptions table indexes
 CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);

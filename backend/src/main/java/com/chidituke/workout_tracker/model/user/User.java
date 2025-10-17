@@ -188,6 +188,15 @@ public class User implements UserDetails {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    // ==================== USER PREFERENCES ====================
+
+    @Column(name = "preferred_distance_unit")
+    private String preferredDistanceUnit = "miles"; // "km" or "miles"
+
+    @Column(name = "preferred_weight_unit")
+    private String preferredWeightUnit = "lbs"; // "kg" or "lbs"
+
+
     // ==================== LOCATION METHODS ====================
 
     /**

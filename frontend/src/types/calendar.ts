@@ -18,9 +18,9 @@ export interface WorkoutPlanExerciseConfig {
     notes?: string;
 }
 
-export interface CalendarDay {
-    dateString: string;
-    date: Date;
-    isToday: boolean;
-    exercises: any[];
-}
+// export interface CalendarDay {
+//     dateString: string;
+//     date: Date;
+//     isToday: boolean;
+//     exercises: any[];
+// }

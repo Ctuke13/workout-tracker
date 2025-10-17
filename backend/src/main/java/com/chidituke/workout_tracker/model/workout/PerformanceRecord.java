@@ -84,6 +84,14 @@ public class PerformanceRecord {
     @DecimalMin(value = "0.0", message = "Distance cannot be negative")
     private Double distanceKm;
 
+    @Column(name = "pace_min_per_km")
+    @DecimalMin(value = "0.0", message = "Pace cannot be negative")
+    private Double paceMinPerKm; // Minutes per kilometer
+
+    @Column(name = "speed_km_per_hour")
+    @DecimalMin(value = "0.0", message = "Speed cannot be negative")
+    private Double speedKmPerHour; // Kilometers per hour
+
     @Column(name = "calories_burned")
     @Min(value = 0, message = "Calories cannot be negative")
     private Integer caloriesBurned;

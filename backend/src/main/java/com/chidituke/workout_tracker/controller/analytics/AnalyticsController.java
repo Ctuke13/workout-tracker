@@ -6,7 +6,9 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -191,5 +193,29 @@ public class AnalyticsController {
         List<Map<String, Object>> progression = analyticsService.getExerciseProgression(
                 userDetails.getUsername(), exerciseId, weeks);
         return ResponseEntity.ok(progression);
+    }
+
+    @GetMapping("/performance-tracker")
+    public ResponseEntity<?> getPerformanceTrackerData(
+            @RequestParam String metric,
+            @RequestParam String period,
+            @RequestParam(required = false) Long exerciseId, // ✅ ADD THIS
+            Authentication authentication) {
+
+        String username = authentication.getName();
+
+        try {
+            Map<String, Object> data = analyticsService.getPerformanceTrackerData(
+                    username,
+                    metric,
+                    period,
+                    exerciseId // ✅ PASS IT TO SERVICE
+            );
+            return ResponseEntity.ok(data);
+        } catch (Exception e) {
+            log.error("Error fetching performance tracker data", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 }

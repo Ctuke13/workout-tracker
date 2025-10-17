@@ -395,15 +395,15 @@ export interface WorkoutPlanSearchResponse {
 
 // ==================== PERFORMANCE RECORD TYPES ====================
 
-export interface PersonalRecord {
-    type: "MAX_WEIGHT" | "MAX_REPS" | "LONGEST_HOLD" | "FASTEST_PACE" | "LONGEST_DISTANCE";
-    exerciseId: number;
-    exerciseName: string;
-    previousValue?: number;
-    newValue: number;
-    unit: string;
-    achievedAt: string;
-}
+// export interface PersonalRecord {
+//     type: "MAX_WEIGHT" | "MAX_REPS" | "LONGEST_HOLD" | "FASTEST_PACE" | "LONGEST_DISTANCE";
+//     exerciseId: number;
+//     exerciseName: string;
+//     previousValue?: number;
+//     newValue: number;
+//     unit: string;
+//     achievedAt: string;
+// }
 
 export interface PerformanceImprovement {
     metric: string;

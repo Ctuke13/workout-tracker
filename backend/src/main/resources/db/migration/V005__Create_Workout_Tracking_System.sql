@@ -117,6 +117,8 @@ CREATE TABLE performance_records (
                                      duration_minutes INTEGER,
                                      duration_seconds DOUBLE PRECISION,
                                      distance_km DOUBLE PRECISION,
+                                     pace_min_per_km DOUBLE PRECISION,
+                                     speed_km_per_hour DOUBLE PRECISION,
                                      calories_burned INTEGER,
 
     -- Advanced performance metrics
@@ -188,6 +190,12 @@ ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_distance_
 
 ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_calories_burned
     CHECK (calories_burned IS NULL OR calories_burned >= 0);
+
+ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_pace_min_per_km
+    CHECK (pace_min_per_km IS NULL OR pace_min_per_km >= 0.0);
+
+ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_speed_km_per_hour
+    CHECK (speed_km_per_hour IS NULL OR speed_km_per_hour >= 0.0);
 
 ALTER TABLE performance_records ADD CONSTRAINT chk_performance_records_perceived_exertion
     CHECK (perceived_exertion IS NULL OR (perceived_exertion >= 1 AND perceived_exertion <= 10));
@@ -290,11 +298,41 @@ CREATE INDEX idx_performance_records_rest_time ON performance_records(rest_time_
 CREATE INDEX idx_performance_records_actual_rest_seconds ON performance_records(actual_rest_seconds);
 CREATE INDEX idx_performance_records_target_analysis ON performance_records(exercise_id, target_reps_planned, target_weight_planned, performance_vs_target);
 
+-- =====================================================
+-- TRACKING_MODE FOR EXERCISES
+-- =====================================================
+
+ALTER TABLE exercises
+    ADD COLUMN tracking_mode VARCHAR(20) NOT NULL DEFAULT 'REP_BASED';
+
+ALTER TABLE exercises ADD CONSTRAINT chk_exercises_tracking_mode
+    CHECK (tracking_mode IN ('REP_BASED', 'TIME_BASED', 'HOLD_BASED'));
+
+-- Update existing exercises based on patterns
+UPDATE exercises
+SET tracking_mode = 'TIME_BASED'
+WHERE LOWER(exercise_name) IN ('running', 'cycling', 'swimming', 'walking', 'jogging', 'rowing')
+   OR is_cardio = TRUE;
+
+UPDATE exercises
+SET tracking_mode = 'HOLD_BASED'
+WHERE LOWER(exercise_name) IN ('plank', 'l-sit', 'wall sit', 'hollow hold', 'dead hang', 'bridge')
+   OR is_isometric = TRUE;
+
+-- Add index for tracking mode queries
+CREATE INDEX idx_exercises_tracking_mode ON exercises(tracking_mode);
+
 -- Composite indexes for complex queries
 CREATE INDEX idx_workout_sessions_user_program ON workout_sessions(user_id, workout_program_id);
 CREATE INDEX idx_workout_sessions_user_workout_plan ON workout_sessions(user_id, workout_plan_id);
 CREATE INDEX idx_performance_records_exercise_date ON performance_records(exercise_id, created_at);
 CREATE INDEX idx_performance_records_weight_reps ON performance_records(exercise_id, weight, reps);
+
+-- Indexes for cardio metrics
+CREATE INDEX idx_performance_records_distance ON performance_records(distance_km);
+CREATE INDEX idx_performance_records_pace ON performance_records(pace_min_per_km);
+CREATE INDEX idx_performance_records_speed ON performance_records(speed_km_per_hour);
+CREATE INDEX idx_performance_records_calories ON performance_records(calories_burned);
 
 -- =====================================================
 -- UTILITY FUNCTIONS

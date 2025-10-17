@@ -3,6 +3,11 @@
 export * from './exercise';
 export * from './api';
 export * from './gamification';
+export * from './analytics';
+export * from './enums';
+export * from './calendar';
+export * from './workoutAnalysis';
+export * from './workoutCompletionResponse';
 
 // Common shared types
 export interface ApiResponse<T> {

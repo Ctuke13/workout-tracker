@@ -1,59 +1,19 @@
 import apiClient from './apiClient';
+import {
+    TimePeriod,
+    mapPeriodToBackend,
+    AllPeriodSummaries,
+    TimePeriodSummary,
+    PersonalRecord,
+    TopExercise,
+    ExerciseProgressionPoint,
+    PerformanceTrackerResponse
+} from '../types/analytics';
 
 /**
  * Analytics API Service
  * Handles all analytics and insights endpoints
  */
-
-// ==================== TYPES ====================
-
-export interface TimePeriodSummary {
-    period: string;
-    startDate: string;
-    endDate: string;
-    workouts: number;
-    minutes: number;
-    volume: number;
-    workoutChange: number;
-    minutesChange: number;
-    volumeChange: number;
-    averageMinutesPerWorkout?: number;
-}
-
-export interface AllPeriodSummaries {
-    week: TimePeriodSummary;
-    month: TimePeriodSummary;
-    year: TimePeriodSummary;
-    allTime: TimePeriodSummary;
-}
-
-export interface PersonalRecord {
-    type: string;
-    exerciseName: string;
-    exerciseId: number;
-    value: number;
-    reps?: number;
-    weight?: number;
-    date: string;
-    unit: string;
-}
-
-export interface TopExercise {
-    exerciseId: number;
-    exerciseName: string;
-    count: number;
-    volume: number;
-}
-
-export interface ExerciseProgressionPoint {
-    date: string;
-    weight: number;
-    reps: number;
-    volume: number;
-    setNumber: number;
-}
-
-// ==================== API CLIENT ====================
 
 export const analyticsApi = {
     /**
@@ -108,8 +68,9 @@ export const analyticsApi = {
     /**
      * Get top exercises for a time period
      */
-    async getTopExercises(period: 'WEEK' | 'MONTH' | 'YEAR' | 'ALL_TIME' = 'WEEK', limit: number = 5): Promise<TopExercise[]> {
-        return apiClient.get<TopExercise[]>(`/api/analytics/top-exercises?period=${period}&limit=${limit}`);
+    async getTopExercises(period: TimePeriod = 'WEEK', limit: number = 5): Promise<TopExercise[]> {
+        const backendPeriod = mapPeriodToBackend(period);
+        return apiClient.get<TopExercise[]>(`/api/analytics/top-exercises?period=${backendPeriod}&limit=${limit}`);
     },
 
     /**
@@ -117,5 +78,33 @@ export const analyticsApi = {
      */
     async getExerciseProgression(exerciseId: number, weeks: number = 12): Promise<ExerciseProgressionPoint[]> {
         return apiClient.get<ExerciseProgressionPoint[]>(`/api/analytics/exercise/${exerciseId}/progression?weeks=${weeks}`);
+    },
+
+    /**
+     * Get performance tracker data for charts
+     */
+    async getPerformanceTrackerData(
+        metric: string,
+        period: string,
+        exerciseId?: number | null // ✅ ADD THIS PARAMETER
+    ): Promise<PerformanceTrackerResponse> {
+        // ✅ Build query string with optional exerciseId
+        let url = `/api/analytics/performance-tracker?metric=${metric}&period=${period}`;
+        if (exerciseId) {
+            url += `&exerciseId=${exerciseId}`;
+        }
+
+        const response = await apiClient.get<PerformanceTrackerResponse>(url);
+        return response;
     }
+};
+
+// Re-export types for convenience
+export type {
+    AllPeriodSummaries,
+    TimePeriodSummary,
+    PersonalRecord,
+    TopExercise,
+    ExerciseProgressionPoint,
+    PerformanceTrackerResponse
 };

@@ -1,8 +1,8 @@
 // src/services/apiClient.ts - API Client that leverages your existing AuthService
 
-import axios, { AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { authService } from './authService';
-import { ApiResponse } from '../types/api';
+import axios, {AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestConfig} from 'axios';
+import {authService} from './authService';
+import {ApiResponse} from '../types/api';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
@@ -116,7 +116,7 @@ class ApiClient {
      */
     public async get<T>(endpoint: string, params?: any): Promise<T> {
         try {
-            const response = await this.client.get<ApiResponse<T> | T>(endpoint, { params });
+            const response = await this.client.get<ApiResponse<T> | T>(endpoint, {params});
             return this.extractData<T>(response.data);
         } catch (error) {
             throw this.handleError(error, 'GET', endpoint);
@@ -144,6 +144,18 @@ class ApiClient {
             return this.extractData<T>(response.data);
         } catch (error) {
             throw this.handleError(error, 'PUT', endpoint);
+        }
+    }
+
+    /**
+     * Generic PATCH request
+     */
+    public async patch<T>(endpoint: string, data?: any): Promise<T> {
+        try {
+            const response = await this.client.patch<ApiResponse<T> | T>(endpoint, data);
+            return this.extractData<T>(response.data);
+        } catch (error) {
+            throw this.handleError(error, 'PATCH', endpoint);
         }
     }
 
@@ -218,6 +230,7 @@ class ApiClient {
     /**
      * Get the underlying Axios instance for advanced usage
      */
+
     // ==================== TESTING METHODS ====================
 
     /**
@@ -226,7 +239,7 @@ class ApiClient {
     public async testConnection(): Promise<{ status: string; message: string }> {
         try {
             console.log('🧪 Testing basic connectivity to:', API_BASE_URL);
-            const response = await this.client.get('/api/health', { timeout: 5000 });
+            const response = await this.client.get('/api/health', {timeout: 5000});
             console.log('✅ Connection test successful:', response.status);
             return {
                 status: 'success',
@@ -268,7 +281,7 @@ class ApiClient {
         for (const endpoint of publicEndpoints) {
             try {
                 console.log(`🧪 Testing endpoint: ${endpoint}`);
-                const response = await this.client.get(endpoint, { timeout: 5000 });
+                const response = await this.client.get(endpoint, {timeout: 5000});
                 console.log(`✅ ${endpoint} - Status: ${response.status}`);
                 results.push({
                     endpoint,

@@ -1,6 +1,6 @@
 import React, {createContext, useContext, useReducer, useEffect, ReactNode, useState, useCallback} from 'react';
 import {ScheduledExercise, WorkoutResults} from '../types/exercise';
-import {WorkoutSet, WorkoutExercise, PersonalRecord, PerformanceImprovement} from '../types/api';
+import {WorkoutSet, WorkoutExercise, PerformanceImprovement, PersonalRecord} from '../types';
 import {calendarApi} from '../services/calendarApi';
 
 // ==================== TYPES ====================

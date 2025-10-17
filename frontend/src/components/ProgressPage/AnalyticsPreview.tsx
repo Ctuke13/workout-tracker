@@ -1,9 +1,12 @@
 import React, {useEffect, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {TrendingUp, Trophy, Dumbbell, Clock, Target} from 'lucide-react';
 import {analyticsApi, TimePeriodSummary, PersonalRecord, TopExercise} from '../../services/analyticsApi';
 import {useSeason} from '../../contexts/SeasonContext';
 
 export const AnalyticsPreview: React.FC = () => {
+    const navigate = useNavigate();
+    
     const {theme, loading: seasonLoading} = useSeason();
     const [currentSlide, setCurrentSlide] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -127,6 +130,7 @@ export const AnalyticsPreview: React.FC = () => {
                         </div>
                     </div>
                     <button
+                        onClick={() => navigate('/analytics')}
                         className={`px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r ${theme.buttonGradient} text-white text-xs sm:text-sm font-bold rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg`}>
                         View All →
                     </button>

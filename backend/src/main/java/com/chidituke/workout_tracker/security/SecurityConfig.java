@@ -172,6 +172,9 @@ public class SecurityConfig {
 
                     // 📊 ANALYTICS - User-specific analytics (requires auth)
                     auth.requestMatchers("/api/analytics/**").authenticated();
+
+                    // 🔒 USER PREFERENCES - User settings (requires auth)
+                    auth.requestMatchers("/api/users/preferences/**").authenticated();
                     // ===================================================================
                     // 💼 PROFESSIONAL ROLE - Content creation
                     // ===================================================================

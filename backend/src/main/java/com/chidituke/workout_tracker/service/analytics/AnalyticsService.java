@@ -53,6 +53,207 @@ public class AnalyticsService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> getPerformanceTrackerData(
+            String username,
+            String metric,
+            String period,
+            Long exerciseId) { // ✅ ADD THIS PARAMETER
+
+        User user = getUserByUsername(username);
+
+        // Determine date range based on period
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate;
+
+        switch (period.toUpperCase()) {
+            case "WEEK":
+                startDate = endDate.minusWeeks(1);
+                break;
+            case "MONTH":
+                startDate = endDate.minusMonths(1);
+                break;
+            case "SEASON":
+                startDate = endDate.minusMonths(3);
+                break;
+            case "YEAR":
+                startDate = endDate.minusYears(1);
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid period: " + period);
+        }
+
+        // Get workout sessions for the period
+        List<WorkoutSession> sessions = workoutSessionRepository
+                .findByUserAndDateBetween(user, startDate, endDate);
+
+        // ✅ Filter by exercise if specified
+        List<PerformanceRecord> records = new ArrayList<>();
+        for (WorkoutSession session : sessions) {
+            for (PerformanceRecord record : session.getPerformanceRecords()) {
+                // If exerciseId is specified, only include that exercise
+                if (exerciseId == null || record.getExercise().getId().equals(exerciseId)) {
+                    records.add(record);
+                }
+            }
+        }
+
+        // Group by date and calculate metric values
+        Map<LocalDate, List<PerformanceRecord>> recordsByDate = records.stream()
+                .collect(Collectors.groupingBy(r -> r.getWorkoutSession().getDate()));
+
+        // Calculate data points based on metric
+        List<Map<String, Object>> dataPoints = new ArrayList<>();
+
+        for (Map.Entry<LocalDate, List<PerformanceRecord>> entry : recordsByDate.entrySet()) {
+            LocalDate date = entry.getKey();
+            List<PerformanceRecord> dayRecords = entry.getValue();
+
+            double value = calculateMetricValue(metric, dayRecords);
+
+            Map<String, Object> point = new HashMap<>();
+            point.put("date", date.toString());
+            point.put("value", value);
+            point.put("workoutCount", dayRecords.stream()
+                    .map(r -> r.getWorkoutSession().getId())
+                    .distinct()
+                    .count());
+
+            dataPoints.add(point);
+        }
+
+        // Sort by date
+        dataPoints.sort((a, b) ->
+                ((String) a.get("date")).compareTo((String) b.get("date")));
+
+        // Calculate summary statistics
+        double[] values = dataPoints.stream()
+                .mapToDouble(p -> (double) p.get("value"))
+                .toArray();
+
+        Map<String, Object> summary = new HashMap<>();
+        if (values.length > 0) {
+            summary.put("average", Arrays.stream(values).average().orElse(0));
+            summary.put("peak", Arrays.stream(values).max().orElse(0));
+            summary.put("low", Arrays.stream(values).min().orElse(0));
+
+            // Calculate trend (simple: compare first half to second half)
+            int midPoint = values.length / 2;
+            double firstHalfAvg = Arrays.stream(values, 0, midPoint).average().orElse(0);
+            double secondHalfAvg = Arrays.stream(values, midPoint, values.length).average().orElse(0);
+
+            String trend = "STABLE";
+            double trendPercentage = 0;
+            if (firstHalfAvg > 0) {
+                trendPercentage = ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100;
+                if (trendPercentage > 5) trend = "UP";
+                else if (trendPercentage < -5) trend = "DOWN";
+            }
+
+            summary.put("trend", trend);
+            summary.put("trendPercentage", trendPercentage);
+        } else {
+            summary.put("average", 0);
+            summary.put("peak", 0);
+            summary.put("low", 0);
+            summary.put("trend", "STABLE");
+            summary.put("trendPercentage", 0);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("dataPoints", dataPoints);
+        response.put("summary", summary);
+
+        return response;
+    }
+
+    private double calculateMetricValue(String metric, List<PerformanceRecord> records) {
+        switch (metric.toUpperCase()) {
+            case "WEIGHT":
+                // Max weight for the day
+                return records.stream()
+                        .filter(r -> r.getWeight() != null)
+                        .mapToDouble(PerformanceRecord::getWeight)
+                        .max()
+                        .orElse(0);
+
+            case "VOLUME":
+                // Total volume for the day
+                return records.stream()
+                        .filter(r -> r.getWeight() != null && r.getReps() != null)
+                        .mapToDouble(r -> r.getWeight() * r.getReps())
+                        .sum();
+
+            case "REPS":
+                // Total reps for the day
+                return records.stream()
+                        .filter(r -> r.getReps() != null)
+                        .mapToInt(PerformanceRecord::getReps)
+                        .sum();
+
+            case "SETS":
+                // Total sets for the day
+                return records.size();
+
+            case "DISTANCE":
+                // Total distance for the day
+                return records.stream()
+                        .filter(r -> r.getDistanceKm() != null)
+                        .mapToDouble(PerformanceRecord::getDistanceKm)
+                        .sum();
+
+            case "PACE":
+                // Average pace for the day
+                return records.stream()
+                        .filter(r -> r.getPaceMinPerKm() != null)
+                        .mapToDouble(PerformanceRecord::getPaceMinPerKm)
+                        .average()
+                        .orElse(0);
+
+            case "SPEED":
+                // Average speed for the day
+                return records.stream()
+                        .filter(r -> r.getSpeedKmPerHour() != null)
+                        .mapToDouble(PerformanceRecord::getSpeedKmPerHour)
+                        .average()
+                        .orElse(0);
+
+            case "CALORIES":
+                // Total calories for the day
+                return records.stream()
+                        .filter(r -> r.getCaloriesBurned() != null)
+                        .mapToInt(PerformanceRecord::getCaloriesBurned)
+                        .sum();
+
+            // ✅ ADD THESE NEW CASES FOR ISOMETRIC EXERCISES
+            case "HOLD_DURATION":
+                // Average hold duration for the day (in seconds)
+                return records.stream()
+                        .filter(r -> r.getHoldDurationSeconds() != null)
+                        .mapToInt(PerformanceRecord::getHoldDurationSeconds)
+                        .average()
+                        .orElse(0);
+
+            case "TOTAL_HOLD_TIME":
+                // Total cumulative hold time for the day (in seconds)
+                return records.stream()
+                        .filter(r -> r.getHoldDurationSeconds() != null)
+                        .mapToInt(PerformanceRecord::getHoldDurationSeconds)
+                        .sum();
+
+            case "MAX_HOLD":
+                // Maximum single hold duration for the day (in seconds)
+                return records.stream()
+                        .filter(r -> r.getHoldDurationSeconds() != null)
+                        .mapToInt(PerformanceRecord::getHoldDurationSeconds)
+                        .max()
+                        .orElse(0);
+
+            default:
+                return 0;
+        }
+    }
+
     /**
      * Get summaries for all time periods at once (efficient for frontend)
      */
@@ -486,9 +687,10 @@ public class AnalyticsService {
             for (PerformanceRecord record : session.getPerformanceRecords()) {
                 Long exerciseId = record.getExercise().getId();
                 String exerciseName = record.getExercise().getExerciseName();
+                String trackingMode = record.getExercise().getWorkoutTrackingMode().name();
 
                 ExerciseStats stats = exerciseStatsMap.computeIfAbsent(exerciseId,
-                        k -> new ExerciseStats(exerciseId, exerciseName));
+                        k -> new ExerciseStats(exerciseId, exerciseName, trackingMode));
 
                 stats.incrementCount();
 
@@ -507,6 +709,7 @@ public class AnalyticsService {
                     Map<String, Object> map = new HashMap<>();
                     map.put("exerciseId", stats.exerciseId);
                     map.put("exerciseName", stats.name);
+                    map.put("trackingMode", stats.trackingMode); // ✅ ADD THIS
                     map.put("count", stats.count);
                     map.put("volume", Math.round(stats.totalVolume));
                     return map;
@@ -518,12 +721,14 @@ public class AnalyticsService {
     private static class ExerciseStats {
         Long exerciseId;
         String name;
+        String trackingMode; // ✅ ADD THIS
         int count = 0;
         double totalVolume = 0;
 
-        ExerciseStats(Long exerciseId, String name) {
+        ExerciseStats(Long exerciseId, String name, String trackingMode) { // ✅ UPDATE CONSTRUCTOR
             this.exerciseId = exerciseId;
             this.name = name;
+            this.trackingMode = trackingMode; // ✅ ADD THIS
         }
 
         void incrementCount() {

@@ -29,7 +29,7 @@ import {
     TrophyIcon,
     StarIcon as StarIconSolid, PlusIcon
 } from '@heroicons/react/24/outline';
-import {CalendarDay} from '../../types/calendar';
+import {CalendarDay} from '../../types';
 import {useExerciseSelector} from '../../hooks/useExerciseSelector';
 import {useWorkout} from '../../contexts/WorkoutContext';
 

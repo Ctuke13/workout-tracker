@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import React, {useState, useRef} from 'react';
+import {Outlet, useLocation} from 'react-router-dom';
 import TopNavigation from './TopNavigation';
 import BottomNavigation from './BottomNavigation';
 import FloatingActionButton from './FloatingActionButton';
@@ -10,10 +10,11 @@ interface MobileLayoutProps {
     children?: React.ReactNode;
 }
 
-const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
+const MobileLayout: React.FC<MobileLayoutProps> = ({children}) => {
     const [isWorkoutMode, setIsWorkoutMode] = useState(false);
     const [showWorkoutModal, setShowWorkoutModal] = useState(false);
     const location = useLocation();
+    const mainRef = useRef<HTMLElement>(null);
 
     // Hide bottom nav on certain pages (login, register, etc.)
     const hideBottomNav = ['/login', '/register', '/'].includes(location.pathname);
@@ -24,15 +25,18 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
     return (
         <div className="flex flex-col h-screen bg-gray-50">
             {/* Top Navigation - Always visible */}
-            <TopNavigation />
+            <TopNavigation scrollContainerRef={mainRef}/>
 
             {/* Main Content Area */}
-            <main className={`flex-1 overflow-y-auto ${!hideBottomNav ? 'pb-16' : ''}`}>
-                {children || <Outlet />}
+            <main
+                ref={mainRef}
+                className={`flex-1 overflow-y-auto ${!hideBottomNav ? 'pb-16' : ''}`}
+            >
+                {children || <Outlet/>}
             </main>
 
             {/* Bottom Navigation - Hidden on auth pages */}
-            {!hideBottomNav && <BottomNavigation />}
+            {!hideBottomNav && <BottomNavigation/>}
 
             {/* Floating Action Button - Only on main app pages (except calendar) */}
             {!hideBottomNav && !hideGeneralFAB && (

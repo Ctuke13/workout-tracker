@@ -19,7 +19,11 @@ public class JwtResponse {
     private String lastName;
     private UserType userType;
     private Boolean isProfessional;
-    private SubscriptionTier subscriptionTier; // ✅ Added subscription tier
+    private SubscriptionTier subscriptionTier;
+    private String nickname;
+    private String petName;
+    private Boolean onboardingCompleted;
+
 
     // ═══════════════════════════════════════════════════════════════════
     // 🔧 CONSTRUCTORS
@@ -70,6 +74,28 @@ public class JwtResponse {
         this.email = email;
         this.subscriptionTier = SubscriptionTier.FREE; // Default to FREE
         // Other fields will be null - should be avoided in favor of complete constructor
+    }
+
+    /**
+     * Complete constructor with onboarding fields
+     */
+    public JwtResponse(String accessToken, Long id, String username, String email,
+                       String firstName, String lastName, UserType userType, Boolean isProfessional,
+                       SubscriptionTier subscriptionTier, String nickname, String petName,
+                       Boolean onboardingCompleted) {
+        this.token = accessToken;
+        this.type = "Bearer";
+        this.id = id;
+        this.username = username;
+        this.email = email;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.userType = userType;
+        this.isProfessional = isProfessional;
+        this.subscriptionTier = subscriptionTier;
+        this.nickname = nickname;
+        this.petName = petName;
+        this.onboardingCompleted = onboardingCompleted;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -129,6 +155,37 @@ public class JwtResponse {
      */
     public String getAuthorizationHeader() {
         return type + " " + token;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public String getPetName() {
+        return petName;
+    }
+
+    public void setPetName(String petName) {
+        this.petName = petName;
+    }
+
+    public Boolean getOnboardingCompleted() {
+        return onboardingCompleted;
+    }
+
+    public void setOnboardingCompleted(Boolean onboardingCompleted) {
+        this.onboardingCompleted = onboardingCompleted;
+    }
+
+    /**
+     * Check if user needs to complete onboarding
+     */
+    public boolean needsOnboarding() {
+        return !Boolean.TRUE.equals(onboardingCompleted);
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -44,6 +44,8 @@ public class ProgressionUpdateResponse {
     // Summary message
     private String summaryMessage;
 
+    private PetStatsUpdateDTO petUpdate;
+
     /**
      * Build a summary message based on the progression update
      */
@@ -68,5 +70,26 @@ public class ProgressionUpdateResponse {
         }
 
         return message.toString();
+    }
+
+    // ==========================================
+    // NESTED DTO FOR PET STATS UPDATE
+    // ==========================================
+
+    /**
+     * Pet stats update information returned with workout completion
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PetStatsUpdateDTO {
+        private Integer crystalsEarned;
+        private Integer wastedCrystals;
+        private Integer newCrystalBalance;
+        private Integer fatigueIncrease;
+        private Integer newFatigue;
+        private Boolean isSleeping;
+        private String message;
     }
 }

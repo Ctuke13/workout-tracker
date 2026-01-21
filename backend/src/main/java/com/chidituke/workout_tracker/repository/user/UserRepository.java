@@ -70,6 +70,29 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.userType = :userType AND u.accountStatus = 'ACTIVE'")
     List<User> findActiveUsersByType(@Param("userType") UserType userType);
 
+    // ==================== ONBOARDING QUERIES ====================
+
+    /**
+     * Check if nickname is already taken
+     */
+    boolean existsByNickname(String nickname);
+
+    /**
+     * Check if nickname is taken by another user (for updates)
+     */
+    @Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM User u WHERE u.nickname = :nickname AND u.id != :userId")
+    boolean existsByNicknameAndIdNot(@Param("nickname") String nickname, @Param("userId") Long userId);
+
+    /**
+     * Find user by nickname
+     */
+    Optional<User> findByNickname(String nickname);
+
+    /**
+     * Find users who haven't completed onboarding
+     */
+    List<User> findByOnboardingCompletedFalse();
+
     // ==================== PROFESSIONAL USER QUERIES ====================
 
     @Query("SELECT u FROM User u WHERE u.userType = 'PROFESSIONAL' AND u.professionalProfile IS NOT NULL AND u.accountStatus = 'ACTIVE'")

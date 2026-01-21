@@ -29,6 +29,11 @@ CREATE TABLE users (
                        country VARCHAR(255) DEFAULT 'US',
                        phone_number VARCHAR(255),
 
+    -- ==================== ONBOARDING & PET SYSTEM ====================
+                       nickname VARCHAR(20) UNIQUE,                          -- Display name for leaderboards (optional)
+                       pet_name VARCHAR(50),                                 -- Custom pet name (e.g., "Luna")
+                       onboarding_completed BOOLEAN NOT NULL DEFAULT false,  -- Has user completed onboarding flow
+
     -- Profile
                        profile_image_url VARCHAR(255),
                        bio VARCHAR(500),
@@ -314,6 +319,10 @@ CREATE INDEX idx_users_email_verified ON users(email_verified);
 CREATE INDEX idx_users_created_at ON users(created_at);
 CREATE INDEX idx_users_distance_unit ON users(preferred_distance_unit);
 CREATE INDEX idx_users_weight_unit ON users(preferred_weight_unit);
+
+-- Onboarding indexes
+CREATE INDEX idx_users_nickname ON users(nickname) WHERE nickname IS NOT NULL;
+CREATE INDEX idx_users_onboarding ON users(onboarding_completed);
 
 -- Subscriptions table indexes
 CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);

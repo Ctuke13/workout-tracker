@@ -568,7 +568,7 @@ workout-tracker/
 │   │   │           ├── V009__Create_Social_System.sql
 │   │   │           ├── V010__Social_System_Optimizations.sql
 │   │   │           ├── V011__Create_Messaging_System.sql
-│   │   │           ├── V0117__Add_Leaderboard_Indexes.sql
+│   │   │           ├── V017__Add_Leaderboard_Indexes.sql
 │   │   │           ├── V012__Add_Foundation_Exercises.sql
 │   │   │           ├── V013__Create_Scheduled_Workouts.sql
 │   │   │           ├── V014__Add_Calorie_Tracking.sql
@@ -826,24 +826,27 @@ October 16, 2025
 ## 🔄 Recent Changes
 
 ### Latest Updates (October 16, 2025)
+
 - **📊 Analytics Module**: Added comprehensive analytics system
-  - New AnalyticsController and PerformanceTrackerController
-  - PerformanceTrackerService for detailed workout analytics
-  - PerformanceMetric model for tracking performance data
-  - PerformanceTrackerResponse DTO for API responses
-  - AnalyticsPage with 6 new components (AnalyticsStats, PerformanceTrackerChart, PersonalRecords, TopExercises, WorkoutTypeBreakdown, types)
+    - New AnalyticsController and PerformanceTrackerController
+    - PerformanceTrackerService for detailed workout analytics
+    - PerformanceMetric model for tracking performance data
+    - PerformanceTrackerResponse DTO for API responses
+    - AnalyticsPage with 6 new components (AnalyticsStats, PerformanceTrackerChart, PersonalRecords, TopExercises,
+      WorkoutTypeBreakdown, types)
 - **👤 User Preferences**: Added UserPreferencesController and UserPreferencesDTO
 - **📈 Progress Page Enhancements**:
-  - Added AnalyticsPreview component with accurate duration tracking
-  - Added Achievements and Leaderboard components
-  - Enhanced CurrentSeasonCard, HeroStatsCard, and LeaderboardPreview
+    - Added AnalyticsPreview component with accurate duration tracking
+    - Added Achievements and Leaderboard components
+    - Enhanced CurrentSeasonCard, HeroStatsCard, and LeaderboardPreview
 - **🎯 Gamification Features**:
-  - Tier progression with animated tier-up celebrations
-  - MiniProgressWidget in navigation
+    - Tier progression with animated tier-up celebrations
+    - MiniProgressWidget in navigation
 - **📁 File Count Updates**: 341 Java files, 153 TypeScript/JavaScript files
-- **🗄️ Migration Updates**: Now includes V0117__Add_Leaderboard_Indexes.sql (17 total migrations)
+- **🗄️ Migration Updates**: Now includes V017__Add_Leaderboard_Indexes.sql (17 total migrations)
 
 ### Previous Updates (January 9, 2025)
+
 - **🎯 Added Gamification System**: Complete achievement, ranking, and leaderboard functionality
 - **📊 Progress Tracking Module**: New progress controller, models, DTOs, services, and repositories
 - **🏆 Achievement System**: 10 new model files including Achievement, UserAchievement, Season, LeaderboardEntry
@@ -864,53 +867,55 @@ October 16, 2025
 ### Backend (Spring Boot) - 341 Java Files
 
 #### Layer Breakdown:
+
 - **🔒 Security Layer**: 6 files - JWT authentication, role-based access control
 - **🎮 Controller Layer**: 26 files - REST controllers with comprehensive API endpoints
-  - Analytics: 2 files (main, performance tracker)
-  - Auth: 1 file
-  - Exercise: 5 files (main, admin, analytics, favorites, user)
-  - Messaging: 2 files
-  - Progress: 1 file
-  - Social: 1 file
-  - System: 1 file
-  - Test: 1 file
-  - User: 4 files (main, professional profile, subscription, preferences)
-  - Workout: 9 files
+    - Analytics: 2 files (main, performance tracker)
+    - Auth: 1 file
+    - Exercise: 5 files (main, admin, analytics, favorites, user)
+    - Messaging: 2 files
+    - Progress: 1 file
+    - Social: 1 file
+    - System: 1 file
+    - Test: 1 file
+    - User: 4 files (main, professional profile, subscription, preferences)
+    - Workout: 9 files
 - **🔧 Service Layer**: 38 files - Business logic services with modular architecture
-  - Analytics: 2 files (main, performance tracker)
-  - Exercise: 5 files
-  - Messaging: 2 files
-  - Notification: 1 file
-  - Progress: 5 files (Achievement, Leaderboard, Season, SeasonTransition, UserProgression)
-  - Scheduled Workouts: 5 files
-  - Social: 4 files
-  - User: 8 files
-  - Workout: 7 files
+    - Analytics: 2 files (main, performance tracker)
+    - Exercise: 5 files
+    - Messaging: 2 files
+    - Notification: 1 file
+    - Progress: 5 files (Achievement, Leaderboard, Season, SeasonTransition, UserProgression)
+    - Scheduled Workouts: 5 files
+    - Social: 4 files
+    - User: 8 files
+    - Workout: 7 files
 - **🗄️ Data Layer**: 30 files - Repositories with complex entity relationships
-  - Messaging: 3 files
-  - Progress: 6 files
-  - Scheduled Workouts: 1 file
-  - Social: 3 files
-  - User: 4 files
-  - Workout: 13 files
+    - Messaging: 3 files
+    - Progress: 6 files
+    - Scheduled Workouts: 1 file
+    - Social: 3 files
+    - User: 4 files
+    - Workout: 13 files
 - **🏗️ Model Layer**: 46 files - Domain entities with comprehensive workout tracking
-  - Analytics: 1 file (PerformanceMetric)
-  - Common: 1 file
-  - Messaging: 7 files (3 models + 4 enums)
-  - Progress: 10 files (6 models + 4 enums)
-  - Social: 5 files
-  - User: 7 files (4 models + 3 enums)
-  - Workout: 14 files
+    - Analytics: 1 file (PerformanceMetric)
+    - Common: 1 file
+    - Messaging: 7 files (3 models + 4 enums)
+    - Progress: 10 files (6 models + 4 enums)
+    - Social: 5 files
+    - User: 7 files (4 models + 3 enums)
+    - Workout: 14 files
 - **❌ Exception Handling**: 50 files - Custom exceptions with global error handling
 - **🗺️ Mapping Layer**: 13 files - DTO transformations
 - **📤 DTO Layer**: 140+ files (67 request, 73+ response)
-  - Analytics: 1 response file
-  - Progress: 15 files (1 request, 14 response)
-  - User: 3 request files (including UserPreferencesDTO)
+    - Analytics: 1 response file
+    - Progress: 15 files (1 request, 14 response)
+    - User: 3 request files (including UserPreferencesDTO)
 - **⚙️ Configuration**: 2 files
 - **⏰ Scheduler**: 1 file (LeaderboardScheduler)
 
 #### Key Features:
+
 - **Exercise Management**: Complete CRUD with admin controls, analytics, favorites, ratings
 - **Workout Tracking**: Plans, programs, sessions, scheduled workouts, performance records
 - **User Management**: Profiles, subscriptions, professional profiles, relationships, preferences
@@ -924,65 +929,72 @@ October 16, 2025
 ### Frontend (TypeScript React) - 153 Source Files
 
 #### Component Architecture:
+
 - **🧩 Components**: 80+ files
-  - AnalyticsPage: 7 components (stats, charts, records, exercises, breakdown, types)
-  - CalendarPage: 14 components (workout display, exercise config, performance stats)
-  - WorkoutModePage: 9 components (trackers for strength/cardio/isometric, rest timer, confetti)
-  - ProgressPage: 7 components (achievements, leaderboard, analytics preview, season card, hero stats)
-  - ExerciseConfig: 3 components (type-specific configuration)
-  - ExercisePage: 4 components (filters, cards)
-  - Gamification: 2 components (MiniProgressWidget, ProgressTooltip)
-  - LandingPage: 9 components (marketing, pricing, features)
-  - Layout: 7 components (navigation, modals, overlays)
-  - UI: 9 components (shadcn/ui design system)
-  - Cards: 2 components
-  - Tabs: 5 components
-  - Forms: 1 component
-  - Auth: 2 components
+    - AnalyticsPage: 7 components (stats, charts, records, exercises, breakdown, types)
+    - CalendarPage: 14 components (workout display, exercise config, performance stats)
+    - WorkoutModePage: 9 components (trackers for strength/cardio/isometric, rest timer, confetti)
+    - ProgressPage: 7 components (achievements, leaderboard, analytics preview, season card, hero stats)
+    - ExerciseConfig: 3 components (type-specific configuration)
+    - ExercisePage: 4 components (filters, cards)
+    - Gamification: 2 components (MiniProgressWidget, ProgressTooltip)
+    - LandingPage: 9 components (marketing, pricing, features)
+    - Layout: 7 components (navigation, modals, overlays)
+    - UI: 9 components (shadcn/ui design system)
+    - Cards: 2 components
+    - Tabs: 5 components
+    - Forms: 1 component
+    - Auth: 2 components
 
 #### State & Logic:
+
 - **🔄 Contexts**: 2 files (Auth, Workout)
 - **🪝 Hooks**: 11 custom hooks
-  - Calendar: useCalendarActions, useCalendarData
-  - Exercise: useExerciseConfig, useExerciseFilters, useExerciseSelector
-  - Workout: useWorkoutAnalysis, useWorkoutEventListener, useWorkoutMode, useWorkoutPlanConfig
-  - UI: useModalState
+    - Calendar: useCalendarActions, useCalendarData
+    - Exercise: useExerciseConfig, useExerciseFilters, useExerciseSelector
+    - Workout: useWorkoutAnalysis, useWorkoutEventListener, useWorkoutMode, useWorkoutPlanConfig
+    - UI: useModalState
 
 #### Services & Types:
+
 - **🔌 Services**: 11 files (analytics, API client, auth, calendar, calorie, exercise, performance, workout plan)
 - **📝 Types**: 7 files (comprehensive TypeScript definitions)
 - **🛠️ Utils**: 6 files (date handling, formatters, validation, performance analysis)
 
 #### Pages:
+
 - **📄 Pages**: 16 files
-  - Authentication: Login, Register, Welcome
-  - Main: Calendar, Exercises, WorkoutMode, Analytics
-  - User: Progress, Settings, Billing
-  - Social: Community, Messages, Notifications
-  - Info: Help, Landing
+    - Authentication: Login, Register, Welcome
+    - Main: Calendar, Exercises, WorkoutMode, Analytics
+    - User: Progress, Settings, Billing
+    - Social: Community, Messages, Notifications
+    - Info: Help, Landing
 
 #### Styling & Config:
+
 - **🎨 Styling**: Tailwind CSS + shadcn/ui components
 - **⚙️ Configuration**: TypeScript strict mode, ESLint, Prettier
 
 ### Database (PostgreSQL with Flyway)
+
 - **🗄️ Migrations**: 17 SQL files
-  - Core system setup (users, auth)
-  - Exercise system with triggers
-  - Workout tracking system
-  - Program and plan management
-  - Social features
-  - Messaging system
-  - Scheduled workouts
-  - Calorie tracking
-  - Gamification system (V015)
-  - Achievement system (V016)
-  - Leaderboard indexes (V0117)
-  - Foundation exercises data
+    - Core system setup (users, auth)
+    - Exercise system with triggers
+    - Workout tracking system
+    - Program and plan management
+    - Social features
+    - Messaging system
+    - Scheduled workouts
+    - Calorie tracking
+    - Gamification system (V015)
+    - Achievement system (V016)
+    - Leaderboard indexes (V0117)
+    - Foundation exercises data
 
 ## 🎯 Key Capabilities
 
 ### Workout Management
+
 - ✅ Create and manage workout plans
 - ✅ Schedule workouts on calendar
 - ✅ Track performance in real-time
@@ -993,6 +1005,7 @@ October 16, 2025
 - ✅ Calorie calculation and tracking
 
 ### Exercise Library
+
 - ✅ 200+ pre-loaded exercises
 - ✅ Advanced filtering and search
 - ✅ Favorites and ratings system
@@ -1001,6 +1014,7 @@ October 16, 2025
 - ✅ Analytics on exercise usage
 
 ### 📊 Analytics & Performance Tracking
+
 - ✅ Comprehensive workout analytics dashboard
 - ✅ Performance tracker with historical data
 - ✅ Personal records tracking
@@ -1010,6 +1024,7 @@ October 16, 2025
 - ✅ Performance metrics and trends
 
 ### 🎯 Gamification & Progress
+
 - ✅ Achievement system with categories and rarity
 - ✅ User progression with XP and ranks
 - ✅ Seasonal leaderboards and rankings
@@ -1020,6 +1035,7 @@ October 16, 2025
 - ✅ Tier progression with animated celebrations
 
 ### Professional Features
+
 - ✅ Professional profiles and verification
 - ✅ Client-trainer messaging
 - ✅ Workout assignment and tracking
@@ -1028,10 +1044,13 @@ October 16, 2025
 - ✅ User preferences management
 
 ### Social & Community
+
 - ✅ Social posts and comments
 - ✅ Workout sharing
 - ✅ User relationships and following
 - ✅ Direct messaging
 - ✅ Group conversations
 
-This represents a comprehensive full-stack fitness tracking application with enterprise-level architecture, modern development practices, and a complete feature set for workout management, social interaction, professional coaching capabilities, gamified user engagement, and detailed analytics.
+This represents a comprehensive full-stack fitness tracking application with enterprise-level architecture, modern
+development practices, and a complete feature set for workout management, social interaction, professional coaching
+capabilities, gamified user engagement, and detailed analytics.

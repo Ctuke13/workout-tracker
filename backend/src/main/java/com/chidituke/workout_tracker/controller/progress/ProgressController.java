@@ -10,6 +10,8 @@ import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.security.CurrentUser;
 import com.chidituke.workout_tracker.security.UserPrincipal;
 import com.chidituke.workout_tracker.service.progress.*;
+import com.chidituke.workout_tracker.service.pet.PetStatsService;
+import com.chidituke.workout_tracker.dto.response.pet.WorkoutCompleteResponse;
 import com.chidituke.workout_tracker.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +46,7 @@ public class ProgressController {
     private final UserProgressionService userProgressionService;
     private final AchievementService achievementService;
     private final LeaderboardService leaderboardService;
+    private final PetStatsService petStatsService;
     private final SeasonTransitionService seasonTransitionService;
     private final UserRepository userRepository;
 
@@ -284,6 +287,31 @@ public class ProgressController {
 
         // STEP 4: Check for newly unlocked achievements
         List<UserAchievement> newAchievements = achievementService.checkAndUnlockAchievements(userId);
+
+        // STEP 5: Update pet stats
+        ProgressionUpdateResponse.PetStatsUpdateDTO petUpdate = null;
+        try {
+            Integer exerciseCount = request.getExerciseCount() != null ? request.getExerciseCount() : 0;
+            if (exerciseCount > 0) {
+                WorkoutCompleteResponse workoutResponse = petStatsService.handleWorkoutCompletion(userId, exerciseCount);
+
+                // Convert to the nested DTO
+                petUpdate = ProgressionUpdateResponse.PetStatsUpdateDTO.builder()
+                        .crystalsEarned(workoutResponse.getCrystalsEarned())
+                        .wastedCrystals(workoutResponse.getWastedCrystals())
+                        .newCrystalBalance(workoutResponse.getNewCrystalBalance())
+                        .fatigueIncrease(workoutResponse.getFatigueIncrease())
+                        .newFatigue(workoutResponse.getNewFatigue())
+                        .isSleeping(workoutResponse.getIsSleeping())
+                        .message(workoutResponse.getMessage())
+                        .build();
+
+                log.info("🐺 Pet stats updated: {} crystals earned, fatigue now {}",
+                        petUpdate.getCrystalsEarned(), petUpdate.getNewFatigue());
+            }
+        } catch (Exception e) {
+            log.error("❌ Pet stats update failed for user {}: {}", userId, e.getMessage());
+        }
 
         // STEP 5: Build response
         ProgressionUpdateResponse response = ProgressionUpdateResponse.builder()

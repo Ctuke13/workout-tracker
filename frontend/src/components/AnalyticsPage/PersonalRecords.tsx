@@ -1,9 +1,9 @@
 import React, {useState, useEffect} from 'react';
-import {Trophy, TrendingUp, Calendar} from 'lucide-react';
+import {Trophy, TrendingUp, Calendar, Timer} from 'lucide-react';
 import {useSeason} from '../../contexts/SeasonContext';
 import {useUserPreferences} from '../../contexts/UserPreferencesContext';
 import {analyticsApi, PersonalRecord} from '../../services/analyticsApi';
-import {TimePeriod, mapPeriodToBackend} from '../../types/analytics';
+import {TimePeriod} from '../../types/analytics';
 
 interface PersonalRecordsProps {
     period: TimePeriod;
@@ -20,25 +20,39 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
 
     useEffect(() => {
         loadRecords();
-    }, [period]);
+    }, [period, limit]);
+
+    // Map TimePeriod to days for the API
+    const mapPeriodToDays = (period: TimePeriod): number => {
+        switch (period) {
+            case 'WEEK':
+                return 7;
+            case 'MONTH':
+                return 30;
+            case 'SEASON':
+                return 90;
+            case 'YEAR':
+                return 365;
+            default:
+                return 30;
+        }
+    };
 
     const loadRecords = async () => {
         try {
             setLoading(true);
             setError(null);
 
-            const backendPeriod = mapPeriodToBackend(period);
+            // Convert period to days
+            const days = mapPeriodToDays(period);
 
-            // TODO: Update API to accept period parameter
-            // For now, get recent records (30 days)
-            // const data = await analyticsApi.getRecentPersonalRecords(30);
+            // Call real API
+            const data = await analyticsApi.getRecentPersonalRecords(days);
 
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Limit results
+            setRecords(data.slice(0, limit));
 
-            // Mock data
-            const mockData = generateMockPRs();
-            setRecords(mockData.slice(0, limit));
+            console.log(`✅ Loaded ${data.length} personal records for ${period} (${days} days)`);
 
         } catch (err) {
             console.error('Failed to load personal records:', err);
@@ -98,12 +112,34 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
         switch (type) {
             case 'MAX_WEIGHT':
                 return <Trophy className={iconClass}/>;
+            case 'MAX_VOLUME':
+                return <TrendingUp className={iconClass}/>;
+            case 'MAX_HOLD':  // ✅ ADD THIS
+                return <Timer className={iconClass}/>; // Or use Clock icon
             case 'MAX_DISTANCE':
                 return <TrendingUp className={iconClass}/>;
             case 'BEST_TIME':
                 return <Calendar className={iconClass}/>;
             default:
                 return <Trophy className={iconClass}/>;
+        }
+    };
+
+    // Get background color for PR type
+    const getIconBg = (type: string): string => {
+        switch (type) {
+            case 'MAX_WEIGHT':
+                return 'from-yellow-500 to-yellow-600';
+            case 'MAX_VOLUME':
+                return 'from-purple-500 to-purple-600';
+            case 'MAX_HOLD':  // ✅ ADD THIS
+                return 'from-orange-500 to-orange-600'; // Orange for holds
+            case 'MAX_DISTANCE':
+                return 'from-blue-500 to-blue-600';
+            case 'BEST_TIME':
+                return 'from-green-500 to-green-600';
+            default:
+                return 'from-yellow-500 to-yellow-600';
         }
     };
 
@@ -127,7 +163,15 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
         return (
             <div
                 className={`bg-gradient-to-br ${theme.gradient} rounded-lg p-4 md:p-6 border ${theme.border} shadow-lg`}>
-                <p className="text-red-600 font-semibold text-center">⚠️ {error}</p>
+                <div className="text-center py-8">
+                    <p className="text-red-600 font-semibold mb-4">⚠️ {error}</p>
+                    <button
+                        onClick={loadRecords}
+                        className={`px-6 py-2.5 bg-gradient-to-r ${theme.buttonGradient} text-white rounded-lg font-bold text-sm hover:opacity-90 transition shadow-md`}
+                    >
+                        Try Again
+                    </button>
+                </div>
             </div>
         );
     }
@@ -143,7 +187,7 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
                         No Personal Records Yet
                     </h3>
                     <p className={`text-sm ${theme.textSecondary}`}>
-                        Keep training to set your first PR!
+                        Keep training to set your first PR in this period!
                     </p>
                 </div>
             </div>
@@ -163,7 +207,10 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
                             Personal Records
                         </h3>
                         <p className={`text-[10px] sm:text-xs ${theme.textSecondary} font-semibold`}>
-                            Recent achievements
+                            {period === 'WEEK' ? 'This week' :
+                                period === 'MONTH' ? 'This month' :
+                                    period === 'SEASON' ? 'This season' :
+                                        'This year'} achievements
                         </p>
                     </div>
                 </div>
@@ -173,14 +220,14 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
             <div className="space-y-3">
                 {records.map((record, index) => (
                     <div
-                        key={index}
+                        key={`${record.exerciseId}-${record.type}-${index}`}
                         className="bg-white rounded-lg p-3 sm:p-4 border-2 border-gray-100 hover:border-gray-200 transition-all hover:shadow-md"
                     >
                         <div className="flex items-center gap-3">
                             {/* Icon */}
                             <div className="flex-shrink-0">
                                 <div
-                                    className={`p-2 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg shadow-md`}>
+                                    className={`p-2 bg-gradient-to-br ${getIconBg(record.type)} rounded-lg shadow-md`}>
                                     {getIcon(record.type)}
                                 </div>
                             </div>
@@ -196,8 +243,8 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
                                     </p>
                                     {record.reps && (
                                         <span className="text-xs text-gray-400">
-                      • {record.reps} reps
-    </span>
+                                            • {record.reps} reps
+                                        </span>
                                     )}
                                 </div>
                             </div>
@@ -207,6 +254,11 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
                                 <p className={`text-lg sm:text-xl font-black ${theme.textPrimary} tabular-nums`}>
                                     {formatValue(record.value, record.unit)}
                                 </p>
+                                {record.type === 'MAX_VOLUME' && (
+                                    <p className="text-xs text-gray-500">
+                                        {record.weight}×{record.reps}
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -230,29 +282,3 @@ export const PersonalRecords: React.FC<PersonalRecordsProps> = ({period, limit =
         </div>
     );
 };
-
-// ==================== MOCK DATA GENERATOR ====================
-
-function generateMockPRs(): PersonalRecord[] {
-    const exercises = [
-        {name: 'Deadlift', type: 'MAX_WEIGHT', value: 315, unit: 'lbs', reps: 1},
-        {name: 'Bench Press', type: 'MAX_WEIGHT', value: 225, unit: 'lbs', reps: 1},
-        {name: 'Squat', type: 'MAX_WEIGHT', value: 275, unit: 'lbs', reps: 1},
-        {name: 'Pull-ups', type: 'MAX_WEIGHT', value: 45, unit: 'lbs', reps: 10},
-        {name: '5K Run', type: 'BEST_TIME', value: 1350, unit: 'time'}, // 22:30
-        {name: '10K Run', type: 'BEST_TIME', value: 2820, unit: 'time'}, // 47:00
-        {name: 'Running', type: 'MAX_DISTANCE', value: 10.2, unit: 'km'},
-        {name: 'Overhead Press', type: 'MAX_WEIGHT', value: 135, unit: 'lbs', reps: 5},
-    ];
-
-    return exercises.map((ex, index) => ({
-        type: ex.type,
-        exerciseName: ex.name,
-        exerciseId: index + 1,
-        value: ex.value,
-        unit: ex.unit,
-        reps: ex.reps,
-        weight: ex.type === 'MAX_WEIGHT' ? ex.value : undefined,
-        date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    }));
-}

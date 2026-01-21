@@ -196,6 +196,59 @@ public class User implements UserDetails {
     @Column(name = "preferred_weight_unit")
     private String preferredWeightUnit = "lbs"; // "kg" or "lbs"
 
+    // ==================== ONBOARDING & PET SYSTEM ====================
+
+    /**
+     * Display name for leaderboards and social features.
+     * Optional - users can set this during or after onboarding.
+     * Must be unique if set.
+     */
+    @Column(name = "nickname", unique = true, length = 20)
+    @Size(max = 20, message = "Nickname cannot exceed 20 characters")
+    private String nickname;
+
+    /**
+     * Custom name for the user's pet companion.
+     * Set during onboarding, can be changed later.
+     */
+    @Column(name = "pet_name", length = 50)
+    @Size(max = 50, message = "Pet name cannot exceed 50 characters")
+    private String petName;
+
+    /**
+     * Whether user has completed the onboarding flow.
+     * Gates access to main app features.
+     */
+    @Column(name = "onboarding_completed")
+    @Builder.Default
+    private Boolean onboardingCompleted = false;
+
+// ==================== ONBOARDING HELPER METHODS ====================
+
+    /**
+     * Get display name - returns nickname if set, otherwise firstName
+     */
+    public String getDisplayName() {
+        if (nickname != null && !nickname.isBlank()) {
+            return nickname;
+        }
+        return firstName != null ? firstName : username;
+    }
+
+    /**
+     * Get pet display name - returns petName if set, otherwise "Your Pet"
+     */
+    public String getPetDisplayName() {
+        return petName != null && !petName.isBlank() ? petName : "Your Pet";
+    }
+
+    /**
+     * Check if onboarding is complete
+     */
+    public boolean hasCompletedOnboarding() {
+        return Boolean.TRUE.equals(onboardingCompleted);
+    }
+
 
     // ==================== LOCATION METHODS ====================
 

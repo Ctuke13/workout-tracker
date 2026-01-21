@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {TrendingUp, BarChart3, Activity, ChevronDown, ChevronLeft, ChevronRight} from 'lucide-react';
+import {TrendingUp, BarChart3, Activity, ChevronDown, ChevronLeft, ChevronRight, Sparkles, Zap} from 'lucide-react';
 import {
     LineChart,
     Line,
@@ -18,22 +18,10 @@ import {TimePeriod, ChartMetric} from '../../types/analytics';
 import {analyticsApi} from '../../services/analyticsApi';
 import {mapPeriodToBackend} from '../../types/analytics';
 
-// Import your contexts
-// import {useSeason} from '../../contexts/SeasonContext';
-// import {useUserPreferences} from '../../contexts/UserPreferencesContext';
-
 // ==================== TYPES ====================
 
 type ChartMode = 'EXERCISE' | 'WORKOUT';
 type ChartType = 'LINE' | 'BAR';
-
-interface Exercise {
-    id: number;
-    name: string;
-    emoji: string;
-    trackingMode: 'REP_BASED' | 'TIME_BASED' | 'HOLD_BASED';
-    usageCount: number;
-}
 
 interface MetricOption {
     value: string;
@@ -64,52 +52,13 @@ interface PerformanceTrackerChartProps {
     onPeriodChange?: (period: TimePeriod) => void;
 }
 
-// ==================== MOCK DATA ====================
-
-
-// Mock season data (will be replaced by your SeasonContext)
-const MOCK_SEASON = {
-    seasonName: 'Fall 2025',
-    emoji: '🍂',
-    startDate: '2025-09-21',
-    endDate: '2025-12-20',
-    color: '#fb923c'
-};
-
-const MOCK_THEME = {
-    emoji: '🍂',
-    buttonGradient: 'from-amber-600 to-orange-600',
-    textPrimary: 'text-amber-900',
-    accentBg: 'bg-amber-500'
-};
-
-// Helper functions
-const getBaseValueForMetric = (metric: string): number => {
-    const baseValues: Record<string, number> = {
-        'MAX_WEIGHT': 200,
-        'TOTAL_VOLUME': 15000,
-        'AVG_WEIGHT': 180,
-        'ESTIMATED_1RM': 225,
-        'TOTAL_REPS': 24,
-        'TOTAL_DISTANCE': 5,
-        'BEST_PACE': 7,
-        'AVG_PACE': 8,
-        'TOTAL_DURATION': 45,
-        'CALORIES': 400,
-        'MAX_HOLD': 60,
-        'TOTAL_HOLD': 180,
-        'AVG_HOLD': 55,
-        'WORKOUT_COUNT': 4,
-        'WORKOUT_DURATION': 60
-    };
-    return baseValues[metric] || 100;
-};
+// ==================== HELPERS ====================
 
 const isIntegerMetric = (metric: string): boolean => {
     const integerMetrics = [
         'TOTAL_REPS', 'WORKOUT_COUNT', 'CALORIES',
         'MAX_HOLD', 'TOTAL_HOLD', 'AVG_HOLD',
-        'TOTAL_DURATION', 'WORKOUT_DURATION'
+        'TOTAL_DURATION', 'WORKOUT_DURATION', 'REPS', 'SETS'
     ];
     return integerMetrics.includes(metric);
 };
@@ -121,7 +70,6 @@ const formatMetricValue = (value: number, metric: string): string => {
     return value.toFixed(1);
 };
 
-// Date calculation helpers
 const getDateRange = (period: TimePeriod, offset: number) => {
     const today = new Date();
 
@@ -148,12 +96,8 @@ const getDateRange = (period: TimePeriod, offset: number) => {
     }
 
     if (period === 'SEASON') {
-        // Mock season calculation (will use real SeasonContext)
-        const seasonStart = new Date(MOCK_SEASON.startDate);
-        const seasonEnd = new Date(MOCK_SEASON.endDate);
-
-        // For now, just return current season
-        // In real implementation, calculate based on offset
+        const seasonStart = new Date();
+        const seasonEnd = new Date();
         return {startDate: seasonStart, endDate: seasonEnd};
     }
 
@@ -174,14 +118,13 @@ const formatDateRange = (startDate: Date, endDate: Date): string => {
     return `${start} - ${end}`;
 };
 
-const getPeriodLabel = (period: TimePeriod, offset: number): string => {
+const getPeriodLabel = (period: TimePeriod, offset: number, seasonName: string, seasonEmoji: string): string => {
     if (offset === 0) {
         if (period === 'WEEK') return 'This Week';
         if (period === 'MONTH') {
-            const month = new Date().toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
-            return month;
+            return new Date().toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
         }
-        if (period === 'SEASON') return `${MOCK_SEASON.emoji} ${MOCK_SEASON.seasonName}`;
+        if (period === 'SEASON') return `${seasonEmoji} ${seasonName}`;
         if (period === 'YEAR') return new Date().getFullYear().toString();
     }
 
@@ -208,74 +151,21 @@ const getPeriodLabel = (period: TimePeriod, offset: number): string => {
     return 'Unknown';
 };
 
-const getStartOfWeek = (date: Date): Date => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    d.setDate(diff);
-    d.setHours(0, 0, 0, 0);
-    return d;
-};
+const formatChartDate = (dateStr: string, period: TimePeriod): string => {
+    const date = new Date(dateStr);
 
-const getEndOfWeek = (date: Date): Date => {
-    const start = getStartOfWeek(date);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    return end;
-};
-
-const getDateLabelsForRange = (period: TimePeriod, startDate: Date, endDate: Date) => {
-    const labels: { date: string; label: string }[] = [];
-
-    if (period === 'WEEK') {
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(startDate);
-            date.setDate(startDate.getDate() + i);
-            labels.push({
-                date: date.toISOString().split('T')[0],
-                label: date.toLocaleDateString('en-US', {weekday: 'short'})
-            });
-        }
-    } else if (period === 'MONTH') {
-        // Show weekly aggregates (4-5 points)
-        const weeks = [];
-        let current = new Date(startDate);
-        while (current <= endDate) {
-            weeks.push(new Date(current));
-            current.setDate(current.getDate() + 7);
-        }
-        weeks.forEach(weekStart => {
-            labels.push({
-                date: weekStart.toISOString().split('T')[0],
-                label: weekStart.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})
-            });
-        });
-    } else if (period === 'SEASON') {
-        // Show weekly points (~12 points for 3 months)
-        const weeks = [];
-        let current = new Date(startDate);
-        while (current <= endDate) {
-            weeks.push(new Date(current));
-            current.setDate(current.getDate() + 7);
-        }
-        weeks.forEach(weekStart => {
-            labels.push({
-                date: weekStart.toISOString().split('T')[0],
-                label: weekStart.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})
-            });
-        });
-    } else if (period === 'YEAR') {
-        for (let i = 0; i < 12; i++) {
-            const date = new Date(startDate.getFullYear(), i, 1);
-            labels.push({
-                date: date.toISOString().split('T')[0],
-                label: date.toLocaleDateString('en-US', {month: 'short'})
-            });
-        }
+    switch (period) {
+        case 'WEEK':
+            return date.toLocaleDateString('en-US', {weekday: 'short'});
+        case 'MONTH':
+            return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+        case 'SEASON':
+            return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+        case 'YEAR':
+            return date.toLocaleDateString('en-US', {month: 'short'});
+        default:
+            return dateStr;
     }
-
-    return labels;
 };
 
 // ==================== MAIN COMPONENT ====================
@@ -284,15 +174,8 @@ export default function PerformanceTrackerChart({
                                                     period: externalPeriod,
                                                     onPeriodChange
                                                 }: PerformanceTrackerChartProps) {
-    // Uncomment when integrating with your contexts:
-    // const {theme, season} = useSeason();
-    // const {distanceUnit, weightUnit} = useUserPreferences();
-
-    // Mock theme/season (remove when using real contexts)
-    const theme = MOCK_THEME;
-    const season = MOCK_SEASON;
-    const weightUnit = 'lbs';
-    const distanceUnit = 'miles';
+    const {theme, season} = useSeason();
+    const {distanceUnit, weightUnit} = useUserPreferences();
 
     const [mode, setMode] = useState<ChartMode>('EXERCISE');
     const [availableExercises, setAvailableExercises] = useState<{
@@ -301,16 +184,12 @@ export default function PerformanceTrackerChart({
         trackingMode: 'REP_BASED' | 'TIME_BASED' | 'HOLD_BASED';
     }[]>([]);
     const [selectedExercise, setSelectedExercise] = useState<number | null>(null);
-    const [selectedMetric, setSelectedMetric] = useState<string>(() => {
-        // Initialize with first metric from WORKOUT mode (most common)
-        return 'VOLUME'; // Safe default that works for both modes
-    });
+    const [selectedMetric, setSelectedMetric] = useState<string>('VOLUME');
     const [chartType, setChartType] = useState<ChartType>('LINE');
     const [internalPeriod, setInternalPeriod] = useState<TimePeriod>('MONTH');
     const [offset, setOffset] = useState(0);
     const [error, setError] = useState<string | null>(null);
 
-    const [showExerciseDropdown, setShowExerciseDropdown] = useState(false);
     const [showMetricDropdown, setShowMetricDropdown] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -341,7 +220,6 @@ export default function PerformanceTrackerChart({
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
             if (!target.closest('.dropdown-container')) {
-                setShowExerciseDropdown(false);
                 setShowMetricDropdown(false);
             }
         };
@@ -361,18 +239,9 @@ export default function PerformanceTrackerChart({
             ];
         }
 
-        // Get selected exercise details
         const selectedExerciseData = availableExercises.find(e => e.id === selectedExercise);
 
-        // ✅ ADD DEBUGGING
-        console.log('🔍 Selected Exercise:', selectedExercise);
-        console.log('🔍 Exercise Data:', selectedExerciseData);
-        console.log('🔍 Tracking Mode:', selectedExerciseData?.trackingMode);
-        console.log('🔍 Tracking Mode Type:', typeof selectedExerciseData?.trackingMode);
-
-        // If no exercise selected, show all metrics
         if (!selectedExercise || !selectedExerciseData) {
-            console.log('📊 Returning ALL metrics (no exercise selected)');
             return [
                 {value: 'WEIGHT', label: 'Max Weight', unit: weightUnit, icon: '🏋️'},
                 {value: 'VOLUME', label: 'Total Volume', unit: weightUnit, icon: '📊'},
@@ -385,11 +254,9 @@ export default function PerformanceTrackerChart({
             ];
         }
 
-        // Filter metrics based on tracking mode
         const trackingMode = selectedExerciseData.trackingMode;
 
         if (trackingMode === 'REP_BASED') {
-            console.log('💪 Returning REP_BASED metrics');
             return [
                 {value: 'WEIGHT', label: 'Max Weight', unit: weightUnit, icon: '🏋️'},
                 {value: 'VOLUME', label: 'Total Volume', unit: weightUnit, icon: '📊'},
@@ -399,7 +266,6 @@ export default function PerformanceTrackerChart({
         }
 
         if (trackingMode === 'TIME_BASED') {
-            console.log('🏃 Returning TIME_BASED metrics');
             return [
                 {value: 'DISTANCE', label: 'Distance', unit: distanceUnit, icon: '🏃'},
                 {value: 'PACE', label: 'Pace', unit: `min/${distanceUnit}`, icon: '⏱️'},
@@ -409,7 +275,6 @@ export default function PerformanceTrackerChart({
         }
 
         if (trackingMode === 'HOLD_BASED') {
-            console.log('🧘 Returning HOLD_BASED metrics');
             return [
                 {value: 'HOLD_DURATION', label: 'Avg Hold Time', unit: 'seconds', icon: '⏱️'},
                 {value: 'TOTAL_HOLD_TIME', label: 'Total Hold Time', unit: 'seconds', icon: '⏳'},
@@ -418,8 +283,6 @@ export default function PerformanceTrackerChart({
             ];
         }
 
-        // Default fallback
-        console.log('⚠️ FALLING BACK TO DEFAULT - trackingMode did not match!');
         return [
             {value: 'WEIGHT', label: 'Max Weight', unit: weightUnit, icon: '🏋️'},
             {value: 'VOLUME', label: 'Total Volume', unit: weightUnit, icon: '📊'}
@@ -441,19 +304,15 @@ export default function PerformanceTrackerChart({
     }, [mode, selectedExercise]);
 
     const loadChartData = async () => {
-        // ✅ Don't load if metrics aren't ready
         const metrics = getAvailableMetrics();
         if (metrics.length === 0) {
-            console.log('⏳ Metrics not ready yet, skipping load');
             return;
         }
 
-        // ✅ Ensure selected metric is valid
         const validMetric = metrics.find(m => m.value === selectedMetric);
         if (!validMetric) {
-            console.log('⚠️ Invalid metric selected, using first available:', metrics[0].value);
             setSelectedMetric(metrics[0].value);
-            return; // Will trigger re-load via useEffect
+            return;
         }
 
         setLoading(true);
@@ -462,14 +321,12 @@ export default function PerformanceTrackerChart({
         try {
             const currentPeriod = externalPeriod || internalPeriod;
 
-            // ✅ Call real API
             const response = await analyticsApi.getPerformanceTrackerData(
                 selectedMetric,
                 mapPeriodToBackend(currentPeriod),
                 selectedExercise
             );
 
-            // Transform API data to chart format
             const chartData: ChartDataPoint[] = response.dataPoints.map(point => ({
                 date: point.date,
                 value: point.value,
@@ -481,7 +338,6 @@ export default function PerformanceTrackerChart({
 
             setDataPoints(chartData);
 
-            // Set summary from API
             setSummary({
                 average: response.summary.average,
                 peak: response.summary.peak,
@@ -509,14 +365,12 @@ export default function PerformanceTrackerChart({
         setShowMetricDropdown(false);
     };
 
-
     const handleMetricDropdownToggle = () => {
         setShowMetricDropdown(!showMetricDropdown);
-        setShowExerciseDropdown(false);
     };
 
     const handlePeriodChange = (newPeriod: TimePeriod) => {
-        setOffset(0); // Reset to current period
+        setOffset(0);
         if (onPeriodChange) {
             onPeriodChange(newPeriod);
         } else {
@@ -538,31 +392,12 @@ export default function PerformanceTrackerChart({
         setOffset(0);
     };
 
-    const formatChartDate = (dateStr: string, period: TimePeriod): string => {
-        const date = new Date(dateStr);
-
-        switch (period) {
-            case 'WEEK':
-                return date.toLocaleDateString('en-US', {weekday: 'short'});
-            case 'MONTH':
-                return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
-            case 'SEASON':
-                return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
-            case 'YEAR':
-                return date.toLocaleDateString('en-US', {month: 'short'});
-            default:
-                return dateStr;
-        }
-    };
-
     const handleExerciseChange = (exerciseId: number | null) => {
         setSelectedExercise(exerciseId);
 
-        // ✅ Reset metric to first valid one for this exercise type
         if (exerciseId) {
             const exerciseData = availableExercises.find(ex => ex.id === exerciseId);
             if (exerciseData) {
-                // Get metrics for this exercise type
                 let newMetrics: MetricOption[] = [];
 
                 if (exerciseData.trackingMode === 'REP_BASED') {
@@ -588,33 +423,27 @@ export default function PerformanceTrackerChart({
                     ];
                 }
 
-                // Check if current metric is valid for new exercise
                 const isCurrentMetricValid = newMetrics.some(m => m.value === selectedMetric);
                 if (!isCurrentMetricValid && newMetrics.length > 0) {
-                    console.log(`🔄 Exercise changed to ${exerciseData.trackingMode}, resetting metric from ${selectedMetric} to ${newMetrics[0].value}`);
                     setSelectedMetric(newMetrics[0].value);
                 }
             }
         } else {
-            // If "All Exercises" selected, reset to a universal metric
-            console.log('🔄 Switched to "All Exercises", resetting metric to VOLUME');
             setSelectedMetric('VOLUME');
         }
     };
 
-    // Get chart color from season theme
-    const chartColor = season.color || '#60a5fa';
-
     const {startDate, endDate} = getDateRange(period, offset);
-    const periodLabel = getPeriodLabel(period, offset);
+    const periodLabel = getPeriodLabel(period, offset, season?.seasonName || 'Season', theme?.emoji || '🌟');
     const dateRangeLabel = formatDateRange(startDate, endDate);
 
     if (loading) {
         return (
-            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                <div className="p-4 animate-pulse">
-                    <div className="h-6 bg-gray-200 rounded w-32 mb-4"></div>
-                    <div className="h-[45vh] bg-gray-100 rounded"></div>
+            <div
+                className={`relative max-w-5xl mx-auto bg-gradient-to-br ${theme.gradient} rounded-3xl shadow-2xl overflow-hidden border ${theme.border}`}>
+                <div className="p-8 animate-pulse">
+                    <div className={`h-8 ${theme.accentBg} bg-opacity-20 rounded-xl w-48 mb-6`}></div>
+                    <div className="h-[45vh] bg-white/50 rounded-2xl"></div>
                 </div>
             </div>
         );
@@ -622,14 +451,19 @@ export default function PerformanceTrackerChart({
 
     if (error) {
         return (
-            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-                <div className="p-4">
-                    <div className="text-red-600 text-center">
-                        <p className="font-bold mb-2">Error Loading Data</p>
-                        <p className="text-sm">{error}</p>
+            <div
+                className={`relative max-w-5xl mx-auto bg-gradient-to-br ${theme.gradient} rounded-3xl shadow-2xl overflow-hidden border ${theme.border}`}>
+                <div className="p-8">
+                    <div className="text-center">
+                        <div
+                            className={`w-16 h-16 ${theme.accentBg} bg-opacity-20 rounded-2xl flex items-center justify-center mx-auto mb-4`}>
+                            <span className="text-3xl">⚠️</span>
+                        </div>
+                        <p className={`font-bold text-lg mb-2 ${theme.textPrimary}`}>Error Loading Data</p>
+                        <p className={`text-sm mb-6 ${theme.textSecondary}`}>{error}</p>
                         <button
                             onClick={() => loadChartData()}
-                            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            className={`px-6 py-3 bg-gradient-to-r ${theme.buttonGradient} text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform hover:scale-105`}
                         >
                             Retry
                         </button>
@@ -640,296 +474,384 @@ export default function PerformanceTrackerChart({
     }
 
     return (
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden max-w-4xl mx-auto">
-            {/* Mode Tabs */}
-            <div className="flex border-b border-gray-200">
-                <button
-                    onClick={() => handleModeChange('EXERCISE')}
-                    className={`flex-1 py-3 px-4 font-bold text-sm transition-all ${
-                        mode === 'EXERCISE'
-                            ? `border-b-2 border-${season.color?.replace('#', '')} ${theme.textPrimary} bg-gray-50`
-                            : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                >
-                    📈 Exercise Progress
-                </button>
-                <button
-                    onClick={() => handleModeChange('WORKOUT')}
-                    className={`flex-1 py-3 px-4 font-bold text-sm transition-all ${
-                        mode === 'WORKOUT'
-                            ? `border-b-2 border-${season.color?.replace('#', '')} ${theme.textPrimary} bg-gray-50`
-                            : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                >
-                    📊 Workout Stats
-                </button>
+        <div className="relative max-w-5xl mx-auto">
+            {/* 🎨 Seasonal Floating Orbs */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-3xl -z-10">
+                <div
+                    className={`absolute -top-24 -right-24 w-96 h-96 ${theme.orb1} rounded-full blur-3xl opacity-40 animate-pulse`}></div>
+                <div
+                    className={`absolute -bottom-24 -left-24 w-96 h-96 ${theme.orb2} rounded-full blur-3xl opacity-30`}></div>
             </div>
 
-            {/* Period Navigation */}
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                    <button
-                        onClick={handleNavigateBack}
-                        className="p-2 hover:bg-gray-200 rounded-lg transition"
-                        aria-label="Previous period"
-                    >
-                        <ChevronLeft className="w-5 h-5 text-gray-700"/>
-                    </button>
+            {/* 🎯 Main Card */}
+            <div
+                className={`relative bg-gradient-to-br ${theme.gradient} rounded-3xl shadow-2xl overflow-hidden border-2 ${theme.border}`}>
 
-                    <div className="text-center flex-1">
-                        <h3 className={`text-base font-black ${theme.textPrimary}`}>
-                            {periodLabel}
-                        </h3>
-                        <p className="text-xs text-gray-600 font-medium mt-0.5">
-                            {dateRangeLabel}
-                        </p>
-                    </div>
+                {/* ✨ Header Section - Mobile-First Compact */}
+                <div className="relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/60 via-white/40 to-transparent"></div>
 
-                    <button
-                        onClick={handleNavigateForward}
-                        disabled={offset >= 0}
-                        className={`p-2 rounded-lg transition ${
-                            offset >= 0
-                                ? 'text-gray-300 cursor-not-allowed'
-                                : 'hover:bg-gray-200 text-gray-700'
-                        }`}
-                        aria-label="Next period"
-                    >
-                        <ChevronRight className="w-5 h-5"/>
-                    </button>
-                </div>
-
-                {offset !== 0 && (
-                    <div className="flex justify-center">
-                        <button
-                            onClick={handleToday}
-                            className={`px-3 py-1 text-xs font-bold rounded-full bg-gradient-to-r ${theme.buttonGradient} text-white hover:opacity-90 transition`}
-                        >
-                            Today
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            {/* Selectors */}
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                <div className="space-y-2">
-                    {mode === 'EXERCISE' && availableExercises.length > 0 && (
-                        <div className="relative dropdown-container">
-                            <label className="block text-xs font-semibold text-gray-600 mb-1">
-                                Exercise
-                            </label>
-                            <select
-                                value={selectedExercise || ''}
-                                onChange={(e) => handleExerciseChange(e.target.value ? Number(e.target.value) : null)}
-                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 hover:bg-gray-50 transition"
+                    <div className="relative px-3 md:px-6 py-3 md:py-4">
+                        {/* Mode Tabs - Compact Mobile */}
+                        <div className="flex gap-2 mb-3 md:mb-4">
+                            <button
+                                onClick={() => handleModeChange('EXERCISE')}
+                                className={`flex-1 py-2.5 md:py-3 px-3 md:px-4 font-bold text-xs md:text-sm rounded-xl md:rounded-2xl transition-all ${
+                                    mode === 'EXERCISE'
+                                        ? `bg-gradient-to-r ${theme.buttonGradient} text-white shadow-lg`
+                                        : `bg-white/70 backdrop-blur-sm ${theme.textSecondary} hover:bg-white hover:shadow-md`
+                                }`}
                             >
-                                <option value="">All Exercises</option>
-                                {availableExercises.map(exercise => (
-                                    <option key={exercise.id} value={exercise.id}>
-                                        {exercise.name}
-                                    </option>
-                                ))}
-                            </select>
+                                <div className="flex items-center justify-center gap-1.5 md:gap-2">
+                                    <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4"/>
+                                    <span className="hidden sm:inline">Exercise</span>
+                                    <span className="sm:hidden">Exercise Metrics</span>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => handleModeChange('WORKOUT')}
+                                className={`flex-1 py-2.5 md:py-3 px-3 md:px-4 font-bold text-xs md:text-sm rounded-xl md:rounded-2xl transition-all ${
+                                    mode === 'WORKOUT'
+                                        ? `bg-gradient-to-r ${theme.buttonGradient} text-white shadow-lg`
+                                        : `bg-white/70 backdrop-blur-sm ${theme.textSecondary} hover:bg-white hover:shadow-md`
+                                }`}
+                            >
+                                <div className="flex items-center justify-center gap-1.5 md:gap-2">
+                                    <BarChart3 className="w-3.5 h-3.5 md:w-4 md:h-4"/>
+                                    <span className="hidden sm:inline">Workout</span>
+                                    <span className="sm:hidden">Workout Metrics</span>
+                                </div>
+                            </button>
                         </div>
-                    )}
 
-                    <div className="relative dropdown-container">
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">
-                            Metric
-                        </label>
-                        <button
-                            onClick={handleMetricDropdownToggle}
-                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg flex items-center justify-between hover:bg-gray-50 transition text-sm font-bold text-gray-900"
-                        >
-                            <div className="flex items-center gap-2">
-                                <span>{currentMetric?.icon}</span>
-                                <span>{currentMetric?.label}</span>
+                        {/* Period Navigation - Compact */}
+                        <div className="flex items-center justify-between gap-2">
+                            <button
+                                onClick={handleNavigateBack}
+                                className="p-2 md:p-2.5 hover:bg-white/60 rounded-lg md:rounded-xl transition-all active:scale-95"
+                            >
+                                <ChevronLeft className={`w-4 h-4 md:w-5 md:h-5 ${theme.textPrimary}`}/>
+                            </button>
+
+                            <div className="text-center flex-1 min-w-0">
+                                <div className="flex items-center justify-center gap-1.5 md:gap-2 mb-0.5">
+                                    <span className="text-lg md:text-2xl flex-shrink-0">{theme.emoji}</span>
+                                    <h3 className={`text-sm md:text-lg font-black ${theme.textPrimary} truncate`}>
+                                        {periodLabel}
+                                    </h3>
+                                </div>
+                                <p className={`text-[10px] md:text-sm font-semibold ${theme.textSecondary}`}>
+                                    {dateRangeLabel}
+                                </p>
                             </div>
-                            <ChevronDown
-                                className={`w-4 h-4 transition-transform ${showMetricDropdown ? 'rotate-180' : ''}`}/>
-                        </button>
 
-                        {showMetricDropdown && (
-                            <div
-                                className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto">
-                                {availableMetrics.map((metric) => (
-                                    <button
-                                        key={metric.value}
-                                        onClick={() => handleMetricChange(metric.value)}
-                                        className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition flex items-center gap-2 text-sm font-semibold ${
-                                            selectedMetric === metric.value ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                                        }`}
-                                    >
-                                        <span>{metric.icon}</span>
-                                        <span>{metric.label}</span>
-                                        <span className="text-xs text-gray-500 ml-auto">({metric.unit})</span>
-                                    </button>
-                                ))}
+                            <button
+                                onClick={handleNavigateForward}
+                                disabled={offset >= 0}
+                                className={`p-2 md:p-2.5 rounded-lg md:rounded-xl transition-all active:scale-95 ${
+                                    offset >= 0
+                                        ? 'text-gray-300 cursor-not-allowed'
+                                        : `hover:bg-white/60 ${theme.textPrimary}`
+                                }`}
+                            >
+                                <ChevronRight className="w-4 h-4 md:w-5 md:h-5"/>
+                            </button>
+                        </div>
+
+                        {offset !== 0 && (
+                            <div className="flex justify-center mt-2 md:mt-3">
+                                <button
+                                    onClick={handleToday}
+                                    className={`px-4 py-1.5 md:px-5 md:py-2 text-xs md:text-sm font-bold rounded-full bg-gradient-to-r ${theme.buttonGradient} text-white shadow-lg hover:shadow-xl transition-all active:scale-95`}
+                                >
+                                    <div className="flex items-center gap-1.5 md:gap-2">
+                                        <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4"/>
+                                        <span className="hidden sm:inline">Back to Current</span>
+                                        <span className="sm:hidden">Current</span>
+                                    </div>
+                                </button>
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="flex justify-end mt-3">
-                    <div className="flex gap-1 bg-white rounded-lg p-1 border border-gray-200">
-                        <button
-                            onClick={() => setChartType('LINE')}
-                            className={`p-1.5 rounded transition ${
-                                chartType === 'LINE' ? theme.accentBg + ' bg-opacity-20' : 'hover:bg-gray-100'
-                            }`}
-                        >
-                            <Activity
-                                className={`w-4 h-4 ${chartType === 'LINE' ? theme.textPrimary : 'text-gray-600'}`}/>
-                        </button>
-                        <button
-                            onClick={() => setChartType('BAR')}
-                            className={`p-1.5 rounded transition ${
-                                chartType === 'BAR' ? theme.accentBg + ' bg-opacity-20' : 'hover:bg-gray-100'
-                            }`}
-                        >
-                            <BarChart3
-                                className={`w-4 h-4 ${chartType === 'BAR' ? theme.textPrimary : 'text-gray-600'}`}/>
-                        </button>
+                {/* 🎮 Controls Section - Compact Mobile */}
+                <div className="px-3 md:px-6 py-3 md:py-4 bg-white/40 backdrop-blur-sm border-y border-white/50">
+                    <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 mb-3 md:mb-4">
+                        {/* Exercise Selector */}
+                        {mode === 'EXERCISE' && availableExercises.length > 0 && (
+                            <div className="relative dropdown-container">
+                                <label
+                                    className={`block text-[10px] md:text-xs font-bold ${theme.textSecondary} mb-1.5 md:mb-2 uppercase tracking-wide`}>
+                                    💪 Exercise
+                                </label>
+                                <select
+                                    value={selectedExercise || ''}
+                                    onChange={(e) => handleExerciseChange(e.target.value ? Number(e.target.value) : null)}
+                                    className={`w-full px-3 py-2.5 md:px-4 md:py-3 bg-white/90 backdrop-blur-sm border-2 ${theme.border} rounded-lg md:rounded-xl text-xs md:text-sm font-bold ${theme.textPrimary} hover:bg-white hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2`}
+                                >
+                                    <option value="">All Exercises</option>
+                                    {availableExercises.map(exercise => (
+                                        <option key={exercise.id} value={exercise.id}>
+                                            {exercise.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Metric Selector */}
+                        <div className="relative dropdown-container">
+                            <label
+                                className={`block text-[10px] md:text-xs font-bold ${theme.textSecondary} mb-1.5 md:mb-2 uppercase tracking-wide`}>
+                                📊 Metric
+                            </label>
+                            <button
+                                onClick={handleMetricDropdownToggle}
+                                className={`w-full px-3 py-2.5 md:px-4 md:py-3 bg-white/90 backdrop-blur-sm border-2 ${theme.border} rounded-lg md:rounded-xl flex items-center justify-between hover:bg-white hover:shadow-lg transition-all text-xs md:text-sm font-bold ${theme.textPrimary}`}
+                            >
+                                <div className="flex items-center gap-2 md:gap-3">
+                                    <span className="text-base md:text-lg">{currentMetric?.icon}</span>
+                                    <span>{currentMetric?.label}</span>
+                                </div>
+                                <ChevronDown
+                                    className={`w-4 h-4 md:w-5 md:h-5 transition-transform ${showMetricDropdown ? 'rotate-180' : ''}`}/>
+                            </button>
+
+                            {showMetricDropdown && (
+                                <div
+                                    className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-md border-2 border-gray-200 rounded-xl md:rounded-2xl shadow-2xl z-50 max-h-64 md:max-h-72 overflow-y-auto">
+                                    {availableMetrics.map((metric) => (
+                                        <button
+                                            key={metric.value}
+                                            onClick={() => handleMetricChange(metric.value)}
+                                            className={`w-full px-3 py-2.5 md:px-4 md:py-3 text-left transition-all flex items-center gap-2 md:gap-3 text-xs md:text-sm font-bold border-b border-gray-100 last:border-b-0 ${
+                                                selectedMetric === metric.value
+                                                    ? `${theme.messageBg} ${theme.textPrimary}`
+                                                    : `text-gray-700 hover:${theme.messageBg}`
+                                            }`}
+                                        >
+                                            <span className="text-lg md:text-xl">{metric.icon}</span>
+                                            <span className="flex-1">{metric.label}</span>
+                                            <span
+                                                className={`text-[10px] md:text-xs px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg ${theme.cardBg} ${theme.textTertiary}`}>
+                                                {metric.unit}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Chart Type Toggle - Compact */}
+                    <div className="flex justify-end">
+                        <div
+                            className="inline-flex gap-1.5 md:gap-2 bg-white/80 backdrop-blur-sm rounded-lg md:rounded-xl p-1 md:p-1.5 border-2 border-white/50 shadow-md">
+                            <button
+                                onClick={() => setChartType('LINE')}
+                                className={`p-2 md:p-2.5 rounded-md md:rounded-lg transition-all ${
+                                    chartType === 'LINE'
+                                        ? `${theme.accentBg} bg-opacity-20 shadow-md`
+                                        : 'hover:bg-white/60'
+                                }`}
+                                title="Line Chart"
+                            >
+                                <Activity
+                                    className={`w-4 h-4 md:w-5 md:h-5 ${chartType === 'LINE' ? theme.textPrimary : 'text-gray-600'}`}/>
+                            </button>
+                            <button
+                                onClick={() => setChartType('BAR')}
+                                className={`p-2 md:p-2.5 rounded-md md:rounded-lg transition-all ${
+                                    chartType === 'BAR'
+                                        ? `${theme.accentBg} bg-opacity-20 shadow-md`
+                                        : 'hover:bg-white/60'
+                                }`}
+                                title="Bar Chart"
+                            >
+                                <BarChart3
+                                    className={`w-4 h-4 md:w-5 md:h-5 ${chartType === 'BAR' ? theme.textPrimary : 'text-gray-600'}`}/>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Chart */}
-            <div className="w-full h-[45vh] bg-gray-50">
-                <ResponsiveContainer width="100%" height="100%">
-                    {chartType === 'LINE' ? (
-                        <LineChart data={dataPoints} margin={{top: 20, right: -20, left: -20, bottom: 5}}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false}/>
-                            <XAxis
-                                dataKey="label"
-                                stroke="#9ca3af"
-                                style={{fontSize: '11px'}}
-                                tick={{fill: '#6b7280'}}
-                                tickLine={false}
-                                axisLine={false}
-                            />
-                            <YAxis
-                                stroke="#9ca3af"
-                                style={{fontSize: '11px'}}
-                                tick={{fill: '#6b7280'}}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(value) => formatMetricValue(value, selectedMetric)}
-                            />
-                            <Tooltip content={(props) => <CustomTooltip {...props} metric={currentMetric}/>}/>
-                            <Line
-                                type="monotone"
-                                dataKey="displayValue"
-                                stroke={chartColor}
-                                strokeWidth={2.5}
-                                dot={(props: any) => {
-                                    const isHighlighted = props.payload.isCurrentPeriod;
-                                    return (
+                {/* 📊 Chart Section */}
+                <div className="w-full h-[45vh] bg-white/30 backdrop-blur-sm p-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        {chartType === 'LINE' ? (
+                            <LineChart data={dataPoints} margin={{top: 10, right: 10, left: -35, bottom: 5}}>
+                                <defs>
+                                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor={theme.chartColor} stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor={theme.chartColor} stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} opacity={0.5}/>
+                                <XAxis
+                                    dataKey="label"
+                                    stroke="#9ca3af"
+                                    style={{fontSize: '12px', fontWeight: 'bold'}}
+                                    tick={{fill: '#6b7280'}}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    stroke="#9ca3af"
+                                    style={{fontSize: '12px', fontWeight: 'bold'}}
+                                    tick={{fill: '#6b7280'}}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => formatMetricValue(value, selectedMetric)}
+                                />
+                                <Tooltip content={(props) => <CustomTooltip {...props} metric={currentMetric}
+                                                                            theme={theme}/>}/>
+                                <Line
+                                    type="monotone"
+                                    dataKey="displayValue"
+                                    stroke={theme.chartColor}
+                                    strokeWidth={3}
+                                    dot={(props: any) => (
                                         <circle
-                                            key={`dot-${props.index}`}
                                             cx={props.cx}
                                             cy={props.cy}
-                                            r={isHighlighted ? 6 : 0}
-                                            fill={chartColor}
-                                            fillOpacity={isHighlighted ? 0.5 : 0}
-                                            stroke={chartColor}
+                                            r={5}
+                                            fill={theme.chartColor}
+                                            stroke="white"
                                             strokeWidth={2}
+                                            className="drop-shadow-lg"
                                         />
-                                    );
-                                }}
-                                activeDot={{r: 5, fill: chartColor}}
-                                animationDuration={800}
-                            />
-                        </LineChart>
-                    ) : (
-                        <BarChart data={dataPoints} margin={{top: 20, right: 10, left: -20, bottom: 5}}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false}/>
-                            <XAxis
-                                dataKey="label"
-                                stroke="#9ca3af"
-                                style={{fontSize: '11px'}}
-                                tick={{fill: '#6b7280'}}
-                                tickLine={false}
-                                axisLine={false}
-                            />
-                            <YAxis
-                                stroke="#9ca3af"
-                                style={{fontSize: '11px'}}
-                                tick={{fill: '#6b7280'}}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(value) => formatMetricValue(value, selectedMetric)}
-                            />
-                            <Tooltip content={(props) => <CustomTooltip {...props} metric={currentMetric}/>}/>
-                            <Bar
-                                dataKey="displayValue"
-                                fill={chartColor}
-                                radius={[6, 6, 0, 0]}
-                                animationDuration={800}
-                            >
-                                {dataPoints.map((entry, index) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fillOpacity={entry.isCurrentPeriod ? 0.5 : 1}
-                                    />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    )}
-                </ResponsiveContainer>
-            </div>
-
-            {/* Time Period Pills */}
-            <div className="px-4 py-3 border-t border-gray-100 bg-white">
-                <div className="flex items-center gap-2 overflow-x-auto">
-                    {(['WEEK', 'MONTH', 'SEASON', 'YEAR'] as TimePeriod[]).map((p) => (
-                        <button
-                            key={p}
-                            onClick={() => handlePeriodChange(p)}
-                            className={`px-4 py-2 rounded-full font-bold text-sm whitespace-nowrap transition-all flex-shrink-0 flex items-center gap-1 ${
-                                period === p
-                                    ? `bg-gradient-to-r ${theme.buttonGradient} text-white shadow-md`
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            {p === 'SEASON' && <span>{theme.emoji}</span>}
-                            {p === 'WEEK' ? '1W' : p === 'MONTH' ? '1M' : p === 'SEASON' ? 'Season' : '1Y'}
-                        </button>
-                    ))}
+                                    )}
+                                    activeDot={{r: 7, fill: theme.chartColor, stroke: 'white', strokeWidth: 3}}
+                                    animationDuration={1000}
+                                />
+                            </LineChart>
+                        ) : (
+                            <BarChart data={dataPoints} margin={{top: 10, right: 10, left: -35, bottom: 5}}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} opacity={0.5}/>
+                                <XAxis
+                                    dataKey="label"
+                                    stroke="#9ca3af"
+                                    style={{fontSize: '12px', fontWeight: 'bold'}}
+                                    tick={{fill: '#6b7280'}}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    stroke="#9ca3af"
+                                    style={{fontSize: '12px', fontWeight: 'bold'}}
+                                    tick={{fill: '#6b7280'}}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => formatMetricValue(value, selectedMetric)}
+                                />
+                                <Tooltip content={(props) => <CustomTooltip {...props} metric={currentMetric}
+                                                                            theme={theme}/>}/>
+                                <Bar
+                                    dataKey="displayValue"
+                                    fill={theme.chartColor}
+                                    radius={[8, 8, 0, 0]}
+                                    animationDuration={1000}
+                                >
+                                    {dataPoints.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            className="drop-shadow-md hover:drop-shadow-xl transition-all"
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        )}
+                    </ResponsiveContainer>
                 </div>
-            </div>
 
-            {/* Summary Stats */}
-            {summary && (
-                <div className="px-4 py-4 bg-gray-50 border-t border-gray-100">
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                            <p className="text-xs text-gray-600 font-semibold mb-1">Average</p>
-                            <p className="text-lg font-black text-gray-900 tabular-nums">
-                                {formatMetricValue(summary.average, selectedMetric)}
-                            </p>
-                            <p className="text-xs text-gray-500">{currentMetric?.unit}</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-xs text-gray-600 font-semibold mb-1">Peak</p>
-                            <p className="text-lg font-black text-gray-900 tabular-nums">
-                                {formatMetricValue(summary.peak, selectedMetric)}
-                            </p>
-                            <p className="text-xs text-gray-500">{currentMetric?.unit}</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-xs text-gray-600 font-semibold mb-1">Trend</p>
-                            <p className={`text-lg font-black tabular-nums ${
-                                summary.trend === 'UP' ? 'text-green-600' :
-                                    summary.trend === 'DOWN' ? 'text-red-600' : 'text-gray-600'
-                            }`}>
-                                {summary.trend === 'UP' ? '↑' : summary.trend === 'DOWN' ? '↓' : '→'} {Math.abs(summary.trendPercentage).toFixed(1)}%
-                            </p>
-                        </div>
+                {/* 🎯 Time Period Pills - Mobile First */}
+                <div className="px-4 md:px-6 py-3 bg-white/40 backdrop-blur-sm border-t border-white/50">
+                    <div className="flex items-center justify-between md:justify-start md:gap-2">
+                        {(['WEEK', 'MONTH', 'SEASON', 'YEAR'] as TimePeriod[]).map((p) => (
+                            <button
+                                key={p}
+                                onClick={() => handlePeriodChange(p)}
+                                className={`px-3 py-2 md:px-5 md:py-2.5 rounded-full font-bold text-xs md:text-sm whitespace-nowrap transition-all transform flex-shrink-0 flex items-center gap-1 ${
+                                    period === p
+                                        ? `bg-gradient-to-r ${theme.buttonGradient} text-white shadow-lg`
+                                        : `bg-white/70 backdrop-blur-sm ${theme.textSecondary} hover:bg-white hover:shadow-md`
+                                }`}
+                            >
+                                {p === 'SEASON' && <span className="text-sm md:text-base">{theme.emoji}</span>}
+                                <span className="md:hidden">
+                                    {p === 'WEEK' ? '1W' : p === 'MONTH' ? '1M' : p === 'SEASON' ? 'Season' : '1Y'}
+                                </span>
+                                <span className="hidden md:inline">
+                                    {p === 'WEEK' ? 'Week' : p === 'MONTH' ? 'Month' : p === 'SEASON' ? 'Season' : 'Year'}
+                                </span>
+                            </button>
+                        ))}
                     </div>
                 </div>
-            )}
+
+                {/* 📈 Ultra-Compact Summary Stats */}
+                {summary && (
+                    <div className="px-4 py-3 bg-white/50 backdrop-blur-sm border-t border-white/50">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div
+                                className={`text-center p-2 rounded-lg ${theme.cardBg} backdrop-blur-sm border ${theme.cardBorder} hover:scale-105 transition-all`}>
+                                <p className={`text-[9px] font-bold ${theme.textSecondary} mb-0.5 uppercase tracking-wider`}>
+                                    Avg
+                                </p>
+                                <p className={`text-base font-black ${theme.textPrimary} tabular-nums leading-tight`}>
+                                    {formatMetricValue(summary.average, selectedMetric)}
+                                </p>
+                                <p className={`text-[9px] font-semibold ${theme.textTertiary}`}>{currentMetric?.unit}</p>
+                            </div>
+
+                            <div
+                                className={`text-center p-2 rounded-lg ${theme.cardBg} backdrop-blur-sm border ${theme.cardBorder} hover:scale-105 transition-all`}>
+                                <p className={`text-[9px] font-bold ${theme.textSecondary} mb-0.5 uppercase tracking-wider`}>
+                                    Peak
+                                </p>
+                                <p className={`text-base font-black ${theme.textPrimary} tabular-nums leading-tight`}>
+                                    {formatMetricValue(summary.peak, selectedMetric)}
+                                </p>
+                                <p className={`text-[9px] font-semibold ${theme.textTertiary}`}>{currentMetric?.unit}</p>
+                            </div>
+
+                            <div
+                                className={`text-center p-2 rounded-lg ${theme.cardBg} backdrop-blur-sm border ${theme.cardBorder} hover:scale-105 transition-all`}>
+                                <p className={`text-[9px] font-bold ${theme.textSecondary} mb-0.5 uppercase tracking-wider`}>
+                                    Low
+                                </p>
+                                <p className={`text-base font-black ${theme.textPrimary} tabular-nums leading-tight`}>
+                                    {formatMetricValue(summary.low, selectedMetric)}
+                                </p>
+                                <p className={`text-[9px] font-semibold ${theme.textTertiary}`}>{currentMetric?.unit}</p>
+                            </div>
+
+                            <div
+                                className={`text-center p-2 rounded-lg ${theme.cardBg} backdrop-blur-sm border ${theme.cardBorder} hover:scale-105 transition-all`}>
+                                <p className={`text-[9px] font-bold ${theme.textSecondary} mb-0.5 uppercase tracking-wider`}>
+                                    Trend
+                                </p>
+                                <div className="flex items-center justify-center min-h-[20px]">
+                                    {summary.trend === 'UP' ? (
+                                        <p className="text-base font-black text-green-600 tabular-nums leading-tight">
+                                            ↑{Math.abs(summary.trendPercentage).toFixed(0)}%
+                                        </p>
+                                    ) : summary.trend === 'DOWN' ? (
+                                        <p className="text-base font-black text-red-600 tabular-nums leading-tight">
+                                            ↓{Math.abs(summary.trendPercentage).toFixed(0)}%
+                                        </p>
+                                    ) : (
+                                        <p className="text-base font-black text-gray-600 tabular-nums leading-tight">
+                                            →{Math.abs(summary.trendPercentage).toFixed(0)}%
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -941,9 +863,10 @@ interface CustomTooltipProps {
     payload?: Array<{ payload: ChartDataPoint; value: number; }>;
     label?: string | number;
     metric?: MetricOption;
+    theme?: any;
 }
 
-const CustomTooltip: React.FC<CustomTooltipProps> = ({active, payload, label, metric}) => {
+const CustomTooltip: React.FC<CustomTooltipProps> = ({active, payload, label, metric, theme}) => {
     if (!active || !payload || !payload[0]) return null;
     const data = payload[0].payload;
 
@@ -959,19 +882,30 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({active, payload, label, me
         : data.displayValue.toFixed(1);
 
     return (
-        <div className="bg-white border-2 border-gray-200 rounded-lg shadow-xl p-3 min-w-[180px]">
-            <p className="text-xs font-bold text-gray-900 mb-2">{fullDate}</p>
-            <div className="space-y-1">
-                <p className="text-sm font-bold text-gray-900">
-                    {displayValue} {metric?.unit}
-                </p>
-                <p className="text-xs text-gray-600">
-                    {metric?.icon} {metric?.label}
-                </p>
+        <div
+            className={`bg-white/95 backdrop-blur-md border-2 ${theme?.border || 'border-gray-200'} rounded-2xl shadow-2xl p-4 min-w-[200px]`}>
+            <p className={`text-xs font-bold ${theme?.textSecondary || 'text-gray-600'} mb-3 uppercase tracking-wide`}>
+                {fullDate}
+            </p>
+            <div className="space-y-2">
+                <div className={`flex items-center gap-3 p-3 rounded-xl ${theme?.cardBg || 'bg-gray-100'}`}>
+                    <span className="text-2xl">{metric?.icon}</span>
+                    <div>
+                        <p className={`text-xs font-semibold ${theme?.textTertiary || 'text-gray-600'} mb-0.5`}>
+                            {metric?.label}
+                        </p>
+                        <p className={`text-lg font-black ${theme?.textPrimary || 'text-gray-900'}`}>
+                            {displayValue} {metric?.unit}
+                        </p>
+                    </div>
+                </div>
                 {data.workoutCount && (
-                    <p className="text-xs text-gray-500 mt-1.5 pt-1.5 border-t border-gray-100">
-                        💪 {data.workoutCount} workout{data.workoutCount > 1 ? 's' : ''}
-                    </p>
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                        <span className="text-sm">💪</span>
+                        <p className={`text-sm font-semibold ${theme?.textSecondary || 'text-gray-600'}`}>
+                            {data.workoutCount} workout{data.workoutCount > 1 ? 's' : ''}
+                        </p>
+                    </div>
                 )}
             </div>
         </div>

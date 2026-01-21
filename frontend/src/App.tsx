@@ -19,6 +19,7 @@ import CalendarPage from './pages/CalendarPage';
 import CommunityPage from './pages/CommunityPage';
 import MessagesPage from './pages/MessagesPage';
 import ExercisesPage from './pages/ExercisesPage';
+import AchievementsPage from './pages/AchievementsPage';
 
 // Workout Mode (full-screen, no layout)
 import WorkoutModePage from './pages/WorkoutModePage';
@@ -57,6 +58,8 @@ const App: React.FC = () => {
                                 <Route path="/community" element={<MobileLayout><CommunityPage/></MobileLayout>}/>
                                 <Route path="/messages" element={<MobileLayout><MessagesPage/></MobileLayout>}/>
                                 <Route path="/exercises" element={<MobileLayout><ExercisesPage/></MobileLayout>}/>
+                                <Route path="/progress/achievements"
+                                       element={<MobileLayout><AchievementsPage/></MobileLayout>}/> {/* ✅ ADDED */}
                                 <Route path="/notifications"
                                        element={<MobileLayout><NotificationsPage/></MobileLayout>}/>
                                 <Route path="/settings" element={<MobileLayout><SettingsPage/></MobileLayout>}/>

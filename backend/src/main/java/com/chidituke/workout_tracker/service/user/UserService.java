@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +39,16 @@ public class UserService {
     private final UserActivityService userActivityService;
     private final UserAdminService userAdminService;
     private final UserQueryService userQueryService;
+
+    // ==================== PROFANITY FILTER ====================
+    private static final Set<String> BLOCKED_WORDS = Set.of(
+            // Add offensive words here - keeping list minimal for example
+            "fuck", "shit", "ass", "bitch", "damn", "cunt", "dick", "cock",
+            "pussy", "whore", "slut", "fag", "nigger", "nigga", "retard",
+            "nazi", "hitler", "penis", "vagina", "porn", "sex", "rape",
+            "kill", "murder", "suicide", "terrorist", "bomb"
+            // Add more as needed
+    );
 
     // ═══════════════════════════════════════════════════════════════════
     // 🔍 BASIC USER OPERATIONS (PERFORMANCE OPTIMIZED)
@@ -117,6 +128,168 @@ public class UserService {
     @Transactional
     public void reactivateUser(Long userId) {
         userProfileService.reactivateUser(userId);
+    }
+
+    // ==================== ONBOARDING METHODS ====================
+
+    /**
+     * Check if a nickname is available and valid
+     */
+    public NicknameCheckResult checkNicknameAvailability(String nickname, Long currentUserId) {
+        // Null or empty check
+        if (nickname == null || nickname.isBlank()) {
+            return new NicknameCheckResult(false, "Nickname cannot be empty");
+        }
+
+        // Length check
+        if (nickname.length() < 3) {
+            return new NicknameCheckResult(false, "Nickname must be at least 3 characters");
+        }
+        if (nickname.length() > 20) {
+            return new NicknameCheckResult(false, "Nickname cannot exceed 20 characters");
+        }
+
+        // Character validation (alphanumeric + underscore only)
+        if (!nickname.matches("^[a-zA-Z0-9_]+$")) {
+            return new NicknameCheckResult(false, "Nickname can only contain letters, numbers, and underscores");
+        }
+
+        // Profanity check
+        String lowerNickname = nickname.toLowerCase();
+        for (String blocked : BLOCKED_WORDS) {
+            if (lowerNickname.contains(blocked)) {
+                return new NicknameCheckResult(false, "Nickname contains inappropriate content");
+            }
+        }
+
+        // Availability check
+        boolean isTaken;
+        if (currentUserId != null) {
+            // User is updating their nickname - exclude their current one
+            isTaken = userRepository.existsByNicknameAndIdNot(nickname, currentUserId);
+        } else {
+            isTaken = userRepository.existsByNickname(nickname);
+        }
+
+        if (isTaken) {
+            return new NicknameCheckResult(false, "Nickname is already taken");
+        }
+
+        return new NicknameCheckResult(true, "Nickname is available");
+    }
+
+    /**
+     * Check if a pet name is valid (no profanity)
+     */
+    public PetNameCheckResult checkPetName(String petName) {
+        // Null is okay (optional field)
+        if (petName == null || petName.isBlank()) {
+            return new PetNameCheckResult(true, "");
+        }
+
+        // Length check
+        if (petName.length() > 50) {
+            return new PetNameCheckResult(false, "Pet name cannot exceed 50 characters");
+        }
+
+        // Profanity check
+        String lowerPetName = petName.toLowerCase();
+        for (String blocked : BLOCKED_WORDS) {
+            if (lowerPetName.contains(blocked)) {
+                return new PetNameCheckResult(false, "Pet name contains inappropriate content");
+            }
+        }
+
+        return new PetNameCheckResult(true, "Pet name is valid");
+    }
+
+    /**
+     * Complete the onboarding process for a user
+     */
+    @Transactional
+    public User completeOnboarding(Long userId, String nickname, String petName) {
+        User user = getUserById(userId);
+
+        // Validate nickname if provided
+        if (nickname != null && !nickname.isBlank()) {
+            NicknameCheckResult nicknameCheck = checkNicknameAvailability(nickname, userId);
+            if (!nicknameCheck.isAvailable()) {
+                throw new IllegalArgumentException(nicknameCheck.getMessage());
+            }
+            user.setNickname(nickname);
+        }
+
+        // Validate pet name if provided
+        if (petName != null && !petName.isBlank()) {
+            PetNameCheckResult petNameCheck = checkPetName(petName);
+            if (!petNameCheck.isValid()) {
+                throw new IllegalArgumentException(petNameCheck.getMessage());
+            }
+            user.setPetName(petName);
+        }
+
+        user.setOnboardingCompleted(true);
+        user.setUpdatedAt(LocalDateTime.now());
+
+        return userRepository.save(user);
+    }
+
+    /**
+     * Update user's nickname
+     */
+    @Transactional
+    public User updateNickname(Long userId, String nickname) {
+        User user = getUserById(userId);
+
+        NicknameCheckResult check = checkNicknameAvailability(nickname, userId);
+        if (!check.isAvailable()) {
+            throw new IllegalArgumentException(check.getMessage());
+        }
+
+        user.setNickname(nickname);
+        user.setUpdatedAt(LocalDateTime.now());
+
+        return userRepository.save(user);
+    }
+
+    /**
+     * Update user's pet name
+     */
+    @Transactional
+    public User updatePetName(Long userId, String petName) {
+        User user = getUserById(userId);
+
+        PetNameCheckResult check = checkPetName(petName);
+        if (!check.isValid()) {
+            throw new IllegalArgumentException(check.getMessage());
+        }
+
+        user.setPetName(petName);
+        user.setUpdatedAt(LocalDateTime.now());
+
+        return userRepository.save(user);
+    }
+
+// ==================== RESULT CLASSES ====================
+
+    public record NicknameCheckResult(boolean available, String message) {
+        public boolean isAvailable() {
+            return available;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+    }
+
+    public record PetNameCheckResult(boolean valid, String message) {
+        public boolean isValid() {
+            return valid;
+        }
+
+        public String getMessage() {
+            return message;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════

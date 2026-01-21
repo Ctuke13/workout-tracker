@@ -1,6 +1,7 @@
 package com.chidituke.workout_tracker.dto.request.performance;
 
 import com.chidituke.workout_tracker.controller.workout.ScheduledWorkoutController;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -46,4 +47,7 @@ public class WorkoutCompletionRequest {
     // Optional cardio data
     private Double distanceKm;
     private Integer caloriesBurned;
+
+    @Min(value = 1, message = "Must complete at least 1 exercise")
+    private Integer exerciseCount = 1;
 }

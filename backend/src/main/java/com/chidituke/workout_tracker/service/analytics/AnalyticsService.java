@@ -616,6 +616,7 @@ public class AnalyticsService {
 
     /**
      * Extract personal records from sessions
+     * Supports: MAX_WEIGHT, MAX_VOLUME, MAX_HOLD, MAX_DISTANCE, BEST_TIME
      */
     private List<Map<String, Object>> extractPersonalRecords(List<WorkoutSession> sessions) {
         // Group performance records by exercise
@@ -634,7 +635,7 @@ public class AnalyticsService {
         for (Map.Entry<Long, List<PerformanceRecord>> entry : recordsByExercise.entrySet()) {
             List<PerformanceRecord> records = entry.getValue();
 
-            // Find max weight PR
+            // 1. Find max weight PR
             records.stream()
                     .filter(r -> r.getWeight() != null && r.getWeight() > 0)
                     .max(Comparator.comparing(PerformanceRecord::getWeight))
@@ -650,7 +651,7 @@ public class AnalyticsService {
                         prs.add(pr);
                     });
 
-            // Find max volume PR (weight × reps)
+            // 2. Find max volume PR (weight × reps)
             records.stream()
                     .filter(r -> r.getWeight() != null && r.getReps() != null)
                     .max(Comparator.comparing(r -> r.getWeight() * r.getReps()))
@@ -665,6 +666,51 @@ public class AnalyticsService {
                         pr.put("reps", maxVolumeRecord.getReps());
                         pr.put("date", maxVolumeRecord.getWorkoutSession().getDate());
                         pr.put("unit", "lbs");
+                        prs.add(pr);
+                    });
+
+            // ✅ 3. Find max hold PR (for isometric exercises)
+            records.stream()
+                    .filter(r -> r.getHoldDurationSeconds() != null && r.getHoldDurationSeconds() > 0)
+                    .max(Comparator.comparing(PerformanceRecord::getHoldDurationSeconds))
+                    .ifPresent(maxHoldRecord -> {
+                        Map<String, Object> pr = new HashMap<>();
+                        pr.put("type", "MAX_HOLD");
+                        pr.put("exerciseName", maxHoldRecord.getExercise().getExerciseName());
+                        pr.put("exerciseId", maxHoldRecord.getExercise().getId());
+                        pr.put("value", maxHoldRecord.getHoldDurationSeconds());
+                        pr.put("date", maxHoldRecord.getWorkoutSession().getDate());
+                        pr.put("unit", "seconds");
+                        prs.add(pr);
+                    });
+
+            // ✅ 4. Find max distance PR (for cardio)
+            records.stream()
+                    .filter(r -> r.getDistanceKm() != null && r.getDistanceKm() > 0)
+                    .max(Comparator.comparing(PerformanceRecord::getDistanceKm))
+                    .ifPresent(maxDistanceRecord -> {
+                        Map<String, Object> pr = new HashMap<>();
+                        pr.put("type", "MAX_DISTANCE");
+                        pr.put("exerciseName", maxDistanceRecord.getExercise().getExerciseName());
+                        pr.put("exerciseId", maxDistanceRecord.getExercise().getId());
+                        pr.put("value", maxDistanceRecord.getDistanceKm());
+                        pr.put("date", maxDistanceRecord.getWorkoutSession().getDate());
+                        pr.put("unit", "km");
+                        prs.add(pr);
+                    });
+
+            // ✅ 5. Find best time PR (fastest duration for timed exercises)
+            records.stream()
+                    .filter(r -> r.getDurationSeconds() != null && r.getDurationSeconds() > 0)
+                    .min(Comparator.comparing(PerformanceRecord::getDurationSeconds)) // MIN for fastest time
+                    .ifPresent(bestTimeRecord -> {
+                        Map<String, Object> pr = new HashMap<>();
+                        pr.put("type", "BEST_TIME");
+                        pr.put("exerciseName", bestTimeRecord.getExercise().getExerciseName());
+                        pr.put("exerciseId", bestTimeRecord.getExercise().getId());
+                        pr.put("value", bestTimeRecord.getDurationSeconds());
+                        pr.put("date", bestTimeRecord.getWorkoutSession().getDate());
+                        pr.put("unit", "time");
                         prs.add(pr);
                     });
         }

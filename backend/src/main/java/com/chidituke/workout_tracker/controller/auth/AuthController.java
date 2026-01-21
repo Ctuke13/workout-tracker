@@ -70,7 +70,10 @@ public class AuthController {
                 user.getLastName(),
                 user.getUserType(),
                 user.getProfessionalProfile() != null,
-                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE // ✅ Added subscription tier
+                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
+                user.getNickname(),      // NEW
+                user.getPetName(),       // NEW
+                user.getOnboardingCompleted()  // NEW
         );
 
         return ResponseEntity.ok(jwtResponse);
@@ -122,7 +125,10 @@ public class AuthController {
                 user.getLastName(),
                 user.getUserType(),
                 user.getProfessionalProfile() != null,
-                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE // ✅ Added subscription tier
+                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
+                user.getNickname(),
+                user.getPetName(),
+                user.getOnboardingCompleted()
         );
 
         return ResponseEntity.ok(jwtResponse);

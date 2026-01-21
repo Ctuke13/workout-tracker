@@ -183,19 +183,24 @@ const WorkoutModePage: React.FC = () => {
     };
 
     const handleCompleteWorkout = async () => {
-        // Show confetti
         workoutMode.setShowConfetti(true);
         setShowSetCompletionDialog(false);
 
         try {
-            // Complete workout and get the data back
-            const workoutData = await workoutMode.completeWorkout(workoutMode.workoutDuration);
-            console.log(`⏱️ Passing timer duration to workout completion: ${workoutMode.workoutDuration} seconds`);
+            const workoutData = await workoutMode.completeWorkout();
 
             if (workoutData) {
                 console.log('✅ Completed workout:', workoutData);
 
-                // Calculate workout statistics
+                // 🆕 USE workoutMode.workoutDuration (it's already being tracked!)
+                const durationMinutes = Math.round(workoutMode.workoutDuration / 60) || 30;
+
+                console.log('⏱️ Workout duration:', {
+                    durationSeconds: workoutMode.workoutDuration,
+                    durationMinutes: durationMinutes
+                });
+
+                // Calculate statistics
                 const totalSets = workoutData.exercises?.reduce((sum, ex) =>
                     sum + (ex.sets?.length || 0), 0
                 ) || 0;
@@ -222,49 +227,128 @@ const WorkoutModePage: React.FC = () => {
                     workoutData.exercises?.map(ex => ex.scheduledExercise?.exercise?.exerciseId)
                 ).size;
 
-                const totalDuration = Math.max(1, Math.ceil(workoutMode.workoutDuration / 60));
-                console.log(`⏱️ Actual workout duration: ${totalDuration} minutes (${workoutMode.workoutDuration} seconds)`);
+                const exerciseCount = workoutData.exercises?.length || 1;
 
+                // Determine workout type
                 const hasCardio = workoutData.exercises?.some(ex =>
                     ex.scheduledExercise?.exercise?.isCardio
                 );
                 const hasIsometric = workoutData.exercises?.some(ex =>
                     ex.scheduledExercise?.exercise?.isIsometric
                 );
-                const workoutType = hasCardio ? 'CARDIO' :
-                    hasIsometric ? 'ISOMETRIC' : 'STRENGTH';
 
-                // Submit to progression system
+                const workoutType: 'CARDIO' | 'ISOMETRIC' | 'STRENGTH' = hasCardio
+                    ? 'CARDIO'
+                    : hasIsometric
+                        ? 'ISOMETRIC'
+                        : 'STRENGTH';
+
+                console.log('📊 Workout stats:', {
+                    duration: durationMinutes,
+                    sets: totalSets,
+                    volume: totalVolume,
+                    exerciseCount,
+                    workoutType
+                });
+
+                // Submit to progression API
                 const progressResponse = await progressApi.completeWorkout({
-                    durationMinutes: totalDuration,
+                    durationMinutes,
                     setsCompleted: totalSets,
                     volumeLifted: totalVolume,
                     distanceKm: totalDistance > 0 ? totalDistance : undefined,
                     holdSeconds: totalHoldTime > 0 ? totalHoldTime : undefined,
                     uniqueExercisesCount: uniqueExercises,
-                    workoutType: workoutType
+                    workoutType,
+                    exerciseCount
                 });
 
                 console.log('🎉 Progression response:', progressResponse);
 
-                // 🆕 Store celebration data in sessionStorage for CalendarPage
-                sessionStorage.setItem('celebrationData', JSON.stringify(progressResponse));
-                sessionStorage.setItem('workoutJustCompleted', 'true');
-                sessionStorage.setItem('completedWorkoutDate', workoutData.date);
+                // Show XP gained
+                if (progressResponse.xpGained > 0) {
+                    toast.success(
+                        `+${progressResponse.xpGained} XP earned! ⚡`,
+                        {duration: 3000}
+                    );
+                }
 
-                // Simple success toast
-                toast.success('💪 Workout saved!', {duration: 2000});
+                // Show rank up
+                if (progressResponse.rankedUp) {
+                    setTimeout(() => {
+                        toast.success(
+                            `🏆 Rank Up! You're now ${progressResponse.seasonalRank}!`,
+                            {duration: 5000, icon: '👑'}
+                        );
+                    }, 1000);
+                }
+
+                // Show streak milestone
+                if (progressResponse.streakMilestone) {
+                    setTimeout(() => {
+                        toast.success(
+                            `🔥 ${progressResponse.currentStreak} day streak! Keep it going!`,
+                            {duration: 4000}
+                        );
+                    }, 2000);
+                }
+
+                // Show achievements
+                if (progressResponse.achievementsUnlocked && progressResponse.achievementsUnlocked.length > 0) {
+                    progressResponse.achievementsUnlocked.forEach((achievement, index) => {
+                        setTimeout(() => {
+                            toast.success(
+                                `🏅 ${achievement.icon} ${achievement.name} (+${achievement.bonusXp} XP)`,
+                                {duration: 6000}
+                            );
+                        }, 3000 + (index * 1500));
+                    });
+                }
+
+                // Show pet update
+                if (progressResponse.petUpdate) {
+                    const petUpdate = progressResponse.petUpdate;
+
+                    setTimeout(() => {
+                        toast.success(
+                            `🐺 +${petUpdate.crystalsEarned} crystals! Pet fatigue: ${petUpdate.newFatigue}%`,
+                            {duration: 4000}
+                        );
+                    }, 2500);
+
+                    if (petUpdate.isSleeping) {
+                        setTimeout(() => {
+                            toast.error(
+                                '💤 Your pet is exhausted and needs 24 hours of rest!',
+                                {duration: 5000}
+                            );
+                        }, 3500);
+                    }
+
+                    if (petUpdate.wastedCrystals > 0) {
+                        setTimeout(() => {
+                            toast(
+                                `⚠️ ${petUpdate.wastedCrystals} crystals wasted (cap reached)`,
+                                {duration: 3000, icon: '⚠️'}
+                            );
+                        }, 4000);
+                    }
+                }
+
+                // Final success
+                setTimeout(() => {
+                    toast.success('💪 Workout complete! Great job!', {duration: 3000});
+                }, 4500);
             }
 
         } catch (error) {
-            console.error('❌ Error completing workout:', error);
+            console.error('Error completing workout:', error);
             toast.error('Error saving workout. Please try again.');
         }
 
-        // Navigate to calendar after brief delay
         setTimeout(() => {
             navigate('/calendar');
-        }, 1500);
+        }, 6000);
     };
 
     // Workout control handlers

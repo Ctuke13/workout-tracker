@@ -1,5 +1,5 @@
 // src/components/layout/TopNavigation.tsx - With Gamification Widget
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {useAuth} from '../../contexts/AuthContext';
 import {useNavigate, useLocation} from 'react-router-dom';
 import {
@@ -10,13 +10,53 @@ import {
     ArrowRightOnRectangleIcon,
     ChevronDownIcon
 } from '@heroicons/react/24/outline';
-import {MiniProgressWidget} from '../gamification/MiniProgressWidget'; // 🆕 NEW IMPORT
+import {MiniProgressWidget} from '../gamification/MiniProgressWidget';
 
-const TopNavigation: React.FC = () => {
+interface TopNavigationProps {
+    scrollContainerRef?: React.RefObject<HTMLElement | null>;
+}
+
+
+const useScrollDirection = (scrollContainerRef?: React.RefObject<HTMLElement | null>) => {
+    const [isVisible, setIsVisible] = useState(true);
+    const [lastScrollY, setLastScrollY] = useState(0);
+
+    useEffect(() => {
+        const scrollElement = scrollContainerRef?.current || window;
+
+        const handleScroll = () => {
+            const currentScrollY = scrollContainerRef?.current
+                ? scrollContainerRef.current.scrollTop
+                : window.scrollY;
+
+            const scrollThreshold = 30;
+
+            if (Math.abs(currentScrollY - lastScrollY) < scrollThreshold) {
+                return;
+            }
+
+            if (currentScrollY > lastScrollY && currentScrollY > 80) {
+                setIsVisible(false);
+            } else {
+                setIsVisible(true);
+            }
+
+            setLastScrollY(currentScrollY);
+        };
+
+        scrollElement.addEventListener('scroll', handleScroll, {passive: true});
+        return () => scrollElement.removeEventListener('scroll', handleScroll);
+    }, [lastScrollY, scrollContainerRef]);
+
+    return isVisible;
+};
+
+const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
     const {user, logout} = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const isWidgetVisible = useScrollDirection(scrollContainerRef);
 
     // Hide top nav on auth pages
     const hideOnPages = ['/login', '/register', '/'];
@@ -229,9 +269,14 @@ const TopNavigation: React.FC = () => {
                 </div>
             </div>
 
-            {/* 🆕 MOBILE/TABLET: Progress Widget Row (shown below header on smaller screens) */}
+            {/* 🆕 MOBILE/TABLET: Progress Widget Row with SCROLL HIDE - Using max-height */}
             <div
-                className="lg:hidden border-t border-gray-100 bg-gradient-to-r from-blue-50/50 via-purple-50/30 to-pink-50/50">
+                className={`lg:hidden border-t border-gray-100 bg-gradient-to-r from-blue-50/50 via-purple-50/30 to-pink-50/50 overflow-hidden transition-all duration-300 ease-in-out ${
+                    isWidgetVisible
+                        ? 'max-h-20 opacity-100'
+                        : 'max-h-0 opacity-0'
+                }`}
+            >
                 <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5">
                     <div className="flex justify-center">
                         <MiniProgressWidget/>

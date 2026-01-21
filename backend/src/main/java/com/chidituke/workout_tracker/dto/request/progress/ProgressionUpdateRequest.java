@@ -65,4 +65,10 @@ public class ProgressionUpdateRequest {
      */
     @NotNull(message = "Workout type is required")
     private String workoutType;
+
+    /**
+     * Number of exercises completed in workout (for pet crystal rewards)
+     */
+    @Builder.Default
+    private Integer exerciseCount = 0;
 }

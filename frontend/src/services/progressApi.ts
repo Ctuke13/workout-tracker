@@ -11,13 +11,14 @@ export interface WorkoutCompletionRequest {
     holdSeconds?: number;
     uniqueExercisesCount: number;
     workoutType: 'STRENGTH' | 'CARDIO' | 'ISOMETRIC';
+    exerciseCount?: number;  // 🆕 ADD THIS
 }
 
 class ProgressApi {
 
     /**
      * Submit workout completion to progression system
-     * Awards XP, checks achievements, updates streaks
+     * Awards XP, checks achievements, updates streaks, updates pet stats
      */
     async completeWorkout(data: WorkoutCompletionRequest): Promise<WorkoutCompletionResponse> {
         return apiClient.post<WorkoutCompletionResponse>('/api/progress/workout-completion', data);

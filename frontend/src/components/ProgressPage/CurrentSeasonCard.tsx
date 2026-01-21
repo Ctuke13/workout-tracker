@@ -249,7 +249,11 @@ const getXpForNextRank = (currentRank: string, currentTier: number, currentXp: n
     return {nextXp, xpNeeded, progress: Math.min(100, Math.max(0, progress))};
 };
 
-export const CurrentSeasonCard: React.FC = () => {
+interface CurrentSeasonCardProps {
+    onViewHistory?: () => void;
+}
+
+export const CurrentSeasonCard: React.FC<CurrentSeasonCardProps> = ({onViewHistory}) => {
     const {season, theme, loading: seasonLoading} = useSeason();
     const [seasonStats, setSeasonStats] = useState<SeasonStats | null>(null);
     const [loading, setLoading] = useState(true);
@@ -483,6 +487,7 @@ export const CurrentSeasonCard: React.FC = () => {
                 </div>
 
                 <button
+                    onClick={onViewHistory}
                     className={`w-full py-3 px-4 bg-gradient-to-r ${theme.buttonGradient} rounded-lg font-bold text-white text-sm sm:text-base transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl`}>
                     📜 View Season History
                 </button>

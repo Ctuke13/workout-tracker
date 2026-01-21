@@ -3,6 +3,7 @@ import {Trophy, Lock, TrendingUp, Sparkles} from 'lucide-react';
 import {progressApi} from '../../services/progressApi';
 import {Achievement, UnlockedAchievement} from '../../types/gamification';
 import {useSeason} from '../../contexts/SeasonContext';
+import {useNavigate} from 'react-router-dom';
 
 interface AchievementProgress {
     achievement: Achievement;
@@ -81,6 +82,7 @@ const getAchievementEmoji = (category: string) => {
 
 export const AchievementGalleryPreview: React.FC = () => {
     const {theme} = useSeason();
+    const navigate = useNavigate();
     const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievement[]>([]);
     const [totalAchievements, setTotalAchievements] = useState<number>(0);
     const [nextAchievement, setNextAchievement] = useState<AchievementProgress | null>(null);
@@ -212,6 +214,7 @@ export const AchievementGalleryPreview: React.FC = () => {
                         </div>
                     </div>
                     <button
+                        onClick={() => navigate('/progress/achievements')}
                         className={`px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r ${theme.buttonGradient} text-white text-xs sm:text-sm font-bold rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg`}>
                         View All →
                     </button>

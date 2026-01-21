@@ -150,7 +150,11 @@ const formatRank = (rank: string, tier: number): string => {
     return `${rank} ${tierRoman}`;
 };
 
-export const LeaderboardPreview: React.FC = () => {
+interface LeaderboardPreviewProps {
+    onViewFull?: () => void;
+}
+
+export const LeaderboardPreview: React.FC<LeaderboardPreviewProps> = ({onViewFull}) => {
     const {theme, loading: seasonLoading} = useSeason();
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [currentUser, setCurrentUser] = useState<UserProgression | null>(null);
@@ -243,6 +247,7 @@ export const LeaderboardPreview: React.FC = () => {
                         </div>
                     </div>
                     <button
+                        onClick={onViewFull}
                         className={`px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r ${theme.buttonGradient} text-white text-xs sm:text-sm font-bold rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg`}>
                         View All →
                     </button>

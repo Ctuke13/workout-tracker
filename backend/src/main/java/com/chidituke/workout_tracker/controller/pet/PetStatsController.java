@@ -7,6 +7,9 @@ import com.chidituke.workout_tracker.model.pet.PetStats;
 import com.chidituke.workout_tracker.security.CurrentUser;
 import com.chidituke.workout_tracker.security.UserPrincipal;
 import com.chidituke.workout_tracker.service.pet.PetStatsService;
+import com.chidituke.workout_tracker.dto.request.pet.PetNameRequest;
+import com.chidituke.workout_tracker.dto.response.pet.EvolutionRequirementsResponse;
+import com.chidituke.workout_tracker.dto.response.pet.EvolutionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -159,6 +162,44 @@ public class PetStatsController {
     }
 
     // ============================================
+    // SLEEP/WAKE ENDPOINTS
+    // ============================================
+
+    @PostMapping("/sleep")
+    @Operation(summary = "Put pet to sleep",
+            description = "Put the pet to sleep. Pet will rest until explicitly woken. Different from forced sleep at 100% fatigue.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Pet put to sleep successfully"),
+            @ApiResponse(responseCode = "400", description = "Pet is already sleeping or neglected"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
+    public ResponseEntity<?> sleep(@CurrentUser UserPrincipal userPrincipal) {
+        try {
+            PetStats petStats = petStatsService.sleep(userPrincipal.getId());
+            return ResponseEntity.ok(petStatsMapper.toResponse(petStats));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/wake")
+    @Operation(summary = "Wake pet up",
+            description = "Wake the pet from sleep. Reduces fatigue based on time slept (5 points per hour).")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Pet woken successfully"),
+            @ApiResponse(responseCode = "400", description = "Pet is not sleeping"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
+    public ResponseEntity<?> wake(@CurrentUser UserPrincipal userPrincipal) {
+        try {
+            PetStats petStats = petStatsService.wake(userPrincipal.getId());
+            return ResponseEntity.ok(petStatsMapper.toResponse(petStats));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ============================================
     // HOME SELECTION ENDPOINTS
     // ============================================
 
@@ -190,6 +231,79 @@ public class PetStatsController {
     public ResponseEntity<HomeInfoResponse> getHomeInfo(@CurrentUser UserPrincipal userPrincipal) {
         HomeInfoResponse response = petStatsService.getHomeInfo(userPrincipal.getId());
         return ResponseEntity.ok(response);
+    }
+
+    // ============================================
+    // PROFILE ENDPOINT (Alias for /stats with same data)
+    // ============================================
+
+    @GetMapping("/profile")
+    @Operation(summary = "Get pet profile",
+            description = "Retrieves complete pet profile including name, level, XP, evolution stage, and all stats. Alias for /stats endpoint.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Pet profile retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
+    public ResponseEntity<PetStatsResponse> getPetProfile(@CurrentUser UserPrincipal userPrincipal) {
+        PetStats petStats = petStatsService.getPetStats(userPrincipal.getId());
+        return ResponseEntity.ok(petStatsMapper.toResponse(petStats));
+    }
+
+    // ============================================
+    // EVOLUTION ENDPOINTS
+    // ============================================
+
+    @GetMapping("/evolution/requirements")
+    @Operation(summary = "Get evolution requirements",
+            description = "Shows current evolution stage, next stage, and level requirements for evolution")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Evolution requirements retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
+    public ResponseEntity<EvolutionRequirementsResponse> getEvolutionRequirements(
+            @CurrentUser UserPrincipal userPrincipal) {
+        EvolutionRequirementsResponse response = petStatsService.getEvolutionRequirements(
+                userPrincipal.getId()
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/evolve")
+    @Operation(summary = "Evolve pet to next stage",
+            description = "Triggers pet evolution if level requirements are met. Evolution stages: BABY (1-10) → KID (11-25) → TEEN (26-50) → ADULT (51-75) → CHAMPION (76-99) → LEGENDARY (100+)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Evolution attempt completed (check 'success' field in response)"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
+    public ResponseEntity<EvolutionResponse> evolvePet(@CurrentUser UserPrincipal userPrincipal) {
+        EvolutionResponse response = petStatsService.evolvePet(userPrincipal.getId());
+        return ResponseEntity.ok(response);
+    }
+
+    // ============================================
+    // NAMING ENDPOINT
+    // ============================================
+
+    @PostMapping("/name")
+    @Operation(summary = "Update pet name",
+            description = "Sets or updates the pet's name. Names must be 1-20 characters and pass profanity filter.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Pet name updated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid name (profanity, too long, etc.)"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated")
+    })
+    public ResponseEntity<?> updatePetName(
+            @CurrentUser UserPrincipal userPrincipal,
+            @Valid @RequestBody PetNameRequest request) {
+        try {
+            PetStats petStats = petStatsService.updatePetName(
+                    userPrincipal.getId(),
+                    request.getPetName()
+            );
+            return ResponseEntity.ok(petStatsMapper.toResponse(petStats));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     // ============================================

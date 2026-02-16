@@ -1,12 +1,16 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, {createContext, useContext, useReducer, useEffect, ReactNode} from 'react';
+import {useNavigate, useLocation} from 'react-router-dom';
 import {
     AuthState,
     AuthContextType,
     LoginRequest,
     RegisterRequest,
     JwtResponse,
-    UserSummary
+    UserSummary,
+    NicknameCheckResponse,
+    PetNameCheckResponse,
+    CompleteOnboardingRequest,
+    OnboardingStatusResponse,
 } from '../types/auth';
 import authService from '../services/authService';
 
@@ -21,15 +25,16 @@ type AuthAction =
     | { type: 'REGISTER_FAILURE'; payload: string }
     | { type: 'LOGOUT' }
     | { type: 'REFRESH_TOKEN_SUCCESS'; payload: JwtResponse }
+    | { type: 'ONBOARDING_COMPLETE'; payload: JwtResponse }
     | { type: 'CLEAR_ERROR' }
     | { type: 'SET_LOADING'; payload: boolean }
-    | { type: 'INIT_COMPLETE' }; // NEW: Separate action for initialization completion
+    | { type: 'INIT_COMPLETE' };
 
 const initialState: AuthState = {
     isAuthenticated: false,
     user: null,
     token: null,
-    loading: true, // Start with loading true for initialization
+    loading: true,
     error: null,
 };
 
@@ -46,6 +51,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         case 'LOGIN_SUCCESS':
         case 'REGISTER_SUCCESS':
         case 'REFRESH_TOKEN_SUCCESS':
+        case 'ONBOARDING_COMPLETE':
             return {
                 ...state,
                 isAuthenticated: true,
@@ -69,7 +75,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         case 'LOGOUT':
             return {
                 ...initialState,
-                loading: false, // Don't show loading after logout
+                loading: false,
             };
 
         case 'CLEAR_ERROR':
@@ -84,7 +90,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
                 loading: action.payload,
             };
 
-        case 'INIT_COMPLETE': // NEW: Always finish initialization
+        case 'INIT_COMPLETE':
             return {
                 ...state,
                 loading: false,
@@ -95,6 +101,17 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
     }
 }
 
+// ==================== ONBOARDING ROUTES ====================
+
+const ONBOARDING_ROUTES = [
+    '/onboarding',
+    '/onboarding/nickname',
+    '/onboarding/meet-pet',
+    '/onboarding/name-pet',
+];
+
+const PUBLIC_ROUTES = ['/', '/login', '/register'];
+
 // ==================== AUTH CONTEXT ====================
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -103,54 +120,65 @@ interface AuthProviderProps {
     children: ReactNode;
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({children}: AuthProviderProps) {
     const [state, dispatch] = useReducer(authReducer, initialState);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // ==================== COMPUTED VALUES ====================
+
+    const needsOnboarding = state.isAuthenticated && state.user?.onboardingCompleted === false;
 
     // ==================== AUTHENTICATION METHODS ====================
 
     const login = async (credentials: LoginRequest): Promise<void> => {
-        dispatch({ type: 'LOGIN_START' });
+        dispatch({type: 'LOGIN_START'});
         try {
             const response = await authService.login(credentials);
-            dispatch({ type: 'LOGIN_SUCCESS', payload: response });
+            dispatch({type: 'LOGIN_SUCCESS', payload: response});
 
-            navigate('/welcome');
-            console.log('✅ Login successful, redirecting to dashboard')
+            // Redirect based on onboarding status
+            if (!response.onboardingCompleted) {
+                console.log('🐺 User needs onboarding, redirecting...');
+                navigate('/onboarding/nickname');
+            } else {
+                console.log('✅ Login successful, redirecting to home');
+                navigate('/welcome');
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Login failed';
-            dispatch({ type: 'LOGIN_FAILURE', payload: message });
+            dispatch({type: 'LOGIN_FAILURE', payload: message});
             throw error;
         }
     };
 
     const register = async (userData: RegisterRequest): Promise<void> => {
-        dispatch({ type: 'REGISTER_START' });
+        dispatch({type: 'REGISTER_START'});
         try {
             const response = await authService.register(userData);
-            dispatch({ type: 'REGISTER_SUCCESS', payload: response });
+            dispatch({type: 'REGISTER_SUCCESS', payload: response});
 
-            navigate('/welcome', { state: { fromRegistration: true } });
-            console.log('✅ Registration successful, redirecting to dashboard');
+            // New users always go to onboarding
+            console.log('🐺 New registration, starting onboarding...');
+            navigate('/onboarding/nickname');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Registration failed';
-            dispatch({ type: 'REGISTER_FAILURE', payload: message });
+            dispatch({type: 'REGISTER_FAILURE', payload: message});
             throw error;
         }
     };
 
     const logout = (): void => {
         authService.logout();
-        dispatch({ type: 'LOGOUT' });
-
+        dispatch({type: 'LOGOUT'});
         navigate('/');
-        console.log('✅ Logout successful, redirecting to home');
+        console.log('✅ Logout successful');
     };
 
     const refreshToken = async (): Promise<void> => {
         try {
             const response = await authService.refreshToken();
-            dispatch({ type: 'REFRESH_TOKEN_SUCCESS', payload: response });
+            dispatch({type: 'REFRESH_TOKEN_SUCCESS', payload: response});
         } catch (error) {
             logout();
             throw error;
@@ -158,7 +186,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const checkAvailability = async (type: 'email' | 'username', value: string): Promise<boolean> => {
-        // IMPORTANT: Don't affect main loading state for availability checks
         try {
             if (type === 'email') {
                 return await authService.checkEmailAvailability(value);
@@ -167,8 +194,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
         } catch (error) {
             console.error(`Availability check failed for ${type}:`, error);
-            return false; // Assume available on error to not block user
+            return false;
         }
+    };
+
+    // ==================== ONBOARDING METHODS ====================
+
+    const checkNicknameAvailability = async (nickname: string): Promise<NicknameCheckResponse> => {
+        return authService.checkNicknameAvailability(nickname);
+    };
+
+    const checkPetNameValidity = async (petName: string): Promise<PetNameCheckResponse> => {
+        return authService.checkPetNameValidity(petName);
+    };
+
+    const completeOnboarding = async (data: CompleteOnboardingRequest): Promise<void> => {
+        try {
+            const response = await authService.completeOnboarding(data);
+            dispatch({type: 'ONBOARDING_COMPLETE', payload: response});
+
+            console.log('🎉 Onboarding complete! Welcome to EvoPet!');
+            navigate('/welcome');
+        } catch (error) {
+            console.error('Onboarding failed:', error);
+            throw error;
+        }
+    };
+
+    const getOnboardingStatus = async (): Promise<OnboardingStatusResponse> => {
+        return authService.getOnboardingStatus();
     };
 
     const getCurrentUser = async (): Promise<UserSummary> => {
@@ -176,7 +230,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const clearError = (): void => {
-        dispatch({ type: 'CLEAR_ERROR' });
+        dispatch({type: 'CLEAR_ERROR'});
     };
 
     // ==================== INITIALIZATION ====================
@@ -191,20 +245,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
                 if (!token) {
                     console.log('❌ No token found, user not authenticated');
-                    return; // Will hit finally block
+                    return;
                 }
 
                 if (authService.isTokenExpired(token)) {
                     console.log('⏰ Token expired, removing...');
                     authService.removeToken();
-                    return; // Will hit finally block
+                    return;
                 }
 
                 console.log('✅ Valid token found, getting user data...');
 
-                // Try to get current user to validate token
                 const user = await authService.getCurrentUser();
                 console.log('👤 User data retrieved:', user.username);
+                console.log('🐺 Onboarding completed:', user.onboardingCompleted);
 
                 // Create JwtResponse object from stored token and user data
                 const jwtResponse: JwtResponse = {
@@ -217,24 +271,68 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     lastName: user.lastName,
                     userType: user.userType,
                     isProfessional: user.isProfessional,
-                    subscriptionTier: user.subscriptionTier || 'FREE'
+                    subscriptionTier: user.subscriptionTier || 'FREE',
+                    // Onboarding fields
+                    nickname: user.nickname,
+                    petName: user.petName,
+                    onboardingCompleted: user.onboardingCompleted,
                 };
 
-                dispatch({ type: 'LOGIN_SUCCESS', payload: jwtResponse });
+                dispatch({type: 'LOGIN_SUCCESS', payload: jwtResponse});
                 console.log('✅ Auth initialization successful');
             } catch (error) {
                 console.error('❌ Auth initialization failed:', error);
                 authService.removeToken();
-                // Don't dispatch failure here - just let initialization complete
             } finally {
-                // CRITICAL: Always finish initialization regardless of outcome
-                dispatch({ type: 'INIT_COMPLETE' });
+                dispatch({type: 'INIT_COMPLETE'});
                 console.log('🏁 Auth initialization complete');
             }
         };
 
         initializeAuth();
     }, []);
+
+    // ==================== ONBOARDING ROUTE PROTECTION ====================
+
+    useEffect(() => {
+        // Don't redirect while loading
+        if (state.loading) return;
+
+        const currentPath = location.pathname;
+        const isPublicRoute = PUBLIC_ROUTES.includes(currentPath);
+        const isOnboardingRoute = ONBOARDING_ROUTES.some(route => currentPath.startsWith(route));
+
+        // Not authenticated - can only access public routes
+        if (!state.isAuthenticated) {
+            if (!isPublicRoute && !isOnboardingRoute) {
+                console.log('🚫 Not authenticated, redirecting to login');
+                navigate('/login');
+            }
+            return;
+        }
+
+        // Authenticated but needs onboarding
+        if (needsOnboarding) {
+            if (!isOnboardingRoute) {
+                console.log('🐺 Needs onboarding, redirecting...');
+                navigate('/onboarding/nickname');
+            }
+            return;
+        }
+
+        // Authenticated and completed onboarding
+        if (state.user?.onboardingCompleted) {
+            // Redirect away from onboarding pages if already complete
+            if (isOnboardingRoute) {
+                console.log('✅ Already onboarded, redirecting to welcome');
+                navigate('/welcome');
+            }
+            // Redirect away from public pages if logged in
+            if (isPublicRoute && currentPath !== '/') {
+                navigate('/welcome');
+            }
+        }
+    }, [state.isAuthenticated, state.loading, state.user?.onboardingCompleted, location.pathname, navigate, needsOnboarding]);
 
     // ==================== TOKEN REFRESH INTERVAL ====================
 
@@ -243,7 +341,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return;
         }
 
-        // Refresh token 5 minutes before expiry
         const refreshInterval = setInterval(async () => {
             try {
                 if (authService.isTokenExpired(state.token!)) {
@@ -267,8 +364,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         logout,
         refreshToken,
         checkAvailability,
+        checkNicknameAvailability,
+        checkPetNameValidity,
+        completeOnboarding,
+        getOnboardingStatus,
         getCurrentUser,
         clearError,
+        needsOnboarding,
     };
 
     return (

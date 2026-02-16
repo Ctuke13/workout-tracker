@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import {NavLink} from 'react-router-dom';
 import {
     HomeIcon,
     ChartBarIcon,
@@ -11,10 +11,10 @@ import {
 const BottomNavigation: React.FC = () => {
     const navItems = [
         {
-            path: '/welcome',
+            path: '/pet',
             icon: HomeIcon,
-            label: 'Home',
-            activeColor: 'text-blue-600'
+            label: 'Pet',
+            activeColor: 'text-amber-600'
         },
         {
             path: '/progress',
@@ -49,7 +49,7 @@ const BottomNavigation: React.FC = () => {
                     <NavLink
                         key={item.path}
                         to={item.path}
-                        className={({ isActive }) =>
+                        className={({isActive}) =>
                             `flex flex-col items-center justify-center space-y-1 transition-colors ${
                                 isActive
                                     ? `${item.activeColor} bg-gray-50`
@@ -57,9 +57,9 @@ const BottomNavigation: React.FC = () => {
                             }`
                         }
                     >
-                        {({ isActive }) => (
+                        {({isActive}) => (
                             <>
-                                <item.icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''} transition-transform`} />
+                                <item.icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''} transition-transform`}/>
                                 <span className="text-xs font-medium">{item.label}</span>
                             </>
                         )}

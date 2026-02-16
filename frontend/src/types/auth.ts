@@ -1,4 +1,4 @@
-import { UserType, Gender, AccountStatus, ActivityLevel } from './enums';
+import {UserType, Gender, AccountStatus, ActivityLevel} from './enums';
 
 // ==================== AUTHENTICATION TYPES ====================
 
@@ -31,6 +31,10 @@ export interface JwtResponse {
     userType: UserType;
     isProfessional: boolean;
     subscriptionTier: 'FREE' | 'PLUS' | 'PRO' | 'PRO_PROFESSIONAL';
+    // ==================== ONBOARDING FIELDS ====================
+    nickname: string | null;
+    petName: string | null;
+    onboardingCompleted: boolean;
 }
 
 export interface ApiResponse {
@@ -50,6 +54,33 @@ export interface UserSummary {
     isProfessional: boolean;
     isVerified: boolean;
     subscriptionTier: 'FREE' | 'PLUS' | 'PRO' | 'PRO_PROFESSIONAL';
+    // ==================== ONBOARDING FIELDS ====================
+    nickname: string | null;
+    petName: string | null;
+    onboardingCompleted: boolean;
+}
+
+// ==================== ONBOARDING TYPES ====================
+
+export interface NicknameCheckResponse {
+    available: boolean;
+    message: string;
+}
+
+export interface PetNameCheckResponse {
+    valid: boolean;
+    message: string;
+}
+
+export interface CompleteOnboardingRequest {
+    nickname?: string;
+    petName?: string;
+}
+
+export interface OnboardingStatusResponse {
+    onboardingCompleted: boolean;
+    nickname: string | null;
+    petName: string | null;
 }
 
 // ==================== AUTH STATE ====================
@@ -68,8 +99,14 @@ export interface AuthContextType extends AuthState {
     logout: () => void;
     refreshToken: () => Promise<void>;
     checkAvailability: (type: 'email' | 'username', value: string) => Promise<boolean>;
+    checkNicknameAvailability: (nickname: string) => Promise<NicknameCheckResponse>;
+    checkPetNameValidity: (petName: string) => Promise<PetNameCheckResponse>;
+    completeOnboarding: (data: CompleteOnboardingRequest) => Promise<void>;
+    getOnboardingStatus: () => Promise<OnboardingStatusResponse>;
     getCurrentUser: () => Promise<UserSummary>;
     clearError: () => void;
+    // Helper for checking if user needs onboarding
+    needsOnboarding: boolean;
 }
 
 // ==================== FORM VALIDATION ====================

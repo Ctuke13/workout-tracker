@@ -4,114 +4,284 @@
 
 /* shadcn/ui CSS variables */
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-  }
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 222.2 84% 4.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222.2 84% 4.9%;
+        --primary: 222.2 47.4% 11.2%;
+        --primary-foreground: 210 40% 98%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222.2 84% 4.9%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --accent: 210 40% 96%;
+        --accent-foreground: 222.2 84% 4.9%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 222.2 84% 4.9%;
+        --radius: 0.5rem;
+    }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
+    .dark {
+        --background: 222.2 84% 4.9%;
+        --foreground: 210 40% 98%;
+        --card: 222.2 84% 4.9%;
+        --card-foreground: 210 40% 98%;
+        --popover: 222.2 84% 4.9%;
+        --popover-foreground: 210 40% 98%;
+        --primary: 210 40% 98%;
+        --primary-foreground: 222.2 47.4% 11.2%;
+        --secondary: 217.2 32.6% 17.5%;
+        --secondary-foreground: 210 40% 98%;
+        --muted: 217.2 32.6% 17.5%;
+        --muted-foreground: 215 20.2% 65.1%;
+        --accent: 217.2 32.6% 17.5%;
+        --accent-foreground: 210 40% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 217.2 32.6% 17.5%;
+        --input: 217.2 32.6% 17.5%;
+        --ring: 212.7 26.8% 83.9%;
+    }
 }
 
 @layer base {
-  /* shadcn/ui base styles */
-  * {
-    @apply border-border;
-  }
+    /* shadcn/ui base styles */
+    * {
+        @apply border-border;
+    }
 
-  /* Your existing body styles (preserved) */
-  body {
-    margin: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-color: #FFFFFF;
-    color: #1E293B;
-    /* Also apply shadcn/ui background and foreground */
-    @apply bg-background text-foreground;
-  }
+    /* Your existing body styles (preserved) */
+    body {
+        margin: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background-color: #FFFFFF;
+        color: #1E293B;
+        /* Also apply shadcn/ui background and foreground */
+        @apply bg-background text-foreground;
+    }
 
-  /* Smooth scrolling for navigation */
-  html {
-    scroll-behavior: smooth;
-  }
+    /* Smooth scrolling for navigation */
+    html {
+        scroll-behavior: smooth;
+    }
 }
 
 /* Your existing keyframes and animations (preserved) */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes growProgress {
-  from { width: 0; }
-  to { width: 100%; }
+    from {
+        width: 0;
+    }
+    to {
+        width: 100%;
+    }
 }
 
 /* Light theme specific animations */
 @keyframes lightCardHover {
-  from {
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  }
-  to {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  }
+    from {
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+    to {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
 }
 
 /* Gradient backgrounds for light theme (preserved) */
 .light-gradient-1 {
-  background: linear-gradient(135deg, #F8F9FA 0%, #F1F5F9 100%);
+    background: linear-gradient(135deg, #F8F9FA 0%, #F1F5F9 100%);
 }
 
 .light-gradient-2 {
-  background: linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%);
+    background: linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%);
 }
 
 .light-gradient-accent {
-  background: linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(0, 255, 148, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(0, 255, 148, 0.05) 100%);
+}
+
+/* Pet Animations - Add this to your global CSS or index.css */
+
+/* Falling particle animation for WINDOW ONLY - uses percentage to stay in container */
+@keyframes windowFall {
+    0% {
+        transform: translateY(-10px) rotate(0deg);
+        opacity: 0;
+    }
+    5% {
+        opacity: 0.8;
+    }
+    95% {
+        opacity: 0.6;
+    }
+    100% {
+        transform: translateY(150px) rotate(180deg);
+        opacity: 0;
+    }
+}
+
+/* Legacy fall animation (not used for window) */
+@keyframes fall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.8;
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(200px) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+.animate-fall {
+    animation: fall linear infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Slide up animation */
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.5s ease-out forwards;
+}
+
+.animate-slide-up-delay {
+    animation: slideUp 0.5s ease-out 0.2s forwards;
+    opacity: 0;
+}
+
+/* Pulse glow effect for stats */
+@keyframes pulseGlow {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(251, 191, 36, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+    }
+}
+
+.animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Bounce animation for action feedback */
+@keyframes bounceIn {
+    0% {
+        transform: translate(-50%, -20px);
+        opacity: 0;
+    }
+    50% {
+        transform: translate(-50%, 5px);
+    }
+    100% {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
+
+.animate-bounce-in {
+    animation: bounceIn 0.3s ease-out forwards;
+}
+
+/* Shake animation for errors */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-5px);
+    }
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+.animate-shake {
+    animation: shake 0.3s ease-in-out;
+}
+
+/* Heart float animation (for happy pet) */
+@keyframes floatHeart {
+    0% {
+        transform: translateY(0) scale(0);
+        opacity: 0;
+    }
+    20% {
+        transform: translateY(-10px) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-50px) scale(0.5);
+        opacity: 0;
+    }
+}
+
+.animate-float-heart {
+    animation: floatHeart 1.5s ease-out forwards;
+}
+
+/* Z float animation (for sleeping pet) */
+@keyframes floatZ {
+    0% {
+        transform: translateY(0) translateX(0) scale(0.5);
+        opacity: 0;
+    }
+    20% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-30px) translateX(20px) scale(1);
+        opacity: 0;
+    }
+}
+
+.animate-float-z {
+    animation: floatZ 2s ease-out infinite;
 }

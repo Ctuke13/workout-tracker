@@ -2,7 +2,8 @@
 -- V018__Add_Pet_Stats_Table.sql
 -- Creates pet_stats table for the virtual pet companion system
 -- Tracks 4 core stats: Fuel, Motivation, Fatigue, and Cleanliness
--- Implements crystal economy, fatigue/sleep system, neglect tracking, and home selection
+-- Implements crystal economy, fatigue/sleep system, neglect tracking, home selection
+-- AND EVOLUTION SYSTEM: XP, Levels, Evolution Stages, Pet Identity
 -- =============================================================================
 
 -- =====================================================
@@ -12,6 +13,40 @@
 CREATE TABLE pet_stats (
                            pet_stats_id BIGSERIAL PRIMARY KEY,
                            user_id BIGINT NOT NULL UNIQUE,
+
+    -- ==========================================
+    -- PET IDENTITY & PROGRESSION
+    -- ==========================================
+
+    -- Pet name: User-chosen name (e.g., "Luna", "Shadow")
+    -- Set during onboarding, can be changed in settings
+                           pet_name VARCHAR(100),
+
+    -- Pet type: Species of pet (WOLF for beta, future: BEAR, FOX, DRAGON)
+    -- Determines available colors and animations
+                           pet_type VARCHAR(50) NOT NULL DEFAULT 'WOLF',
+
+    -- Pet color: Appearance variant (colors vary by pet type)
+    -- Wolf colors: GREY (free), BROWN (premium), BLACK (premium)
+    -- Validated in service layer per pet type
+                           pet_color VARCHAR(50) NOT NULL DEFAULT 'GREY',
+
+    -- XP (Experience Points): Progress toward next level
+    -- Earned from workouts, feeding, bathing, perfect care
+    -- Resets to 0 on level-up, excess XP carries over
+                           xp INTEGER NOT NULL DEFAULT 0,
+
+    -- Level: Current progression level (1-100+)
+    -- Determines evolution stage and unlocks
+                           level INTEGER NOT NULL DEFAULT 1,
+
+    -- Evolution Stage: Visual appearance based on level
+    -- BABY (1-10), KID (11-25), TEEN (26-50), ADULT (51-75), CHAMPION (76-99), LEGENDARY (100+)
+                           evolution_stage VARCHAR(50) NOT NULL DEFAULT 'BABY',
+
+    -- Workouts completed: Total workouts since pet creation
+    -- Used for milestones and achievements
+                           workouts_completed INTEGER NOT NULL DEFAULT 0,
 
     -- ==========================================
     -- CORE STATS (0-100 scale)
@@ -144,6 +179,25 @@ CREATE TABLE pet_stats (
                            CONSTRAINT chk_crystals_range
                                CHECK (crystals >= 0 AND crystals <= 15),
 
+    -- Ensure XP and level are non-negative
+                           CONSTRAINT chk_xp_positive
+                               CHECK (xp >= 0),
+
+                           CONSTRAINT chk_level_positive
+                               CHECK (level >= 1),
+
+                           CONSTRAINT chk_workouts_positive
+                               CHECK (workouts_completed >= 0),
+
+    -- Validate evolution stages
+                           CONSTRAINT chk_evolution_stage
+                               CHECK (evolution_stage IN ('BABY', 'KID', 'TEEN', 'ADULT', 'CHAMPION', 'LEGENDARY')),
+
+    -- Validate pet types (start with WOLF, expand later)
+                           CONSTRAINT chk_pet_type
+                               CHECK (pet_type IN ('WOLF')),
+
+    -- Validate home selection
                            CONSTRAINT chk_selected_home
                                CHECK (selected_home IN ('GYM', 'NATURE', 'COZY', 'BEACH', 'SPACE', 'CYBER'))
 );
@@ -154,6 +208,11 @@ CREATE TABLE pet_stats (
 
 -- Primary lookup by user
 CREATE INDEX idx_pet_stats_user_id ON pet_stats(user_id);
+
+-- Evolution system queries
+CREATE INDEX idx_pet_stats_level ON pet_stats(level);
+CREATE INDEX idx_pet_stats_evolution_stage ON pet_stats(evolution_stage);
+CREATE INDEX idx_pet_stats_xp ON pet_stats(xp);
 
 -- Query pets by stat levels (for analytics/admin)
 CREATE INDEX idx_pet_stats_fuel ON pet_stats(fuel);
@@ -180,11 +239,24 @@ CREATE INDEX idx_pet_stats_last_workout ON pet_stats(last_workout_time);
 -- Query by home type (for analytics)
 CREATE INDEX idx_pet_stats_home ON pet_stats(selected_home);
 
+-- Query by pet type and color (for analytics)
+CREATE INDEX idx_pet_stats_type ON pet_stats(pet_type);
+CREATE INDEX idx_pet_stats_color ON pet_stats(pet_color);
+
 -- =====================================================
 -- COMMENTS FOR DOCUMENTATION
 -- =====================================================
 
-COMMENT ON TABLE pet_stats IS 'Tracks all virtual pet statistics, crystal economy, sleep/neglect states, and home selection for the EvoPet companion system';
+COMMENT ON TABLE pet_stats IS 'Tracks all virtual pet statistics, evolution progression, crystal economy, sleep/neglect states, and home selection for the EvoPet companion system';
+
+-- Pet Identity & Progression
+COMMENT ON COLUMN pet_stats.pet_name IS 'User-chosen pet name (e.g., Luna, Shadow). Set during onboarding, changeable in settings';
+COMMENT ON COLUMN pet_stats.pet_type IS 'Pet species: WOLF (beta), future: BEAR, FOX, DRAGON. Determines available colors';
+COMMENT ON COLUMN pet_stats.pet_color IS 'Appearance variant. Validated per pet type in service layer. Wolf: GREY/BROWN/BLACK';
+COMMENT ON COLUMN pet_stats.xp IS 'Experience points toward next level. Earned from workouts and care actions. Resets on level-up';
+COMMENT ON COLUMN pet_stats.level IS 'Current progression level (1-100+). Determines evolution stage';
+COMMENT ON COLUMN pet_stats.evolution_stage IS 'Visual form: BABY (1-10), KID (11-25), TEEN (26-50), ADULT (51-75), CHAMPION (76-99), LEGENDARY (100+)';
+COMMENT ON COLUMN pet_stats.workouts_completed IS 'Total workouts since pet creation. Used for milestones and achievements';
 
 -- Core Stats
 COMMENT ON COLUMN pet_stats.fuel IS 'Energy stat (0-100). Decreases 15/day, restored by spending crystals on food';

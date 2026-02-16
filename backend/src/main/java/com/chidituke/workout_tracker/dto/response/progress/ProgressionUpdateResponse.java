@@ -84,12 +84,23 @@ public class ProgressionUpdateResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PetStatsUpdateDTO {
+        // Crystal info
         private Integer crystalsEarned;
         private Integer wastedCrystals;
         private Integer newCrystalBalance;
+
+        // Fatigue info
         private Integer fatigueIncrease;
         private Integer newFatigue;
         private Boolean isSleeping;
+
+        // ✨ XP and Leveling info ✨
+        private Integer xpGained;
+        private Integer newXp;
+        private Integer newLevel;
+        private Boolean leveledUp;
+
+        // Message
         private String message;
     }
 }

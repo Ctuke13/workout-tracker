@@ -3,7 +3,11 @@ import {
     RegisterRequest,
     JwtResponse,
     ApiResponse,
-    UserSummary
+    UserSummary,
+    NicknameCheckResponse,
+    PetNameCheckResponse,
+    CompleteOnboardingRequest,
+    OnboardingStatusResponse,
 } from '../types/auth';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
@@ -36,6 +40,7 @@ class AuthService {
 
             const data: JwtResponse = await response.json();
             console.log(`✅ [${requestId}] Login successful for user:`, data.username);
+            console.log(`🐺 [${requestId}] Onboarding status:`, data.onboardingCompleted);
             this.setToken(data.token);
             return data;
         } catch (error) {
@@ -60,10 +65,9 @@ class AuthService {
             console.log(`📡 [${requestId}] Registration response status:`, response.status);
 
             if (!response.ok) {
-                const errorData = await response.text(); // Use text() first, then try to parse
+                const errorData = await response.text();
                 console.log(`❌ [${requestId}] Registration error response:`, errorData);
 
-                // Try to parse as JSON, fallback to raw text
                 let errorMessage = errorData;
                 try {
                     const parsed = JSON.parse(errorData);
@@ -77,6 +81,7 @@ class AuthService {
 
             const data: JwtResponse = await response.json();
             console.log(`✅ [${requestId}] Registration successful for user:`, data.username);
+            console.log(`🐺 [${requestId}] New user needs onboarding:`, !data.onboardingCompleted);
             this.setToken(data.token);
             return data;
         } catch (error) {
@@ -154,7 +159,6 @@ class AuthService {
     logout(): void {
         console.log('🚪 Logging out user');
         this.removeToken();
-        // Optional: Call logout endpoint for server-side cleanup
         const token = this.getToken();
         if (token) {
             fetch(`${this.baseURL}/logout`, {
@@ -163,7 +167,7 @@ class AuthService {
                     'Authorization': `Bearer ${token}`,
                 },
             }).catch(() => {
-                // Ignore errors - token is already being removed
+                // Ignore errors
             });
         }
     }
@@ -214,6 +218,129 @@ class AuthService {
         }
     }
 
+    // ==================== ONBOARDING METHODS ====================
+
+    async checkNicknameAvailability(nickname: string): Promise<NicknameCheckResponse> {
+        const requestId = Math.random().toString(36).substr(2, 9);
+        console.log(`🐺 [${requestId}] Checking nickname availability for:`, nickname);
+
+        try {
+            const token = this.getToken();
+            const headers: HeadersInit = token
+                ? {'Authorization': `Bearer ${token}`}
+                : {};
+
+            const response = await fetch(
+                `${this.baseURL}/check-nickname?nickname=${encodeURIComponent(nickname)}`,
+                {headers}
+            );
+
+            console.log(`📡 [${requestId}] Nickname check response status:`, response.status);
+
+            if (!response.ok) {
+                throw new Error(`Nickname check failed: ${response.status}`);
+            }
+
+            const data: NicknameCheckResponse = await response.json();
+            console.log(`✅ [${requestId}] Nickname availability:`, data.available);
+            return data;
+        } catch (error) {
+            console.error(`💥 [${requestId}] Nickname check error:`, error);
+            return {available: false, message: 'Failed to check nickname'};
+        }
+    }
+
+    async checkPetNameValidity(petName: string): Promise<PetNameCheckResponse> {
+        const requestId = Math.random().toString(36).substr(2, 9);
+        console.log(`🐺 [${requestId}] Checking pet name validity for:`, petName);
+
+        try {
+            const response = await fetch(
+                `${this.baseURL}/check-pet-name?petName=${encodeURIComponent(petName)}`
+            );
+
+            console.log(`📡 [${requestId}] Pet name check response status:`, response.status);
+
+            if (!response.ok) {
+                throw new Error(`Pet name check failed: ${response.status}`);
+            }
+
+            const data: PetNameCheckResponse = await response.json();
+            console.log(`✅ [${requestId}] Pet name validity:`, data.valid);
+            return data;
+        } catch (error) {
+            console.error(`💥 [${requestId}] Pet name check error:`, error);
+            return {valid: false, message: 'Failed to check pet name'};
+        }
+    }
+
+    async completeOnboarding(data: CompleteOnboardingRequest): Promise<JwtResponse> {
+        const requestId = Math.random().toString(36).substr(2, 9);
+        console.log(`🐺 [${requestId}] Completing onboarding with:`, data);
+
+        try {
+            const token = this.getToken();
+            if (!token) {
+                throw new Error('No authentication token');
+            }
+
+            const response = await fetch(`${this.baseURL}/complete-onboarding`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+
+            console.log(`📡 [${requestId}] Complete onboarding response status:`, response.status);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Onboarding failed: ${response.status}`);
+            }
+
+            const responseData: JwtResponse = await response.json();
+            console.log(`✅ [${requestId}] Onboarding completed! Nickname: ${responseData.nickname}, Pet: ${responseData.petName}`);
+            this.setToken(responseData.token);
+            return responseData;
+        } catch (error) {
+            console.error(`💥 [${requestId}] Complete onboarding error:`, error);
+            throw error instanceof Error ? error : new Error('Failed to complete onboarding');
+        }
+    }
+
+    async getOnboardingStatus(): Promise<OnboardingStatusResponse> {
+        const requestId = Math.random().toString(36).substr(2, 9);
+        console.log(`🐺 [${requestId}] Getting onboarding status`);
+
+        try {
+            const token = this.getToken();
+            if (!token) {
+                throw new Error('No authentication token');
+            }
+
+            const response = await fetch(`${this.baseURL}/onboarding-status`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            console.log(`📡 [${requestId}] Onboarding status response status:`, response.status);
+
+            if (!response.ok) {
+                throw new Error(`Failed to get onboarding status: ${response.status}`);
+            }
+
+            const data: OnboardingStatusResponse = await response.json();
+            console.log(`✅ [${requestId}] Onboarding status:`, data.onboardingCompleted);
+            return data;
+        } catch (error) {
+            console.error(`💥 [${requestId}] Get onboarding status error:`, error);
+            throw error instanceof Error ? error : new Error('Failed to get onboarding status');
+        }
+    }
+
     // ==================== TOKEN MANAGEMENT ====================
 
     getToken(): string | null {
@@ -247,7 +374,7 @@ class AuthService {
 
     getAuthHeaders(): HeadersInit {
         const token = this.getToken();
-        return token ? { 'Authorization': `Bearer ${token}` } : {};
+        return token ? {'Authorization': `Bearer ${token}`} : {};
     }
 
     async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {

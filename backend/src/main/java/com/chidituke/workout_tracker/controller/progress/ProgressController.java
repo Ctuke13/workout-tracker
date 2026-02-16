@@ -293,7 +293,13 @@ public class ProgressController {
         try {
             Integer exerciseCount = request.getExerciseCount() != null ? request.getExerciseCount() : 0;
             if (exerciseCount > 0) {
-                WorkoutCompleteResponse workoutResponse = petStatsService.handleWorkoutCompletion(userId, exerciseCount);
+                WorkoutCompleteResponse workoutResponse = petStatsService.handleWorkoutCompletion(
+                        userId,
+                        exerciseCount,
+                        request.getDurationMinutes(),
+                        request.getSetsCompleted(),
+                        progression.getWeeklyWorkoutCount()
+                );
 
                 // Convert to the nested DTO
                 petUpdate = ProgressionUpdateResponse.PetStatsUpdateDTO.builder()
@@ -303,6 +309,10 @@ public class ProgressController {
                         .fatigueIncrease(workoutResponse.getFatigueIncrease())
                         .newFatigue(workoutResponse.getNewFatigue())
                         .isSleeping(workoutResponse.getIsSleeping())
+                        .xpGained(workoutResponse.getXpGained())
+                        .newXp(workoutResponse.getNewXp())
+                        .newLevel(workoutResponse.getNewLevel())
+                        .leveledUp(workoutResponse.getLeveledUp())
                         .message(workoutResponse.getMessage())
                         .build();
 
@@ -330,6 +340,7 @@ public class ProgressController {
                 .achievementsUnlocked(newAchievements.stream()
                         .map(UserAchievementDTO::fromEntity)
                         .collect(Collectors.toList()))
+                .petUpdate(petUpdate)
                 .build();
 
         log.info("Workout completion processed: +{} XP, {} achievements unlocked, ranked up: {}",

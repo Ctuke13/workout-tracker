@@ -149,6 +149,96 @@ public class AuthController {
                 isAvailable ? "Username is available" : "Username is already taken"));
     }
 
+    // ==================== ONBOARDING ENDPOINTS ====================
+
+    /**
+     * Check nickname availability and validity
+     */
+    @GetMapping("/check-nickname")
+    public ResponseEntity<NicknameCheckResponse> checkNicknameAvailability(
+            @RequestParam String nickname,
+            @CurrentUser UserPrincipal currentUser) {
+
+        Long userId = currentUser != null ? currentUser.getId() : null;
+        UserService.NicknameCheckResult result = userService.checkNicknameAvailability(nickname, userId);
+
+        return ResponseEntity.ok(new NicknameCheckResponse(
+                result.isAvailable(),
+                result.getMessage()
+        ));
+    }
+
+    /**
+     * Check pet name validity (profanity filter)
+     */
+    @GetMapping("/check-pet-name")
+    public ResponseEntity<PetNameCheckResponse> checkPetName(@RequestParam String petName) {
+        UserService.PetNameCheckResult result = userService.checkPetName(petName);
+
+        return ResponseEntity.ok(new PetNameCheckResponse(
+                result.isValid(),
+                result.getMessage()
+        ));
+    }
+
+    /**
+     * Complete onboarding - sets nickname, pet name, and marks onboarding complete
+     */
+    @PostMapping("/complete-onboarding")
+    public ResponseEntity<?> completeOnboarding(
+            @Valid @RequestBody CompleteOnboardingRequest request,
+            @CurrentUser UserPrincipal currentUser) {
+
+        try {
+            User user = userService.completeOnboarding(
+                    currentUser.getId(),
+                    request.getNickname(),
+                    request.getPetName()
+            );
+
+            // Generate fresh JWT with updated info
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String jwt = jwtTokenProvider.generateToken(authentication);
+
+            JwtResponse jwtResponse = new JwtResponse(
+                    jwt,
+                    user.getId(),
+                    user.getUsername(),
+                    user.getEmail(),
+                    user.getFirstName(),
+                    user.getLastName(),
+                    user.getUserType(),
+                    user.getProfessionalProfile() != null,
+                    user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
+                    user.getNickname(),
+                    user.getPetName(),
+                    user.getOnboardingCompleted()
+            );
+
+            return ResponseEntity.ok(jwtResponse);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse(false, e.getMessage()));
+        }
+    }
+
+    /**
+     * Get current onboarding status
+     */
+    @GetMapping("/onboarding-status")
+    public ResponseEntity<OnboardingStatusResponse> getOnboardingStatus(
+            @CurrentUser UserPrincipal currentUser) {
+
+        User user = userService.getUserById(currentUser.getId());
+
+        return ResponseEntity.ok(new OnboardingStatusResponse(
+                user.getOnboardingCompleted(),
+                user.getNickname(),
+                user.getPetName()
+        ));
+    }
+
     // 👤 CURRENT USER INFO
     @GetMapping("/me")
     public ResponseEntity<UserSummary> getCurrentUser(@CurrentUser UserPrincipal userPrincipal) {
@@ -165,7 +255,10 @@ public class AuthController {
                 user.getActivityLevel(),
                 user.getProfessionalProfile() != null,
                 user.getProfessionalProfile() != null ? user.getProfessionalProfile().getIsVerified() : false,
-                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE // ✅ Added subscription tier
+                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
+                user.getNickname(),
+                user.getPetName(),
+                user.getOnboardingCompleted()
         );
 
         return ResponseEntity.ok(userSummary);
@@ -207,7 +300,10 @@ public class AuthController {
                 user.getLastName(),
                 user.getUserType(),
                 user.getProfessionalProfile() != null,
-                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE // ✅ Added subscription tier
+                user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
+                user.getNickname(),
+                user.getPetName(),
+                user.getOnboardingCompleted()
         );
 
         return ResponseEntity.ok(jwtResponse);
@@ -274,12 +370,17 @@ public class AuthController {
         private User.ActivityLevel activityLevel;
         private Boolean isProfessional;
         private Boolean isVerified;
-        private SubscriptionTier subscriptionTier; // ✅ Added subscription tier
+        private SubscriptionTier subscriptionTier;
+        // ==================== ONBOARDING FIELDS ====================
+        private String nickname;
+        private String petName;
+        private Boolean onboardingCompleted;
 
-        // ✅ Updated constructor with subscription tier
+        // ✅ Updated constructor with onboarding fields
         public UserSummary(Long id, String username, String email, String firstName, String lastName,
                            UserType userType, User.AccountStatus accountStatus, User.ActivityLevel activityLevel,
-                           Boolean isProfessional, Boolean isVerified, SubscriptionTier subscriptionTier) {
+                           Boolean isProfessional, Boolean isVerified, SubscriptionTier subscriptionTier,
+                           String nickname, String petName, Boolean onboardingCompleted) {
             this.id = id;
             this.username = username;
             this.email = email;
@@ -291,6 +392,9 @@ public class AuthController {
             this.isProfessional = isProfessional;
             this.isVerified = isVerified;
             this.subscriptionTier = subscriptionTier;
+            this.nickname = nickname;
+            this.petName = petName;
+            this.onboardingCompleted = onboardingCompleted;
         }
 
         // ✅ Getters and setters
@@ -382,7 +486,32 @@ public class AuthController {
             this.subscriptionTier = subscriptionTier;
         }
 
-        // ✅ Utility methods for subscription checks
+        // ==================== ONBOARDING GETTERS/SETTERS ====================
+        public String getNickname() {
+            return nickname;
+        }
+
+        public void setNickname(String nickname) {
+            this.nickname = nickname;
+        }
+
+        public String getPetName() {
+            return petName;
+        }
+
+        public void setPetName(String petName) {
+            this.petName = petName;
+        }
+
+        public Boolean getOnboardingCompleted() {
+            return onboardingCompleted;
+        }
+
+        public void setOnboardingCompleted(Boolean onboardingCompleted) {
+            this.onboardingCompleted = onboardingCompleted;
+        }
+
+        // ✅ Utility methods
         public boolean canAccessPaidPlans() {
             if (subscriptionTier == null) return false;
             return subscriptionTier == SubscriptionTier.PLUS ||
@@ -398,6 +527,117 @@ public class AuthController {
 
         public boolean isFreeTier() {
             return subscriptionTier == null || subscriptionTier == SubscriptionTier.FREE;
+        }
+    }
+
+    // ==================== ONBOARDING DTOS ====================
+
+    public static class NicknameCheckResponse {
+        private Boolean available;
+        private String message;
+
+        public NicknameCheckResponse(Boolean available, String message) {
+            this.available = available;
+            this.message = message;
+        }
+
+        public Boolean getAvailable() {
+            return available;
+        }
+
+        public void setAvailable(Boolean available) {
+            this.available = available;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+    }
+
+    public static class PetNameCheckResponse {
+        private Boolean valid;
+        private String message;
+
+        public PetNameCheckResponse(Boolean valid, String message) {
+            this.valid = valid;
+            this.message = message;
+        }
+
+        public Boolean getValid() {
+            return valid;
+        }
+
+        public void setValid(Boolean valid) {
+            this.valid = valid;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+    }
+
+    public static class CompleteOnboardingRequest {
+        private String nickname;  // Optional
+        private String petName;   // Optional
+
+        public String getNickname() {
+            return nickname;
+        }
+
+        public void setNickname(String nickname) {
+            this.nickname = nickname;
+        }
+
+        public String getPetName() {
+            return petName;
+        }
+
+        public void setPetName(String petName) {
+            this.petName = petName;
+        }
+    }
+
+    public static class OnboardingStatusResponse {
+        private Boolean onboardingCompleted;
+        private String nickname;
+        private String petName;
+
+        public OnboardingStatusResponse(Boolean onboardingCompleted, String nickname, String petName) {
+            this.onboardingCompleted = onboardingCompleted;
+            this.nickname = nickname;
+            this.petName = petName;
+        }
+
+        public Boolean getOnboardingCompleted() {
+            return onboardingCompleted;
+        }
+
+        public void setOnboardingCompleted(Boolean onboardingCompleted) {
+            this.onboardingCompleted = onboardingCompleted;
+        }
+
+        public String getNickname() {
+            return nickname;
+        }
+
+        public void setNickname(String nickname) {
+            this.nickname = nickname;
+        }
+
+        public String getPetName() {
+            return petName;
+        }
+
+        public void setPetName(String petName) {
+            this.petName = petName;
         }
     }
 }

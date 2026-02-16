@@ -32,6 +32,12 @@ public class WorkoutCompleteResponse {
     private Integer cleanlinessDecrease;
     private Integer newCleanliness;
 
+    // ✨ XP and Leveling info ✨
+    private Integer xpGained;
+    private Integer newXp;
+    private Integer newLevel;
+    private Boolean leveledUp;
+
     // Message
     private String message;
 }

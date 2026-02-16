@@ -208,6 +208,7 @@ public class SecurityConfig {
                     // ===================================================================
                     auth.requestMatchers("/api/workouts/**").authenticated();
                     auth.requestMatchers("/api/users/**").authenticated();
+                    auth.requestMatchers("/api/pet/**").authenticated();  // Pet stats and interactions
 
                     // All other requests require authentication
                     auth.anyRequest().authenticated();

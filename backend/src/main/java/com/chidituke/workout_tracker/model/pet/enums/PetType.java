@@ -7,8 +7,14 @@ package com.chidituke.workout_tracker.model.pet.enums;
  * Start with just WOLF for MVP. Add new pet types as enum values when you're ready to implement them.
  * Each new pet type should have its own animations, colors, and evolution stages prepared before adding.
  * <p>
+ * COLOR HANDLING:
+ * Colors are pet-specific but validated in the service layer, not in this enum.
+ * Wolf colors: GREY (free), BROWN (locked), BLACK (locked)
+ * Future pets will have their own color sets defined in PetStatsService.
+ * <p>
  * Future additions will be added like:
- * CAT("Cat", "Agile and independent companion"),
+ * BEAR("Bear", "Powerful and protective companion"),
+ * FOX("Fox", "Clever and swift companion"),
  * DRAGON("Dragon", "Mythical and powerful companion"),
  * etc.
  */
@@ -16,10 +22,10 @@ public enum PetType {
     WOLF("Wolf", "Loyal and strong companion that grows with your fitness journey");
 
     // ADD MORE PET TYPES HERE WHEN READY:
-    // TIGER("Cat", "Agile and independent companion"),
-    // RABBIT("Dragon", "Mythical and powerful companion"),
-    // FOX("Fox", "Clever and swift companion"),
     // BEAR("Bear", "Powerful and protective companion"),
+    // FOX("Fox", "Clever and swift companion"),
+    // RABBIT("Rabbit", "Energetic and quick companion"),
+    // DRAGON("Dragon", "Mythical and powerful companion"),
     // etc.
 
     private final String displayName;

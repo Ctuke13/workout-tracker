@@ -2,6 +2,7 @@ package com.chidituke.workout_tracker.mapper.pet;
 
 import com.chidituke.workout_tracker.dto.response.pet.PetStatsResponse;
 import com.chidituke.workout_tracker.model.pet.PetStats;
+import com.chidituke.workout_tracker.model.pet.enums.EvolutionStage;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -27,10 +28,32 @@ public class PetStatsMapper {
             return null;
         }
 
-        return PetStatsResponse.builder()
+        // Calculate evolution-related fields
+        int xpRequired = calculateXpRequiredForNextLevel(petStats.getLevel());
+        EvolutionStage currentStage = petStats.getEvolutionStage();
+        EvolutionStage nextStage = currentStage.getNextStage();
+        boolean canEvolve = currentStage.canEvolve() &&
+                petStats.getLevel() >= currentStage.getLevelForNextStage();
+
+        PetStatsResponse response = PetStatsResponse.builder()
                 // Identifiers
                 .petStatsId(petStats.getPetStatsId())
                 .userId(petStats.getUserId())
+
+                // Pet Identity & Progression
+                .petName(petStats.getPetName())
+                .petType(petStats.getPetType().toString())
+                .petColor(petStats.getPetColor())
+                .xp(petStats.getXp())
+                .level(petStats.getLevel())
+                .xpToNextLevel(xpRequired)
+                .xpProgress(petStats.getXp()) // Current XP in level (for progress bar)
+                .evolutionStage(currentStage.toString())
+                .evolutionStageDisplay(getEvolutionStageDisplay(petStats))
+                .workoutsCompleted(petStats.getWorkoutsCompleted())
+                .canEvolve(canEvolve)
+                .nextEvolutionStage(nextStage != null ? nextStage.toString() : null)
+                .levelForNextEvolution(currentStage.getLevelForNextStage())
 
                 // Core stats (0-100)
                 .fuel(petStats.getFuel())
@@ -81,6 +104,41 @@ public class PetStatsMapper {
                 .lastUpdated(petStats.getLastUpdated())
                 .createdAt(petStats.getCreatedAt())
                 .build();
+
+        // Calculate and set mood based on current stats
+        response.calculateAndSetMood();
+
+        return response;
+    }
+
+    /**
+     * Calculate XP required for next level
+     * Progressive scaling:
+     * - Levels 1-5: 100 XP per level
+     * - Levels 6-10: 150 XP per level
+     * - Levels 11-20: 200 XP per level
+     * - Levels 21-30: 300 XP per level
+     * - Levels 31-50: 500 XP per level
+     * - Levels 51-75: 750 XP per level
+     * - Levels 76-100+: 1000 XP per level
+     */
+    private int calculateXpRequiredForNextLevel(int currentLevel) {
+        if (currentLevel <= 5) return 100;
+        else if (currentLevel <= 10) return 150;
+        else if (currentLevel <= 20) return 200;
+        else if (currentLevel <= 30) return 300;
+        else if (currentLevel <= 50) return 500;
+        else if (currentLevel <= 75) return 750;
+        else return 1000; // Levels 76+
+    }
+
+    /**
+     * Get display name for evolution stage (e.g., "Baby Wolf", "Kid Wolf")
+     */
+    private String getEvolutionStageDisplay(PetStats petStats) {
+        String stageName = petStats.getEvolutionStage().getDisplayName();
+        String petTypeName = petStats.getPetType().getDisplayName();
+        return stageName + " " + petTypeName;
     }
 
     /**
@@ -120,32 +178,5 @@ public class PetStatsMapper {
      */
     private List<String> getUnlockedHomes() {
         return Arrays.asList("GYM", "NATURE", "COZY");
-    }
-
-    /**
-     * Get human-readable tier name for bath tier
-     *
-     * @param tier The bath tier (1, 2, or 3)
-     * @return Human-readable tier name
-     */
-    private String getTierName(int tier) {
-        return switch (tier) {
-            case 1 -> "Deodorant Spray";
-            case 2 -> "Sponge Bath";
-            case 3 -> "Full Shower";
-            default -> "Unknown";
-        };
-    }
-
-    /**
-     * Get tier description
-     */
-    private String getTierDescription(int tier) {
-        return switch (tier) {
-            case 1 -> "Quick spray to freshen up";
-            case 2 -> "Good scrub with a sponge";
-            case 3 -> "Complete wash with showerhead";
-            default -> "Unknown bath type";
-        };
     }
 }

@@ -1,5 +1,7 @@
 package com.chidituke.workout_tracker.model.pet;
 
+import com.chidituke.workout_tracker.model.pet.enums.EvolutionStage;
+import com.chidituke.workout_tracker.model.pet.enums.PetType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,6 +11,11 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
+/**
+ * Entity representing all statistics and state for a user's virtual pet companion.
+ * Tracks core stats (fuel, motivation, fatigue, cleanliness), crystal economy,
+ * evolution progression (XP, level, stage), and various systems (sleep, neglect, home).
+ */
 @Entity
 @Table(name = "pet_stats")
 @Getter
@@ -24,6 +31,63 @@ public class PetStats {
 
     @Column(name = "user_id", nullable = false, unique = true)
     private Long userId;
+
+    // ==========================================
+    // PET IDENTITY & PROGRESSION
+    // ==========================================
+
+    /**
+     * User-chosen pet name (e.g., "Luna", "Shadow")
+     * Set during onboarding, can be changed in settings
+     */
+    @Column(name = "pet_name", length = 100)
+    private String petName;
+
+    /**
+     * Pet species/type: WOLF (beta), future: BEAR, FOX, DRAGON
+     * Determines available colors and animation sets
+     */
+    @Column(name = "pet_type", nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    private PetType petType = PetType.WOLF;
+
+    /**
+     * Pet appearance variant (color varies by pet type)
+     * Wolf: GREY (free), BROWN (premium), BLACK (premium)
+     * Validated in service layer per pet type
+     */
+    @Column(name = "pet_color", nullable = false, length = 50)
+    private String petColor = "GREY";
+
+    /**
+     * Experience points toward next level
+     * Earned from: workouts (50+), feeding (5), bathing (5), motivating (10), perfect care (20)
+     * Resets to 0 on level-up, excess XP carries over
+     */
+    @Column(name = "xp", nullable = false)
+    private Integer xp = 0;
+
+    /**
+     * Current progression level (1-100+)
+     * Determines evolution stage and feature unlocks
+     */
+    @Column(name = "level", nullable = false)
+    private Integer level = 1;
+
+    /**
+     * Visual evolution stage based on level:
+     * BABY (1-10), KID (11-25), TEEN (26-50), ADULT (51-75), CHAMPION (76-99), LEGENDARY (100+)
+     */
+    @Column(name = "evolution_stage", nullable = false, length = 50)
+    @Enumerated(EnumType.STRING)
+    private EvolutionStage evolutionStage = EvolutionStage.BABY;
+
+    /**
+     * Total workouts completed since pet creation
+     * Used for milestones, achievements, and analytics
+     */
+    @Column(name = "workouts_completed", nullable = false)
+    private Integer workoutsCompleted = 0;
 
     // ==========================================
     // CORE STATS (0-100)
@@ -446,6 +510,9 @@ public class PetStats {
 
         // Update last workout time
         this.lastWorkoutTime = LocalDateTime.now();
+
+        // Increment workout counter
+        this.workoutsCompleted++;
 
         this.lastUpdated = LocalDateTime.now();
     }

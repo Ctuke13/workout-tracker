@@ -30,9 +30,13 @@ CREATE TABLE users (
                        phone_number VARCHAR(255),
 
     -- ==================== ONBOARDING & PET SYSTEM ====================
-                       nickname VARCHAR(20) UNIQUE,                          -- Display name for leaderboards (optional)
-                       pet_name VARCHAR(50),                                 -- Custom pet name (e.g., "Luna")
-                       onboarding_completed BOOLEAN NOT NULL DEFAULT false,  -- Has user completed onboarding flow
+                       nickname VARCHAR(20) UNIQUE,                             -- Display name for leaderboards (optional)
+                       pet_name VARCHAR(50),                                    -- Custom pet name (e.g., "Luna")
+                       onboarding_completed BOOLEAN NOT NULL DEFAULT false,     -- Has user completed onboarding flow
+                       pet_tutorial_completed BOOLEAN NOT NULL DEFAULT false,   -- Has user completed pet page tutorial
+                       calendar_tutorial_completed BOOLEAN NOT NULL DEFAULT false, -- Has user completed calendar tutorial
+                       weekly_workout_goal INTEGER,                             -- User's weekly workout target (optional, 0-7 workouts)
+                       goal_type VARCHAR(50) DEFAULT 'workouts',                -- Type of goal: workouts, xp, volume, etc.
 
     -- Profile
                        profile_image_url VARCHAR(255),
@@ -323,6 +327,9 @@ CREATE INDEX idx_users_weight_unit ON users(preferred_weight_unit);
 -- Onboarding indexes
 CREATE INDEX idx_users_nickname ON users(nickname) WHERE nickname IS NOT NULL;
 CREATE INDEX idx_users_onboarding ON users(onboarding_completed);
+CREATE INDEX idx_users_pet_tutorial ON users(pet_tutorial_completed);
+CREATE INDEX idx_users_calendar_tutorial ON users(calendar_tutorial_completed);
+CREATE INDEX idx_users_weekly_goal ON users(weekly_workout_goal) WHERE weekly_workout_goal IS NOT NULL;
 
 -- Subscriptions table indexes
 CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);

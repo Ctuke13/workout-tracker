@@ -3,6 +3,32 @@ import authService from './authService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
+export interface WeeklyStatsResponse {
+    workoutsThisWeek: number;
+    xpThisWeek: number;
+    currentStreak: number;
+    weeklyGoal: number | null;
+    goalType: string | null;
+    goalProgress: number | null;
+    weekStartDate: string;
+    weekEndDate: string;
+    workoutsRemaining: number | null;
+    goalAchieved: boolean | null;
+    message: string | null;
+}
+
+export interface UserGoalResponse {
+    weeklyWorkoutGoal: number | null;
+    goalType: string;
+    hasGoalSet: boolean;
+    goalLevel: string | null;
+}
+
+export interface UserGoalRequest {
+    weeklyWorkoutGoal: number | null;
+    goalType?: string;
+}
+
 // ==================== NEW TYPES FOR XP SYSTEM ====================
 
 export interface EvolutionRequirements {
@@ -424,6 +450,112 @@ class PetApiService {
             return {onCooldown: false, cooldownEndsAt: null};
         }
     }
+
+    // ==================== 🆕 GET WEEKLY STATS ====================
+
+    async getWeeklyStats(): Promise<WeeklyStatsResponse> {
+        const requestId = Math.random().toString(36).substr(2, 9);
+        console.log(`📊 [${requestId}] Getting weekly stats`);
+
+        try {
+            const token = authService.getToken();
+            if (!token) {
+                throw new Error('No authentication token');
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/user/stats/weekly`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            console.log(`📡 [${requestId}] Get weekly stats response status:`, response.status);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Failed to get weekly stats: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(`✅ [${requestId}] Weekly stats - ${data.workoutsThisWeek} workouts, ${data.currentStreak} day streak`);
+            return data;
+        } catch (error) {
+            console.error(`💥 [${requestId}] Get weekly stats error:`, error);
+            throw error instanceof Error ? error : new Error('Failed to get weekly stats');
+        }
+    }
+
+    // ==================== 🆕 GET USER GOAL ====================
+
+    async getUserGoal(): Promise<UserGoalResponse> {
+        const requestId = Math.random().toString(36).substr(2, 9);
+        console.log(`🎯 [${requestId}] Getting user goal`);
+
+        try {
+            const token = authService.getToken();
+            if (!token) {
+                throw new Error('No authentication token');
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/user/goal`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            console.log(`📡 [${requestId}] Get user goal response status:`, response.status);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Failed to get user goal: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(`✅ [${requestId}] User goal - ${data.hasGoalSet ? `${data.weeklyWorkoutGoal} workouts (${data.goalLevel})` : 'No goal set'}`);
+            return data;
+        } catch (error) {
+            console.error(`💥 [${requestId}] Get user goal error:`, error);
+            throw error instanceof Error ? error : new Error('Failed to get user goal');
+        }
+    }
+
+    // ==================== 🆕 UPDATE USER GOAL ====================
+
+    async updateUserGoal(request: UserGoalRequest): Promise<UserGoalResponse> {
+        const requestId = Math.random().toString(36).substr(2, 9);
+        console.log(`🎯 [${requestId}] Updating user goal to: ${request.weeklyWorkoutGoal}`);
+
+        try {
+            const token = authService.getToken();
+            if (!token) {
+                throw new Error('No authentication token');
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/user/goal`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(request),
+            });
+
+            console.log(`📡 [${requestId}] Update user goal response status:`, response.status);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Failed to update user goal: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(`✅ [${requestId}] Goal updated - ${data.hasGoalSet ? `${data.weeklyWorkoutGoal} workouts` : 'Goal removed'}`);
+            return data;
+        } catch (error) {
+            console.error(`💥 [${requestId}] Update user goal error:`, error);
+            throw error instanceof Error ? error : new Error('Failed to update user goal');
+        }
+    }
+
 
     // ==================== HELPER: CAN AFFORD MEAL ====================
 

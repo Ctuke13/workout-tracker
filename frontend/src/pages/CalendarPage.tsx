@@ -2,6 +2,11 @@ import React, {useState, useRef, useEffect} from 'react';
 import {useNavigate, useLocation} from 'react-router-dom';
 import {Card, CardContent, CardHeader, CardTitle} from '../components/ui/card';
 import {Badge} from '../components/ui/badge';
+import {useAuth} from '../contexts/AuthContext';
+import TutorialOverlay from '../components/tutorial/TutorialOverlay';
+import SkipTutorialModal from '../components/tutorial/SkipTutorialModal';
+import {CALENDAR_TUTORIAL_STEPS} from '../config/tutorialSteps';
+import userApi from '../services/userApi';
 
 // Import extracted hooks
 import {useCalendarData} from '../hooks/useCalendarData';
@@ -27,11 +32,16 @@ const CalendarPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const previousLocation = useRef(location.pathname);
+    const {user, refreshUser} = useAuth();
 
     // Core state
     const [viewingDate, setViewingDate] = useState(new Date());
     const [showCelebration, setShowCelebration] = useState(false);
     const [celebrationData, setCelebrationData] = useState<any>(null);
+
+    // Tutorial state
+    const [showTutorial, setShowTutorial] = useState(false);
+    const [showSkipModal, setShowSkipModal] = useState(false);
 
     // Use extracted data management hook
     const {
@@ -103,6 +113,18 @@ const CalendarPage: React.FC = () => {
         handleModeChange
     } = useModalState();
 
+    // Tutorial trigger effect
+    useEffect(() => {
+        // Show tutorial if user has completed onboarding and pet tutorial, but not calendar tutorial
+        if (user && user.onboardingCompleted && user.petTutorialCompleted && !user.calendarTutorialCompleted) {
+            // Small delay for smooth UX
+            const timer = setTimeout(() => {
+                setShowTutorial(true);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [user]);
+
     useEffect(() => {
         // Handle navigation back to calendar after workout completion
         if (location.pathname === '/calendar' && previousLocation.current === '/workout') {
@@ -113,7 +135,7 @@ const CalendarPage: React.FC = () => {
         // Check session storage for workout completion flag
         const workoutJustCompleted = sessionStorage.getItem('workoutJustCompleted');
         const completedWorkoutDate = sessionStorage.getItem('completedWorkoutDate');
-        const celebrationDataStr = sessionStorage.getItem('celebrationData'); // 🆕
+        const celebrationDataStr = sessionStorage.getItem('celebrationData');
 
         if (workoutJustCompleted === 'true' && completedWorkoutDate) {
             console.log('Workout completion detected, ensuring calendar is up to date...');
@@ -124,7 +146,7 @@ const CalendarPage: React.FC = () => {
                 loadDayData(true);
             }
 
-            // 🆕 Show celebration if data exists
+            // Show celebration if data exists
             if (celebrationDataStr) {
                 try {
                     const data = JSON.parse(celebrationDataStr);
@@ -139,11 +161,36 @@ const CalendarPage: React.FC = () => {
             // Clean up flags (but keep celebrationData until modals dismissed)
             sessionStorage.removeItem('workoutJustCompleted');
             sessionStorage.removeItem('completedWorkoutDate');
-            // Don't remove celebrationData yet - wait for modal dismissal
         }
 
         previousLocation.current = location.pathname;
     }, [location.pathname, refreshCalendarData, viewingDateString, loadDayData]);
+
+    // Tutorial handlers
+    const handleTutorialComplete = async () => {
+        setShowTutorial(false);
+        try {
+            await userApi.completeCalendarTutorial();
+            await refreshUser();
+        } catch (error) {
+            console.error('Failed to mark calendar tutorial as complete:', error);
+        }
+    };
+
+    const handleTutorialSkip = () => {
+        setShowSkipModal(true);
+    };
+
+    const handleConfirmSkip = async () => {
+        setShowSkipModal(false);
+        setShowTutorial(false);
+        try {
+            await userApi.completeCalendarTutorial();
+            await refreshUser();
+        } catch (error) {
+            console.error('Failed to skip tutorial:', error);
+        }
+    };
 
     // Navigation handlers
     const navigateDay = (direction: 'prev' | 'next') => {
@@ -188,12 +235,13 @@ const CalendarPage: React.FC = () => {
         }
     };
 
+    // Modal close handlers
     const handleConfigModalClose = () => {
         closeConfigModal();
-        if (!isEditMode) {
-            resetSchedulingState();
-        } else {
+        if (isEditMode) {
             resetEditingState();
+        } else {
+            resetSchedulingState();
         }
     };
 
@@ -211,7 +259,7 @@ const CalendarPage: React.FC = () => {
     const handleCelebrationComplete = () => {
         console.log('🎉 Celebration sequence complete!');
 
-        // 🆕 CHECK FOR TIER CHANGE BEFORE CLEANING UP
+        // Check for tier change before cleaning up
         if (celebrationData?.tieredUp) {
             console.log('📈 Tier change detected, notifying MiniProgressWidget', {
                 oldTier: celebrationData.oldTier,
@@ -224,7 +272,7 @@ const CalendarPage: React.FC = () => {
                 newTier: celebrationData.newSeasonalTier
             }));
 
-            // 🆕 Dispatch custom event to notify MiniProgressWidget
+            // Dispatch custom event to notify MiniProgressWidget
             window.dispatchEvent(new CustomEvent('tierChanged'));
         }
 
@@ -249,31 +297,37 @@ const CalendarPage: React.FC = () => {
             <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto">
 
                 {/* Date Header Component */}
-                <DateHeader
-                    viewingDate={viewingDate}
-                    loading={loading}
-                    viewingDateExercises={viewingDateExercises}
-                    onNavigateDay={navigateDay}
-                    onGoToToday={goToToday}
-                    onManualRefresh={() => refreshCalendarData(true)}
-                />
+                <div className="date-header">
+                    <DateHeader
+                        viewingDate={viewingDate}
+                        loading={loading}
+                        viewingDateExercises={viewingDateExercises}
+                        onNavigateDay={navigateDay}
+                        onGoToToday={goToToday}
+                        onManualRefresh={() => refreshCalendarData(true)}
+                    />
+                </div>
 
                 {/* Workout Actions Component */}
-                <WorkoutActions
-                    isToday={isToday()}
-                    hasExercises={viewingDateExercises.length > 0}
-                    exerciseCount={viewingDateExercises.length}
-                    onStartFullWorkout={handleStartFullWorkout}
-                    onAddExercise={() => openExerciseSelector('exercise')}
-                    onAddWorkoutPlan={() => openExerciseSelector('workout-plan')}
-                />
+                <div className="add-exercise-button">
+                    <WorkoutActions
+                        isToday={isToday()}
+                        hasExercises={viewingDateExercises.length > 0}
+                        exerciseCount={viewingDateExercises.length}
+                        onStartFullWorkout={handleStartFullWorkout}
+                        onAddExercise={() => openExerciseSelector('exercise')}
+                        onAddWorkoutPlan={() => openExerciseSelector('workout-plan')}
+                    />
+                </div>
 
                 {/* Week Calendar Component */}
-                <WeekCalendar
-                    viewingDate={viewingDate}
-                    scheduledWorkouts={scheduledWorkouts}
-                    onDateSelect={setViewingDate}
-                />
+                <div className="week-calendar">
+                    <WeekCalendar
+                        viewingDate={viewingDate}
+                        scheduledWorkouts={scheduledWorkouts}
+                        onDateSelect={setViewingDate}
+                    />
+                </div>
 
                 {/* Exercises List */}
                 {viewingDateExercises.length > 0 && (
@@ -290,17 +344,18 @@ const CalendarPage: React.FC = () => {
                         <CardContent className="pt-0">
                             <div className="space-y-3 sm:space-y-4">
                                 {viewingDateExercises.map((exercise, index) => (
-                                    <ExerciseCard
-                                        key={exercise.id}
-                                        exercise={exercise}
-                                        index={index}
-                                        workoutResults={workoutResults[exercise.id]}
-                                        onStartWorkout={handleStartWorkout}
-                                        onEditExercise={handleEditExerciseWithModal}
-                                        onDeleteWorkout={handleDeleteWorkout}
-                                        onViewDetails={handleViewWorkoutDetailsWithModal}
-                                        onFavoriteToggle={handleFavoriteToggle}
-                                    />
+                                    <div key={exercise.id} className={index === 0 ? 'exercise-card' : ''}>
+                                        <ExerciseCard
+                                            exercise={exercise}
+                                            index={index}
+                                            workoutResults={workoutResults[exercise.id]}
+                                            onStartWorkout={handleStartWorkout}
+                                            onEditExercise={handleEditExerciseWithModal}
+                                            onDeleteWorkout={handleDeleteWorkout}
+                                            onViewDetails={handleViewWorkoutDetailsWithModal}
+                                            onFavoriteToggle={handleFavoriteToggle}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         </CardContent>
@@ -344,10 +399,12 @@ const CalendarPage: React.FC = () => {
             </div>
 
             {/* Floating Action Button */}
-            <FloatingActionButton
-                onClick={() => openExerciseSelector('exercise')}
-                isWorkoutMode={false}
-            />
+            <div className="start-workout-button">
+                <FloatingActionButton
+                    onClick={() => openExerciseSelector('exercise')}
+                    isWorkoutMode={false}
+                />
+            </div>
 
             {/* Modals */}
             {showExerciseSelector && (
@@ -381,7 +438,7 @@ const CalendarPage: React.FC = () => {
                     mode={schedulingMode}
                     onModeChange={handleModeChange}
                     onWorkoutPlanSelect={() => {
-                    }} // Not used in this context
+                    }}
                     selectedWorkoutPlan={selectedWorkoutPlan}
                     isEditMode={isEditMode}
                     editingExercise={editingExercise}
@@ -409,13 +466,30 @@ const CalendarPage: React.FC = () => {
                 />
             )}
 
-            {/* 🆕 Post-Workout Celebration Sequence */}
+            {/* Post-Workout Celebration Sequence */}
             {showCelebration && celebrationData && (
                 <PostWorkoutOrchestrator
                     data={celebrationData}
                     onComplete={handleCelebrationComplete}
                 />
             )}
+
+            {/* Tutorial Overlay */}
+            {showTutorial && (
+                <TutorialOverlay
+                    steps={CALENDAR_TUTORIAL_STEPS}
+                    onComplete={handleTutorialComplete}
+                    onSkip={handleTutorialSkip}
+                />
+            )}
+
+            {/* Skip Tutorial Modal */}
+            <SkipTutorialModal
+                isOpen={showSkipModal}
+                onConfirm={handleConfirmSkip}
+                onCancel={() => setShowSkipModal(false)}
+                tutorialName="Calendar"
+            />
         </div>
     );
 };

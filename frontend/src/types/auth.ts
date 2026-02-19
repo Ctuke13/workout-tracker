@@ -35,6 +35,9 @@ export interface JwtResponse {
     nickname: string | null;
     petName: string | null;
     onboardingCompleted: boolean;
+    // ==================== TUTORIAL FIELDS ====================
+    petTutorialCompleted: boolean;
+    calendarTutorialCompleted: boolean;
 }
 
 export interface ApiResponse {
@@ -58,6 +61,9 @@ export interface UserSummary {
     nickname: string | null;
     petName: string | null;
     onboardingCompleted: boolean;
+    // ==================== TUTORIAL FIELDS ====================
+    petTutorialCompleted: boolean;
+    calendarTutorialCompleted: boolean;
 }
 
 // ==================== ONBOARDING TYPES ====================
@@ -98,6 +104,7 @@ export interface AuthContextType extends AuthState {
     register: (userData: RegisterRequest) => Promise<void>;
     logout: () => void;
     refreshToken: () => Promise<void>;
+    refreshUser: () => Promise<void>;
     checkAvailability: (type: 'email' | 'username', value: string) => Promise<boolean>;
     checkNicknameAvailability: (nickname: string) => Promise<NicknameCheckResponse>;
     checkPetNameValidity: (petName: string) => Promise<PetNameCheckResponse>;

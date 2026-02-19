@@ -1,13 +1,25 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
+import {User} from 'lucide-react';
 import {useAuth} from '../contexts/AuthContext';
 import {usePet} from '../contexts/PetContext';
-import {PetRoom, PetStatBars, PetActionButtons} from '../components/PetPage';
+import {PetRoom} from '../components/PetPage';
+import LevelBadge from '../components/PetPage/LevelBadge';
+import CompactStats from '../components/PetPage/CompactStats';
+import TodaysActivity from '../components/PetPage/TodaysActivity';
+import FloatingActionButton from '../components/PetPage/FloatingActionButton';
+import QuickActionsCard from '../components/PetPage/QuickActionsCard';
+import TutorialOverlay from '../components/tutorial/TutorialOverlay';
+import PostTutorialPrompt from '../components/tutorial/PostTutorialPrompt';
+import SkipTutorialModal from '../components/tutorial/SkipTutorialModal';
 import {MealType} from '../types/pet';
+import petApi, {WeeklyStatsResponse} from '../services/petApi';
+import {PET_TUTORIAL_STEPS} from '../config/tutorialSteps';
+import userApi from '../services/userApi';
 
 const PetHomePage: React.FC = () => {
     const navigate = useNavigate();
-    const {user} = useAuth();
+    const {user, refreshUser} = useAuth();
     const {
         stats,
         loading,
@@ -18,10 +30,45 @@ const PetHomePage: React.FC = () => {
         feedPet,
         motivatePet,
         bathePet,
-        sleepPet,
-        wakePet,
         clearLastAction,
     } = usePet();
+
+    // Weekly stats state
+    const [weeklyStats, setWeeklyStats] = useState<WeeklyStatsResponse | null>(null);
+    const [weeklyStatsLoading, setWeeklyStatsLoading] = useState(true);
+
+    // Tutorial state
+    const [showTutorial, setShowTutorial] = useState(false);
+    const [showPostTutorialPrompt, setShowPostTutorialPrompt] = useState(false);
+    const [showSkipModal, setShowSkipModal] = useState(false);
+
+    // Fetch weekly stats on mount
+    useEffect(() => {
+        const fetchWeeklyStats = async () => {
+            try {
+                const data = await petApi.getWeeklyStats();
+                setWeeklyStats(data);
+            } catch (err) {
+                console.error('Failed to fetch weekly stats:', err);
+            } finally {
+                setWeeklyStatsLoading(false);
+            }
+        };
+
+        fetchWeeklyStats();
+    }, []);
+
+    // Tutorial trigger effect
+    useEffect(() => {
+        // Show tutorial if user hasn't completed it and stats are loaded
+        if (user && !user.petTutorialCompleted && stats && !loading) {
+            // Small delay for smooth UX
+            const timer = setTimeout(() => {
+                setShowTutorial(true);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [user, stats, loading]);
 
     // Clear action message after 3 seconds
     useEffect(() => {
@@ -30,6 +77,43 @@ const PetHomePage: React.FC = () => {
             return () => clearTimeout(timer);
         }
     }, [lastAction, clearLastAction]);
+
+    // Tutorial handlers
+    const handleTutorialComplete = async () => {
+        setShowTutorial(false);
+        try {
+            await userApi.completePetTutorial();
+            await refreshUser();
+            // Show post-tutorial prompt
+            setShowPostTutorialPrompt(true);
+        } catch (error) {
+            console.error('Failed to mark pet tutorial as complete:', error);
+        }
+    };
+
+    const handleTutorialSkip = () => {
+        setShowSkipModal(true);
+    };
+
+    const handleConfirmSkip = async () => {
+        setShowSkipModal(false);
+        setShowTutorial(false);
+        try {
+            await userApi.completePetTutorial();
+            await refreshUser();
+        } catch (error) {
+            console.error('Failed to skip tutorial:', error);
+        }
+    };
+
+    const handlePlanWorkout = () => {
+        setShowPostTutorialPrompt(false);
+        navigate('/calendar');
+    };
+
+    const handleDismissPrompt = () => {
+        setShowPostTutorialPrompt(false);
+    };
 
     // Action handlers
     const handleFeed = async (mealType: MealType) => {
@@ -56,31 +140,15 @@ const PetHomePage: React.FC = () => {
         }
     };
 
-    const handleSleep = async () => {
-        try {
-            await sleepPet();
-        } catch (err) {
-            console.error('Sleep failed:', err);
-        }
-    };
-
-    const handleWake = async () => {
-        try {
-            await wakePet();
-        } catch (err) {
-            console.error('Wake failed:', err);
-        }
-    };
-
     // Loading state
     if (loading) {
         return (
             <div
-                className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex items-center justify-center">
+                className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50 flex items-center justify-center">
                 <div className="text-center">
                     <div
-                        className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"/>
-                    <p className="text-amber-700 font-medium">Loading your pet...</p>
+                        className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"/>
+                    <p className="text-purple-700 font-medium">Loading your pet...</p>
                 </div>
             </div>
         );
@@ -90,14 +158,14 @@ const PetHomePage: React.FC = () => {
     if (error && !stats) {
         return (
             <div
-                className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex items-center justify-center p-4">
+                className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50 flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full text-center">
                     <div className="text-4xl mb-4">😢</div>
                     <h2 className="text-xl font-bold text-gray-900 mb-2">Couldn't Load Pet</h2>
                     <p className="text-gray-600 mb-4">{error}</p>
                     <button
                         onClick={refreshStats}
-                        className="px-6 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors"
+                        className="px-6 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
                     >
                         Try Again
                     </button>
@@ -106,18 +174,18 @@ const PetHomePage: React.FC = () => {
         );
     }
 
-    // No stats (shouldn't happen if onboarding is complete)
+    // No stats
     if (!stats) {
         return (
             <div
-                className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 flex items-center justify-center p-4">
+                className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50 flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full text-center">
                     <div className="text-4xl mb-4">🐺</div>
                     <h2 className="text-xl font-bold text-gray-900 mb-2">No Pet Found</h2>
                     <p className="text-gray-600 mb-4">Complete onboarding to get your pet!</p>
                     <button
                         onClick={() => navigate('/onboarding/nickname')}
-                        className="px-6 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors"
+                        className="px-6 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
                     >
                         Start Onboarding
                     </button>
@@ -127,28 +195,40 @@ const PetHomePage: React.FC = () => {
     }
 
     return (
-        <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 min-h-full">
+        <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50 min-h-screen pb-24">
             {/* Header */}
-            <div className="bg-white/80 backdrop-blur-md border-b border-amber-200">
+            <div className="bg-white/80 backdrop-blur-md border-b border-purple-200 sticky top-0 z-10">
                 <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+                    {/* Pet Name */}
                     <div className="flex items-center gap-2">
                         <span className="text-2xl">🐺</span>
                         <div>
                             <h1 className="font-bold text-gray-900">
-                                {user?.petName || 'Your Pet'}
+                                {stats.petName || user?.petName || 'Your Pet'}
                             </h1>
                             <p className="text-xs text-gray-500">
-                                {user?.nickname ? `@${user.nickname}` : user?.firstName}'s companion
+                                {stats.evolutionStageDisplay || 'Baby Wolf'}
                             </p>
                         </div>
                     </div>
 
-                    {/* Crystal Counter */}
-                    <div
-                        className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 px-3 py-1.5 rounded-full">
-                        <span className="text-lg">💎</span>
-                        <span className="font-bold text-purple-700">{stats.crystals ?? 0}</span>
-                        <span className="text-xs text-purple-500">/ {stats.maxCrystals ?? 100}</span>
+                    {/* Right Side - Profile & Crystals */}
+                    <div className="flex items-center gap-3">
+                        {/* Profile Button */}
+                        <button
+                            onClick={() => navigate('/pet/profile')}
+                            className="flex items-center gap-1.5 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-full transition-colors"
+                        >
+                            <User className="w-4 h-4 text-purple-700"/>
+                            <span className="text-sm font-medium text-purple-700">Profile</span>
+                        </button>
+
+                        {/* Crystal Counter */}
+                        <div
+                            className="crystal-counter flex items-center gap-2 bg-gradient-to-r from-amber-100 to-orange-100 px-3 py-1.5 rounded-full">
+                            <span className="text-lg">💎</span>
+                            <span className="font-bold text-amber-700">{stats.crystals ?? 0}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -158,7 +238,7 @@ const PetHomePage: React.FC = () => {
                 {/* Action Feedback Toast */}
                 {lastAction && (
                     <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-bounce">
-                        <div className="bg-green-500 text-white px-4 py-2 rounded-full shadow-lg font-medium text-sm">
+                        <div className="bg-green-500 text-white px-6 py-3 rounded-full shadow-lg font-medium text-sm">
                             {lastAction}
                         </div>
                     </div>
@@ -166,39 +246,98 @@ const PetHomePage: React.FC = () => {
 
                 {/* Error Toast */}
                 {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">
+                    <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 text-red-700 text-sm shadow-lg">
                         {error}
                     </div>
                 )}
 
-                {/* Pet Room */}
-                <PetRoom/>
+                {/* Pet Room with Level Badge */}
+                <div className="pet-room-container relative">
+                    <PetRoom/>
 
-                {/* Stats */}
-                <PetStatBars stats={stats}/>
+                    {/* Level Badge Overlay */}
+                    <div className="absolute top-1 right-3">
+                        <LevelBadge
+                            level={stats.level ?? 1}
+                            currentXp={stats.xp ?? 0}
+                            xpToNextLevel={stats.xpToNextLevel ?? 100}
+                        />
+                    </div>
+                </div>
 
-                {/* Actions */}
-                <PetActionButtons
+                {/* Compact Stats (Collapsible) */}
+                <div className="compact-stats-container">
+                    <CompactStats stats={stats}/>
+                </div>
+
+                {/* Today's Activity */}
+                {weeklyStatsLoading ? (
+                    <div
+                        className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-4 shadow-lg border border-blue-200">
+                        <div className="flex items-center justify-center py-8">
+                            <div
+                                className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"/>
+                        </div>
+                    </div>
+                ) : weeklyStats ? (
+                    <div className="todays-activity-card">
+                        <TodaysActivity
+                            workoutsThisWeek={weeklyStats.workoutsThisWeek}
+                            workoutsGoal={weeklyStats.weeklyGoal}
+                            currentStreak={weeklyStats.currentStreak}
+                            xpThisWeek={weeklyStats.xpThisWeek}
+                            goalProgress={weeklyStats.goalProgress}
+                            goalAchieved={weeklyStats.goalAchieved}
+                        />
+                    </div>
+                ) : null}
+
+                {/* Quick Actions Card */}
+                <QuickActionsCard
+                    onPlanWorkout={() => navigate('/calendar')}
+                    workoutsThisWeek={weeklyStats?.workoutsThisWeek}
+                />
+
+
+            </div>
+
+            {/* Floating Action Button */}
+            <div className="floating-action-button">
+                <FloatingActionButton
                     stats={stats}
                     actionLoading={actionLoading}
                     onFeed={handleFeed}
                     onMotivate={handleMotivate}
                     onBathe={handleBathe}
-                    onSleep={handleSleep}
-                    onWake={handleWake}
                 />
-
-                {/* Quick Tips */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 text-sm text-gray-600">
-                    <p className="font-medium text-gray-800 mb-2">💡 Tips:</p>
-                    <ul className="space-y-1 text-xs">
-                        <li>• Complete workouts to earn 💎 crystals</li>
-                        <li>• Feed your pet to keep fuel high</li>
-                        <li>• Motivate daily for best results (30min cooldown)</li>
-                        <li>• Bathe requires 40%+ motivation</li>
-                    </ul>
-                </div>
             </div>
+
+            {/* Tutorial Overlay */}
+            {showTutorial && (
+                <TutorialOverlay
+                    steps={PET_TUTORIAL_STEPS}
+                    onComplete={handleTutorialComplete}
+                    onSkip={handleTutorialSkip}
+                    petName={stats.petName || user?.petName || 'your pet'}
+                />
+            )}
+
+            {/* Post-Tutorial Prompt */}
+            {showPostTutorialPrompt && (
+                <PostTutorialPrompt
+                    onPlanWorkout={handlePlanWorkout}
+                    onDismiss={handleDismissPrompt}
+                    petName={stats.petName || user?.petName || 'your pet'}
+                />
+            )}
+
+            {/* Skip Tutorial Modal */}
+            <SkipTutorialModal
+                isOpen={showSkipModal}
+                onConfirm={handleConfirmSkip}
+                onCancel={() => setShowSkipModal(false)}
+                tutorialName="Pet"
+            />
         </div>
     );
 };

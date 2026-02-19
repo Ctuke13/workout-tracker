@@ -20,7 +20,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({children}) => {
     const hideBottomNav = ['/login', '/register', '/'].includes(location.pathname);
 
     // Hide the general FAB on calendar page since it has its own specific FAB
-    const hideGeneralFAB = location.pathname === '/calendar';
+    const hideGeneralFAB = ['/calendar', '/pet'].includes(location.pathname);
 
     return (
         <div className="flex flex-col h-screen bg-gray-50">

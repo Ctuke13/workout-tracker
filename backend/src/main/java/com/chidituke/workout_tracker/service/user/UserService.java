@@ -87,6 +87,15 @@ public class UserService {
     }
 
     /**
+     * Update user entity (ADDED FOR WEEKLY GOALS)
+     */
+    @Transactional
+    public User updateUser(User user) {
+        user.setUpdatedAt(LocalDateTime.now());
+        return userRepository.save(user);
+    }
+
+    /**
      * Get user by username (ADDED FOR CONVENIENCE)
      */
     public User getUserByUsername(String username) {
@@ -268,6 +277,45 @@ public class UserService {
         user.setUpdatedAt(LocalDateTime.now());
 
         return userRepository.save(user);
+    }
+
+    /**
+     * Change user password
+     * Verifies current password and updates to new password
+     */
+    @Transactional
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        // Get user
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Verify current password
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+
+        // Validate new password
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            throw new RuntimeException("New password cannot be empty");
+        }
+
+        if (newPassword.length() < 8) {
+            throw new RuntimeException("New password must be at least 8 characters");
+        }
+
+        // Don't allow same password
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new RuntimeException("New password must be different from current password");
+        }
+
+        // Hash and update password
+        String hashedPassword = passwordEncoder.encode(newPassword);
+        user.setPassword(hashedPassword);
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepository.save(user);
+
+        log.info("Password changed successfully for user: {}", user.getUsername());
     }
 
 // ==================== RESULT CLASSES ====================

@@ -193,11 +193,19 @@ class ApiClient {
         // Check if response is wrapped in ApiResponse format
         if (responseData && typeof responseData === 'object' && 'success' in responseData) {
             const apiResponse = responseData as ApiResponse<T>;
-            if (apiResponse.success && apiResponse.data !== undefined) {
-                return apiResponse.data;
-            } else {
+
+            // Only throw error if success is explicitly false
+            if (apiResponse.success === false) {
                 throw new Error(apiResponse.message || 'API request failed');
             }
+
+            // Return data if present, otherwise return the whole response
+            if (apiResponse.data !== undefined) {
+                return apiResponse.data;
+            }
+
+            // For endpoints that return {success: true, message: "..."} without data field
+            return apiResponse as T;
         }
 
         // Return direct data if not wrapped

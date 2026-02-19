@@ -25,6 +25,7 @@ type AuthAction =
     | { type: 'REGISTER_FAILURE'; payload: string }
     | { type: 'LOGOUT' }
     | { type: 'REFRESH_TOKEN_SUCCESS'; payload: JwtResponse }
+    | { type: 'REFRESH_USER_SUCCESS'; payload: JwtResponse }
     | { type: 'ONBOARDING_COMPLETE'; payload: JwtResponse }
     | { type: 'CLEAR_ERROR' }
     | { type: 'SET_LOADING'; payload: boolean }
@@ -51,6 +52,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         case 'LOGIN_SUCCESS':
         case 'REGISTER_SUCCESS':
         case 'REFRESH_TOKEN_SUCCESS':
+        case 'REFRESH_USER_SUCCESS':
         case 'ONBOARDING_COMPLETE':
             return {
                 ...state,
@@ -143,7 +145,7 @@ export function AuthProvider({children}: AuthProviderProps) {
                 navigate('/onboarding/nickname');
             } else {
                 console.log('✅ Login successful, redirecting to home');
-                navigate('/welcome');
+                navigate('/pet');
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Login failed';
@@ -185,6 +187,43 @@ export function AuthProvider({children}: AuthProviderProps) {
         }
     };
 
+    const refreshUser = async (): Promise<void> => {
+        try {
+            const token = authService.getToken();
+            if (!token) {
+                console.log('No token found, cannot refresh user');
+                return;
+            }
+
+            const user = await authService.getCurrentUser();
+
+            // Create JwtResponse object with updated user data
+            const jwtResponse: JwtResponse = {
+                token,
+                type: 'Bearer',
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                userType: user.userType,
+                isProfessional: user.isProfessional,
+                subscriptionTier: user.subscriptionTier || 'FREE',
+                nickname: user.nickname,
+                petName: user.petName,
+                onboardingCompleted: user.onboardingCompleted,
+                petTutorialCompleted: user.petTutorialCompleted,
+                calendarTutorialCompleted: user.calendarTutorialCompleted,
+            };
+
+            dispatch({type: 'REFRESH_USER_SUCCESS', payload: jwtResponse});
+            console.log('✅ User data refreshed successfully');
+        } catch (error) {
+            console.error('Failed to refresh user data:', error);
+            throw error;
+        }
+    };
+
     const checkAvailability = async (type: 'email' | 'username', value: string): Promise<boolean> => {
         try {
             if (type === 'email') {
@@ -214,7 +253,7 @@ export function AuthProvider({children}: AuthProviderProps) {
             dispatch({type: 'ONBOARDING_COMPLETE', payload: response});
 
             console.log('🎉 Onboarding complete! Welcome to EvoPet!');
-            navigate('/welcome');
+            navigate('/pet');
         } catch (error) {
             console.error('Onboarding failed:', error);
             throw error;
@@ -276,6 +315,9 @@ export function AuthProvider({children}: AuthProviderProps) {
                     nickname: user.nickname,
                     petName: user.petName,
                     onboardingCompleted: user.onboardingCompleted,
+                    // Tutorial fields
+                    petTutorialCompleted: user.petTutorialCompleted,
+                    calendarTutorialCompleted: user.calendarTutorialCompleted,
                 };
 
                 dispatch({type: 'LOGIN_SUCCESS', payload: jwtResponse});
@@ -325,11 +367,11 @@ export function AuthProvider({children}: AuthProviderProps) {
             // Redirect away from onboarding pages if already complete
             if (isOnboardingRoute) {
                 console.log('✅ Already onboarded, redirecting to welcome');
-                navigate('/welcome');
+                navigate('/pet');
             }
             // Redirect away from public pages if logged in
             if (isPublicRoute && currentPath !== '/') {
-                navigate('/welcome');
+                navigate('/pet');
             }
         }
     }, [state.isAuthenticated, state.loading, state.user?.onboardingCompleted, location.pathname, navigate, needsOnboarding]);
@@ -363,6 +405,7 @@ export function AuthProvider({children}: AuthProviderProps) {
         register,
         logout,
         refreshToken,
+        refreshUser,
         checkAvailability,
         checkNicknameAvailability,
         checkPetNameValidity,

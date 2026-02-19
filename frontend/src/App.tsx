@@ -5,6 +5,7 @@ import {WorkoutProvider} from './contexts/WorkoutContext';
 import {SeasonProvider} from "./contexts/SeasonContext";
 import {UserPreferencesProvider} from './contexts/UserPreferencesContext';
 import {PetProvider} from './contexts/PetContext';
+
 import MobileLayout from './components/layout/MobileLayout';
 
 // Auth Pages (no layout)
@@ -42,6 +43,8 @@ import NotificationsPage from './pages/NotificationsPage';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
 import BillingPage from './pages/BillingPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 
 // import {ApiTestPanel} from './components/ApiTestPanel';
 
@@ -77,7 +80,6 @@ const App: React.FC = () => {
 
                                     {/* ==================== PROTECTED ROUTES ==================== */}
                                     {/* With Mobile Layout - Only accessible after onboarding complete */}
-                                    <Route path="/welcome" element={<MobileLayout><WelcomePage/></MobileLayout>}/>
                                     <Route path="/progress" element={<MobileLayout><ProgressPage/></MobileLayout>}/>
                                     <Route path="/analytics" element={<MobileLayout><AnalyticsPage/></MobileLayout>}/>
                                     <Route path="/calendar" element={<MobileLayout><CalendarPage/></MobileLayout>}/>
@@ -91,6 +93,11 @@ const App: React.FC = () => {
                                     <Route path="/settings" element={<MobileLayout><SettingsPage/></MobileLayout>}/>
                                     <Route path="/help" element={<MobileLayout><HelpPage/></MobileLayout>}/>
                                     <Route path="/billing" element={<MobileLayout><BillingPage/></MobileLayout>}/>
+
+                                    {/* ==================== LEGAL PAGES ==================== */}
+                                    {/* Standalone pages (no layout) - Accessible to all users */}
+                                    <Route path="/terms" element={<TermsPage/>}/>
+                                    <Route path="/privacy" element={<PrivacyPage/>}/>
                                 </Routes>
 
                                 {/* API Test Panel - Shows on all pages in development */}

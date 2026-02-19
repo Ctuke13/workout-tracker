@@ -223,6 +223,21 @@ public class User implements UserDetails {
     @Builder.Default
     private Boolean onboardingCompleted = false;
 
+    // ==================== WEEKLY GOAL TRACKING ====================
+
+    /**
+     * User's weekly workout goal (optional)
+     */
+    @Column(name = "weekly_workout_goal")
+    private Integer weeklyWorkoutGoal;
+
+    /**
+     * Type of weekly goal (currently only "workouts" supported)
+     */
+    @Column(name = "goal_type", length = 50)
+    @Builder.Default
+    private String goalType = "workouts";
+
 // ==================== ONBOARDING HELPER METHODS ====================
 
     /**
@@ -248,6 +263,12 @@ public class User implements UserDetails {
     public boolean hasCompletedOnboarding() {
         return Boolean.TRUE.equals(onboardingCompleted);
     }
+
+    @Column(name = "pet_tutorial_completed", nullable = false)
+    private Boolean petTutorialCompleted = false;
+
+    @Column(name = "calendar_tutorial_completed", nullable = false)
+    private Boolean calendarTutorialCompleted = false;
 
 
     // ==================== LOCATION METHODS ====================

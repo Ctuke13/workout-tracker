@@ -23,6 +23,8 @@ public class JwtResponse {
     private String nickname;
     private String petName;
     private Boolean onboardingCompleted;
+    private Boolean petTutorialCompleted;
+    private Boolean calendarTutorialCompleted;
 
 
     // ═══════════════════════════════════════════════════════════════════
@@ -82,7 +84,8 @@ public class JwtResponse {
     public JwtResponse(String accessToken, Long id, String username, String email,
                        String firstName, String lastName, UserType userType, Boolean isProfessional,
                        SubscriptionTier subscriptionTier, String nickname, String petName,
-                       Boolean onboardingCompleted) {
+                       Boolean onboardingCompleted, Boolean petTutorialCompleted,
+                       Boolean calendarTutorialCompleted) {
         this.token = accessToken;
         this.type = "Bearer";
         this.id = id;
@@ -96,6 +99,8 @@ public class JwtResponse {
         this.nickname = nickname;
         this.petName = petName;
         this.onboardingCompleted = onboardingCompleted;
+        this.petTutorialCompleted = petTutorialCompleted;
+        this.calendarTutorialCompleted = calendarTutorialCompleted;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -186,6 +191,36 @@ public class JwtResponse {
      */
     public boolean needsOnboarding() {
         return !Boolean.TRUE.equals(onboardingCompleted);
+    }
+
+    public Boolean getPetTutorialCompleted() {
+        return petTutorialCompleted;
+    }
+
+    public void setPetTutorialCompleted(Boolean petTutorialCompleted) {
+        this.petTutorialCompleted = petTutorialCompleted;
+    }
+
+    public Boolean getCalendarTutorialCompleted() {
+        return calendarTutorialCompleted;
+    }
+
+    public void setCalendarTutorialCompleted(Boolean calendarTutorialCompleted) {
+        this.calendarTutorialCompleted = calendarTutorialCompleted;
+    }
+
+    /**
+     * Check if user needs to see pet tutorial
+     */
+    public boolean needsPetTutorial() {
+        return !Boolean.TRUE.equals(petTutorialCompleted);
+    }
+
+    /**
+     * Check if user needs to see calendar tutorial
+     */
+    public boolean needsCalendarTutorial() {
+        return !Boolean.TRUE.equals(calendarTutorialCompleted);
     }
 
     // ═══════════════════════════════════════════════════════════════════

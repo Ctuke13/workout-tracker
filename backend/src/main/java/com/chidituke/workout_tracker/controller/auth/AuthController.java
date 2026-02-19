@@ -71,9 +71,11 @@ public class AuthController {
                 user.getUserType(),
                 user.getProfessionalProfile() != null,
                 user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
-                user.getNickname(),      // NEW
-                user.getPetName(),       // NEW
-                user.getOnboardingCompleted()  // NEW
+                user.getNickname(),
+                user.getPetName(),
+                user.getOnboardingCompleted(),
+                user.getPetTutorialCompleted(),
+                user.getCalendarTutorialCompleted()
         );
 
         return ResponseEntity.ok(jwtResponse);
@@ -128,7 +130,9 @@ public class AuthController {
                 user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
                 user.getNickname(),
                 user.getPetName(),
-                user.getOnboardingCompleted()
+                user.getOnboardingCompleted(),
+                user.getPetTutorialCompleted(),
+                user.getCalendarTutorialCompleted()
         );
 
         return ResponseEntity.ok(jwtResponse);
@@ -212,7 +216,9 @@ public class AuthController {
                     user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
                     user.getNickname(),
                     user.getPetName(),
-                    user.getOnboardingCompleted()
+                    user.getOnboardingCompleted(),
+                    user.getPetTutorialCompleted(),
+                    user.getCalendarTutorialCompleted()
             );
 
             return ResponseEntity.ok(jwtResponse);
@@ -258,7 +264,9 @@ public class AuthController {
                 user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
                 user.getNickname(),
                 user.getPetName(),
-                user.getOnboardingCompleted()
+                user.getOnboardingCompleted(),
+                user.getPetTutorialCompleted(),
+                user.getCalendarTutorialCompleted()
         );
 
         return ResponseEntity.ok(userSummary);
@@ -303,7 +311,9 @@ public class AuthController {
                 user.getSubscriptionTier() != null ? user.getSubscriptionTier() : SubscriptionTier.FREE,
                 user.getNickname(),
                 user.getPetName(),
-                user.getOnboardingCompleted()
+                user.getOnboardingCompleted(),
+                user.getPetTutorialCompleted(),
+                user.getCalendarTutorialCompleted()
         );
 
         return ResponseEntity.ok(jwtResponse);
@@ -375,12 +385,16 @@ public class AuthController {
         private String nickname;
         private String petName;
         private Boolean onboardingCompleted;
+        // ==================== TUTORIAL FIELDS ====================
+        private Boolean petTutorialCompleted;
+        private Boolean calendarTutorialCompleted;
 
-        // ✅ Updated constructor with onboarding fields
+        // ✅ Updated constructor with onboarding and tutorial fields
         public UserSummary(Long id, String username, String email, String firstName, String lastName,
                            UserType userType, User.AccountStatus accountStatus, User.ActivityLevel activityLevel,
                            Boolean isProfessional, Boolean isVerified, SubscriptionTier subscriptionTier,
-                           String nickname, String petName, Boolean onboardingCompleted) {
+                           String nickname, String petName, Boolean onboardingCompleted,
+                           Boolean petTutorialCompleted, Boolean calendarTutorialCompleted) {
             this.id = id;
             this.username = username;
             this.email = email;
@@ -395,6 +409,8 @@ public class AuthController {
             this.nickname = nickname;
             this.petName = petName;
             this.onboardingCompleted = onboardingCompleted;
+            this.petTutorialCompleted = petTutorialCompleted;
+            this.calendarTutorialCompleted = calendarTutorialCompleted;
         }
 
         // ✅ Getters and setters
@@ -509,6 +525,23 @@ public class AuthController {
 
         public void setOnboardingCompleted(Boolean onboardingCompleted) {
             this.onboardingCompleted = onboardingCompleted;
+        }
+
+        // ==================== TUTORIAL GETTERS/SETTERS ====================
+        public Boolean getPetTutorialCompleted() {
+            return petTutorialCompleted;
+        }
+
+        public void setPetTutorialCompleted(Boolean petTutorialCompleted) {
+            this.petTutorialCompleted = petTutorialCompleted;
+        }
+
+        public Boolean getCalendarTutorialCompleted() {
+            return calendarTutorialCompleted;
+        }
+
+        public void setCalendarTutorialCompleted(Boolean calendarTutorialCompleted) {
+            this.calendarTutorialCompleted = calendarTutorialCompleted;
         }
 
         // ✅ Utility methods

@@ -1,166 +1,73 @@
 import React from 'react';
-import {
-    Container,
-    Typography,
-    Card,
-    CardContent,
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemText,
-    Divider,
-    Switch,
-    Paper,
-    Box,
-    Avatar,
-    Button
-} from '@mui/material';
-import {
-    Person,
-    Notifications,
-    Security,
-    Palette,
-    Language,
-    Help,
-    Logout,
-    ChevronRight,
-    Edit
-} from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+import {LogOut} from 'lucide-react';
+import {useAuth} from '../contexts/AuthContext';
+import ProfileSection from '../components/SettingsPage/ProfileSection';
+import AccountSection from '../components/SettingsPage/AccountSection';
+import GoalManagement from '../components/SettingsPage/GoalManagement';
+import TutorialSection from '../components/SettingsPage/TutorialSection.jsx';
+import PreferencesSection from '../components/SettingsPage/PreferencesSection';
+import SubscriptionSection from '../components/SettingsPage/SubscriptionSection';
+import DataPrivacySection from '../components/SettingsPage/DataPrivacySection';
+import AboutSection from '../components/SettingsPage/AboutSection';
 
 const SettingsPage: React.FC = () => {
-    const { user, logout } = useAuth();
+    const {logout} = useAuth();
 
-    interface SettingsItem {
-        icon: React.ReactElement;
-        label: string;
-        hasSwitch: boolean;
-        checked?: boolean;
-        value?: string;
-        isAction?: boolean;
-    }
-
-    interface SettingsSection {
-        title: string;
-        items: SettingsItem[];
-    }
-
-    const settingsSections: SettingsSection[] = [
-        {
-            title: 'Account',
-            items: [
-                { icon: <Person />, label: 'Profile Information', hasSwitch: false },
-                { icon: <Edit />, label: 'Edit Profile', hasSwitch: false },
-                { icon: <Security />, label: 'Password & Security', hasSwitch: false }
-            ]
-        },
-        {
-            title: 'Preferences',
-            items: [
-                { icon: <Notifications />, label: 'Push Notifications', hasSwitch: true, checked: true },
-                { icon: <Palette />, label: 'Dark Mode', hasSwitch: true, checked: false },
-                { icon: <Language />, label: 'Language', hasSwitch: false, value: 'English' }
-            ]
-        },
-        {
-            title: 'Support',
-            items: [
-                { icon: <Help />, label: 'Help & Support', hasSwitch: false },
-                { icon: <Logout />, label: 'Sign Out', hasSwitch: false, isAction: true }
-            ]
+    const handleLogout = () => {
+        if (window.confirm('Are you sure you want to sign out?')) {
+            logout();
         }
-    ];
+    };
 
     return (
-        <Container maxWidth="md" sx={{ py: 3 }}>
-            <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
-                Settings & Privacy
-            </Typography>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50/30 pb-24">
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+                <div className="max-w-2xl mx-auto px-4 py-4">
+                    <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+                    <p className="text-sm text-gray-600">Manage your account and preferences</p>
+                </div>
+            </div>
 
-            {/* Profile Header */}
-            <Paper sx={{ p: 3, mb: 3 }}>
-                <Box display="flex" alignItems="center" gap={3}>
-                    <Avatar
-                        sx={{
-                            width: 64,
-                            height: 64,
-                            bgcolor: 'primary.main',
-                            fontSize: '1.5rem'
-                        }}
-                    >
-                        {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
-                    </Avatar>
-                    <Box flexGrow={1}>
-                        <Typography variant="h6" fontWeight="bold">
-                            {user?.firstName} {user?.lastName}
-                        </Typography>
-                        <Typography color="text.secondary">
-                            {user?.email}
-                        </Typography>
-                        <Typography variant="body2" color="primary" sx={{ mt: 0.5 }}>
-                            {user?.userType} Member
-                        </Typography>
-                    </Box>
-                    <Button variant="outlined" startIcon={<Edit />}>
-                        Edit
-                    </Button>
-                </Box>
-            </Paper>
+            {/* Content */}
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+                {/* Profile */}
+                <ProfileSection/>
 
-            {/* Settings Sections */}
-            {settingsSections.map((section, sectionIndex) => (
-                <Card key={sectionIndex} sx={{ mb: 2 }}>
-                    <CardContent sx={{ p: 0 }}>
-                        <Box sx={{ p: 2 }}>
-                            <Typography variant="h6" fontWeight="bold" color="primary">
-                                {section.title}
-                            </Typography>
-                        </Box>
-                        <Divider />
-                        <List sx={{ p: 0 }}>
-                            {section.items.map((item, itemIndex) => (
-                                <React.Fragment key={itemIndex}>
-                                    <ListItem
-                                        sx={{
-                                            cursor: 'pointer',
-                                            '&:hover': { bgcolor: 'action.hover' },
-                                            py: 2
-                                        }}
-                                        onClick={item.label === 'Sign Out' ? logout : undefined}
-                                    >
-                                        <ListItemIcon>
-                                            {item.icon}
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={item.label}
-                                            secondary={item.value}
-                                        />
-                                        {item.hasSwitch ? (
-                                            <Switch
-                                                checked={item.checked}
-                                                color="primary"
-                                            />
-                                        ) : (
-                                            !item.isAction && <ChevronRight color="action" />
-                                        )}
-                                    </ListItem>
-                                    {itemIndex < section.items.length - 1 && <Divider />}
-                                </React.Fragment>
-                            ))}
-                        </List>
-                    </CardContent>
-                </Card>
-            ))}
+                {/* Account */}
+                <AccountSection/>
 
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-                <Typography variant="h6" gutterBottom>
-                    Privacy & Data
-                </Typography>
-                <Typography color="text.secondary" variant="body2">
-                    Your privacy is important to us. We follow industry best practices to keep your data secure.
-                </Typography>
-            </Paper>
-        </Container>
+                {/* Weekly Goals */}
+                <GoalManagement/>
+
+                {/* Tutorials */}
+                <TutorialSection/>
+
+                {/* Preferences */}
+                <PreferencesSection/>
+
+                {/* Subscription */}
+                <SubscriptionSection/>
+
+                {/* Privacy & Data */}
+                <DataPrivacySection/>
+
+                {/* About */}
+                <AboutSection/>
+
+                {/* Sign Out Button */}
+                <button
+                    onClick={handleLogout}
+                    className="w-full bg-white rounded-2xl shadow-sm border border-red-200 hover:border-red-300 hover:bg-red-50 transition-all p-4 flex items-center justify-center gap-3 text-red-600 font-semibold"
+                >
+                    <LogOut className="w-5 h-5"/>
+                    Sign Out
+                </button>
+
+                {/* Bottom Spacing for Mobile Nav */}
+                <div className="h-6"/>
+            </div>
+        </div>
     );
 };
 

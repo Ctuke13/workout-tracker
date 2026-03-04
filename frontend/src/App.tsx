@@ -5,6 +5,7 @@ import {WorkoutProvider} from './contexts/WorkoutContext';
 import {SeasonProvider} from "./contexts/SeasonContext";
 import {UserPreferencesProvider} from './contexts/UserPreferencesContext';
 import {PetProvider} from './contexts/PetContext';
+import WorkoutCompletePage from './pages/WorkoutCompletePage';
 
 import MobileLayout from './components/layout/MobileLayout';
 
@@ -77,6 +78,7 @@ const App: React.FC = () => {
                                     {/* ==================== WORKOUT MODE ==================== */}
                                     {/* Full Screen (No Layout) */}
                                     <Route path="/workout" element={<WorkoutModePage/>}/>
+                                    <Route path="/workout-complete" element={<WorkoutCompletePage/>}/>
 
                                     {/* ==================== PROTECTED ROUTES ==================== */}
                                     {/* With Mobile Layout - Only accessible after onboarding complete */}

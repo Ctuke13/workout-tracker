@@ -1,15 +1,13 @@
 import React, {useEffect, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {User} from 'lucide-react';
 import {useAuth} from '../contexts/AuthContext';
 import {usePet} from '../contexts/PetContext';
 import {PetRoom} from '../components/PetPage';
-import LevelBadge from '../components/PetPage/LevelBadge';
 import CompactStats from '../components/PetPage/CompactStats';
 import TodaysActivity from '../components/PetPage/TodaysActivity';
-import FloatingActionButton from '../components/PetPage/FloatingActionButton';
+import PetActionsCard from '../components/PetPage/PetActionsCard';
 import QuickActionsCard from '../components/PetPage/QuickActionsCard';
-import TutorialOverlay from '../components/tutorial/TutorialOverlay';
+import GuidedTour from '../components/tutorial/GuidedTour';
 import PostTutorialPrompt from '../components/tutorial/PostTutorialPrompt';
 import SkipTutorialModal from '../components/tutorial/SkipTutorialModal';
 import {MealType} from '../types/pet';
@@ -60,15 +58,15 @@ const PetHomePage: React.FC = () => {
 
     // Tutorial trigger effect
     useEffect(() => {
-        // Show tutorial if user hasn't completed it and stats are loaded
-        if (user && !user.petTutorialCompleted && stats && !loading) {
+        // Show tutorial ONLY if user hasn't completed it AND all data is loaded
+        if (user && !user.petTutorialCompleted && stats && !loading && !weeklyStatsLoading && weeklyStats) {
             // Small delay for smooth UX
             const timer = setTimeout(() => {
                 setShowTutorial(true);
             }, 1000);
             return () => clearTimeout(timer);
         }
-    }, [user, stats, loading]);
+    }, [user, stats, loading, weeklyStatsLoading, weeklyStats]);
 
     // Clear action message after 3 seconds
     useEffect(() => {
@@ -196,43 +194,6 @@ const PetHomePage: React.FC = () => {
 
     return (
         <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50 min-h-screen pb-24">
-            {/* Header */}
-            <div className="bg-white/80 backdrop-blur-md border-b border-purple-200 sticky top-0 z-10">
-                <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-                    {/* Pet Name */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-2xl">🐺</span>
-                        <div>
-                            <h1 className="font-bold text-gray-900">
-                                {stats.petName || user?.petName || 'Your Pet'}
-                            </h1>
-                            <p className="text-xs text-gray-500">
-                                {stats.evolutionStageDisplay || 'Baby Wolf'}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Right Side - Profile & Crystals */}
-                    <div className="flex items-center gap-3">
-                        {/* Profile Button */}
-                        <button
-                            onClick={() => navigate('/pet/profile')}
-                            className="flex items-center gap-1.5 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-full transition-colors"
-                        >
-                            <User className="w-4 h-4 text-purple-700"/>
-                            <span className="text-sm font-medium text-purple-700">Profile</span>
-                        </button>
-
-                        {/* Crystal Counter */}
-                        <div
-                            className="crystal-counter flex items-center gap-2 bg-gradient-to-r from-amber-100 to-orange-100 px-3 py-1.5 rounded-full">
-                            <span className="text-lg">💎</span>
-                            <span className="font-bold text-amber-700">{stats.crystals ?? 0}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {/* Main Content */}
             <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
                 {/* Action Feedback Toast */}
@@ -251,26 +212,30 @@ const PetHomePage: React.FC = () => {
                     </div>
                 )}
 
-                {/* Pet Room with Level Badge */}
+                {/* ✨ NEW LOGICAL ORDER ✨ */}
+
+                {/* 1. Pet Room */}
                 <div className="pet-room-container relative">
                     <PetRoom/>
-
-                    {/* Level Badge Overlay */}
-                    <div className="absolute top-1 right-3">
-                        <LevelBadge
-                            level={stats.level ?? 1}
-                            currentXp={stats.xp ?? 0}
-                            xpToNextLevel={stats.xpToNextLevel ?? 100}
-                        />
-                    </div>
                 </div>
 
-                {/* Compact Stats (Collapsible) */}
+                {/* 2. Compact Stats - RIGHT AFTER PET! */}
                 <div className="compact-stats-container">
                     <CompactStats stats={stats}/>
                 </div>
 
-                {/* Today's Activity */}
+                {/* 3. Pet Actions - Always visible! */}
+                <div className="pet-actions-card">
+                    <PetActionsCard
+                        stats={stats}
+                        actionLoading={actionLoading}
+                        onFeed={handleFeed}
+                        onMotivate={handleMotivate}
+                        onBathe={handleBathe}
+                    />
+                </div>
+
+                {/* 4. Today's Activity */}
                 {weeklyStatsLoading ? (
                     <div
                         className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-4 shadow-lg border border-blue-200">
@@ -292,29 +257,16 @@ const PetHomePage: React.FC = () => {
                     </div>
                 ) : null}
 
-                {/* Quick Actions Card */}
+                {/* 5. Quick Actions Card */}
                 <QuickActionsCard
                     onPlanWorkout={() => navigate('/calendar')}
                     workoutsThisWeek={weeklyStats?.workoutsThisWeek}
                 />
-
-
             </div>
 
-            {/* Floating Action Button */}
-            <div className="floating-action-button">
-                <FloatingActionButton
-                    stats={stats}
-                    actionLoading={actionLoading}
-                    onFeed={handleFeed}
-                    onMotivate={handleMotivate}
-                    onBathe={handleBathe}
-                />
-            </div>
-
-            {/* Tutorial Overlay */}
+            {/* Guided Tour */}
             {showTutorial && (
-                <TutorialOverlay
+                <GuidedTour
                     steps={PET_TUTORIAL_STEPS}
                     onComplete={handleTutorialComplete}
                     onSkip={handleTutorialSkip}

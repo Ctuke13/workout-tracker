@@ -360,12 +360,15 @@ export const useCalendarActions = (
 
     const handleStartFullWorkout = async () => {
         try {
-            if (viewingDateExercises.length === 0) {
-                toast.error('No exercises scheduled for today');
+            // Filter out completed exercises FIRST
+            const uncompletedExercises = viewingDateExercises.filter(ex => !ex.completed);
+
+            if (uncompletedExercises.length === 0) {
+                toast.success('All exercises completed! Great job! 🎉');
                 return;
             }
 
-            const compatibleExercises = viewingDateExercises.map(scheduledExercise => ({
+            const compatibleExercises = uncompletedExercises.map(scheduledExercise => ({
                 ...scheduledExercise,
                 exercise: {
                     ...scheduledExercise.exercise,

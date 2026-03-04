@@ -3,9 +3,7 @@ import {NavLink} from 'react-router-dom';
 import {
     HomeIcon,
     ChartBarIcon,
-    CalendarIcon,
-    UserGroupIcon,
-    ChatBubbleLeftIcon
+    CalendarIcon
 } from '@heroicons/react/24/outline';
 
 const BottomNavigation: React.FC = () => {
@@ -27,24 +25,12 @@ const BottomNavigation: React.FC = () => {
             icon: CalendarIcon,
             label: 'Calendar',
             activeColor: 'text-purple-600'
-        },
-        {
-            path: '/community',
-            icon: UserGroupIcon,
-            label: 'Community',
-            activeColor: 'text-orange-600'
-        },
-        {
-            path: '/messages',
-            icon: ChatBubbleLeftIcon,
-            label: 'Messages',
-            activeColor: 'text-pink-600'
         }
     ];
 
     return (
         <nav className="bg-white border-t border-gray-200 fixed bottom-0 left-0 right-0 z-40">
-            <div className="grid grid-cols-5 h-16">
+            <div className="grid grid-cols-3 h-16">
                 {navItems.map((item) => (
                     <NavLink
                         key={item.path}

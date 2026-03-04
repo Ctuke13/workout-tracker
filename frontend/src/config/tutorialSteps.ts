@@ -14,7 +14,8 @@ export interface TutorialStep {
 }
 
 // ==================================================
-// PET PAGE TUTORIAL
+// PET PAGE TUTORIAL - WITH ACTION CARD
+// Pet → Stats → Actions → Crystals → Progress
 // ==================================================
 
 export const PET_TUTORIAL_STEPS: TutorialStep[] = [
@@ -23,7 +24,7 @@ export const PET_TUTORIAL_STEPS: TutorialStep[] = [
         title: '👋 Welcome to EvoPet!',
         description: `This is your pet companion! Take care of them by keeping their stats healthy and they'll motivate you on your fitness journey.`,
         position: 'center',
-        scrollIntoView: false, // Center modal, no scroll needed
+        scrollIntoView: false,
     },
     {
         id: 2,
@@ -35,26 +36,10 @@ export const PET_TUTORIAL_STEPS: TutorialStep[] = [
     },
     {
         id: 3,
-        title: '💎 Crystals',
-        description: `Crystals are your currency! Earn them by completing workouts. Use them to feed your pet and keep them healthy.`,
-        highlightSelector: '.crystal-counter',
-        position: 'bottom',
-        scrollIntoView: true,
-    },
-    {
-        id: 4,
-        title: '📊 This Week\'s Progress',
-        description: `Track your weekly workout goals here. See your streak, XP earned, and progress toward your weekly target!`,
-        highlightSelector: '.todays-activity-card',
-        position: 'top',
-        scrollIntoView: true,
-    },
-    {
-        id: 5,
         title: '📈 Pet Stats',
         description: `Your pet has 4 needs: Fuel, Motivation, Fatigue, and Cleanliness. Keep them balanced to keep your pet happy!`,
         highlightSelector: '.compact-stats-container',
-        position: 'top',
+        position: 'bottom',
         scrollIntoView: true,
         preAction: async () => {
             // Expand CompactStats before highlighting
@@ -70,12 +55,52 @@ export const PET_TUTORIAL_STEPS: TutorialStep[] = [
         },
     },
     {
+        id: 4,
+        title: '🎮 Pet Care Actions',
+        description: `Use these buttons to take care of your pet! Feed them when fuel is low, motivate them for energy, or give them a bath to keep them clean. Each action costs crystals.`,
+        highlightSelector: '.pet-actions-card',
+        position: 'bottom',
+        scrollIntoView: false,
+        preAction: async () => {
+            const element = document.querySelector('.pet-actions-card');
+            if (element) {
+                // Scroll element into view with alignment to create space for modal
+                element.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'start'});
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        },
+    },
+    {
+        id: 5,
+        title: '💎 Crystals',
+        description: `Crystals are your currency! Earn them by completing workouts. You'll need them to feed, motivate, and bathe your pet.`,
+        highlightSelector: '.crystal-counter',
+        position: 'bottom',
+        scrollIntoView: false,
+        preAction: async () => {
+            // Scroll to top to show header
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+            await new Promise(resolve => setTimeout(resolve, 500));
+        },
+    },
+    {
         id: 6,
-        title: '✨ Actions',
-        description: `Tap here to feed, motivate, or bathe your pet! Each action costs crystals or has cooldowns. Take good care of your companion!`,
-        highlightSelector: '.floating-action-button',
-        position: 'top',
-        scrollIntoView: true,
+        title: '📊 This Week\'s Progress',
+        description: `Track your weekly workout goals here. See your streak, XP earned, and progress toward your weekly target!`,
+        highlightSelector: '.todays-activity-card',
+        position: 'bottom',
+        scrollIntoView: false,
+        preAction: async () => {
+            const element = document.querySelector('.todays-activity-card');
+            if (element) {
+                // Scroll to position element more to the left, creating space on right for modal
+                element.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'start'});
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        },
     },
 ];
 

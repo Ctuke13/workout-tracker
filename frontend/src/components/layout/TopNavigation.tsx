@@ -1,14 +1,14 @@
 // src/components/layout/TopNavigation.tsx - With Gamification Widget
 import React, {useState, useEffect} from 'react';
 import {useAuth} from '../../contexts/AuthContext';
+import {usePet} from '../../contexts/PetContext';
 import {useNavigate, useLocation} from 'react-router-dom';
 import {
     Bars3Icon,
     BellIcon,
     UserCircleIcon,
     Cog6ToothIcon,
-    ArrowRightOnRectangleIcon,
-    ChevronDownIcon
+    ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import {MiniProgressWidget} from '../gamification/MiniProgressWidget';
 
@@ -53,6 +53,7 @@ const useScrollDirection = (scrollContainerRef?: React.RefObject<HTMLElement | n
 
 const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
     const {user, logout} = useAuth();
+    const {stats} = usePet();
     const navigate = useNavigate();
     const location = useLocation();
     const [showUserMenu, setShowUserMenu] = useState(false);
@@ -134,8 +135,16 @@ const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
                     </div>
 
                     {/* 🆕 CENTER: Desktop Progress Widget (hidden on mobile/tablet) */}
-                    <div className="hidden lg:flex items-center justify-center mx-4 flex-shrink-0">
+                    <div className="hidden lg:flex items-center justify-center mx-4 flex-shrink-0 gap-2">
                         <MiniProgressWidget/>
+                        {/* Crystal Counter - After rank badge */}
+                        <div
+                            className="crystal-counter flex items-center gap-1.5 bg-gradient-to-r from-amber-100 to-orange-100 px-2.5 py-1.5 rounded-full border border-amber-200">
+                            <span className="text-base">💎</span>
+                            <span className="font-bold text-amber-700 text-sm">
+                                {stats?.crystals ?? 0}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Right Side - User Actions */}
@@ -152,34 +161,20 @@ const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
                             </button>
                         </div>
 
-                        {/* User Menu */}
+                        {/* User Menu - Compact Avatar Only */}
                         <div className="relative">
                             <button
                                 onClick={() => setShowUserMenu(!showUserMenu)}
-                                className="flex items-center space-x-2 p-1 sm:p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                                title="User menu"
+                                className="p-1 rounded-full hover:ring-2 hover:ring-purple-300 transition-all"
+                                title={`${user?.firstName} ${user?.lastName} - ${user?.userType === 'REGULAR' ? 'Free Plan' : 'Pro Plan'}`}
                             >
                                 {/* User Avatar */}
                                 <div
-                                    className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white font-semibold text-xs sm:text-sm">
+                                    className="w-9 h-9 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-md">
+                                    <span className="text-white font-semibold text-sm">
                                         {getUserInitials()}
                                     </span>
                                 </div>
-
-                                {/* User Name - Desktop only */}
-                                <div className="hidden xl:block text-left min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">
-                                        {user?.firstName} {user?.lastName}
-                                    </p>
-                                    <p className="text-xs text-gray-500 truncate">
-                                        {user?.userType === 'REGULAR' ? 'Free Plan' : 'Pro Plan'}
-                                    </p>
-                                </div>
-
-                                {/* Dropdown Arrow - Desktop only */}
-                                <ChevronDownIcon
-                                    className={`hidden sm:block w-4 h-4 text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}/>
                             </button>
 
                             {/* User Dropdown Menu */}
@@ -278,8 +273,16 @@ const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
                 }`}
             >
                 <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5">
-                    <div className="flex justify-center">
+                    <div className="flex justify-center items-center gap-2">
                         <MiniProgressWidget/>
+                        {/* Crystal Counter - After rank badge */}
+                        <div
+                            className="crystal-counter flex items-center gap-1.5 bg-gradient-to-r from-amber-100 to-orange-100 px-2.5 py-1.5 rounded-full border border-amber-200">
+                            <span className="text-base">💎</span>
+                            <span className="font-bold text-amber-700 text-sm">
+                                {stats?.crystals ?? 0}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

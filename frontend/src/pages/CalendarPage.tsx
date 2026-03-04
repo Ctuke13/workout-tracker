@@ -3,7 +3,7 @@ import {useNavigate, useLocation} from 'react-router-dom';
 import {Card, CardContent, CardHeader, CardTitle} from '../components/ui/card';
 import {Badge} from '../components/ui/badge';
 import {useAuth} from '../contexts/AuthContext';
-import TutorialOverlay from '../components/tutorial/TutorialOverlay';
+import GuidedTour from '../components/tutorial/GuidedTour';
 import SkipTutorialModal from '../components/tutorial/SkipTutorialModal';
 import {CALENDAR_TUTORIAL_STEPS} from '../config/tutorialSteps';
 import userApi from '../services/userApi';
@@ -313,7 +313,8 @@ const CalendarPage: React.FC = () => {
                     <WorkoutActions
                         isToday={isToday()}
                         hasExercises={viewingDateExercises.length > 0}
-                        exerciseCount={viewingDateExercises.length}
+                        hasUncompletedExercises={viewingDateExercises.some(w => !w.completed)}
+                        exerciseCount={viewingDateExercises.filter(ex => !ex.completed).length}
                         onStartFullWorkout={handleStartFullWorkout}
                         onAddExercise={() => openExerciseSelector('exercise')}
                         onAddWorkoutPlan={() => openExerciseSelector('workout-plan')}
@@ -476,7 +477,7 @@ const CalendarPage: React.FC = () => {
 
             {/* Tutorial Overlay */}
             {showTutorial && (
-                <TutorialOverlay
+                <GuidedTour
                     steps={CALENDAR_TUTORIAL_STEPS}
                     onComplete={handleTutorialComplete}
                     onSkip={handleTutorialSkip}

@@ -265,91 +265,33 @@ const WorkoutModePage: React.FC = () => {
 
                 console.log('🎉 Progression response:', progressResponse);
 
-                // Show XP gained
-                if (progressResponse.xpGained > 0) {
-                    toast.success(
-                        `+${progressResponse.xpGained} XP earned! ⚡`,
-                        {duration: 3000}
-                    );
-                }
+                                // Navigate immediately to workout complete page
+                                navigate('/workout-complete', {
+                                    state: {
+                                        progressResponse,
+                                        workoutStats: {
+                                            durationMinutes,
+                                            setsCompleted: totalSets,
+                                            exerciseCount,
+                                            volumeLifted: totalVolume > 0 ? totalVolume : undefined,
+                                            distanceKm: totalDistance > 0 ? totalDistance : undefined,
+                                            holdSeconds: totalHoldTime > 0 ? totalHoldTime : undefined,
+                                            workoutType
+                                        }
+                                    }
+                                });
+                            }
 
-                // Show rank up
-                if (progressResponse.rankedUp) {
-                    setTimeout(() => {
-                        toast.success(
-                            `🏆 Rank Up! You're now ${progressResponse.seasonalRank}!`,
-                            {duration: 5000, icon: '👑'}
-                        );
-                    }, 1000);
-                }
+          } catch (error) {
+              console.error('Error completing workout:', error);
+              toast.error('Error saving workout. Please try again.');
+              setTimeout(() => {
+                  navigate('/calendar');
+              }, 3000);
+          }
+      };
 
-                // Show streak milestone
-                if (progressResponse.streakMilestone) {
-                    setTimeout(() => {
-                        toast.success(
-                            `🔥 ${progressResponse.currentStreak} day streak! Keep it going!`,
-                            {duration: 4000}
-                        );
-                    }, 2000);
-                }
 
-                // Show achievements
-                if (progressResponse.achievementsUnlocked && progressResponse.achievementsUnlocked.length > 0) {
-                    progressResponse.achievementsUnlocked.forEach((achievement, index) => {
-                        setTimeout(() => {
-                            toast.success(
-                                `🏅 ${achievement.icon} ${achievement.name} (+${achievement.bonusXp} XP)`,
-                                {duration: 6000}
-                            );
-                        }, 3000 + (index * 1500));
-                    });
-                }
-
-                // Show pet update
-                if (progressResponse.petUpdate) {
-                    const petUpdate = progressResponse.petUpdate;
-
-                    setTimeout(() => {
-                        toast.success(
-                            `🐺 +${petUpdate.crystalsEarned} crystals! Pet fatigue: ${petUpdate.newFatigue}%`,
-                            {duration: 4000}
-                        );
-                    }, 2500);
-
-                    if (petUpdate.isSleeping) {
-                        setTimeout(() => {
-                            toast.error(
-                                '💤 Your pet is exhausted and needs 24 hours of rest!',
-                                {duration: 5000}
-                            );
-                        }, 3500);
-                    }
-
-                    if (petUpdate.wastedCrystals > 0) {
-                        setTimeout(() => {
-                            toast(
-                                `⚠️ ${petUpdate.wastedCrystals} crystals wasted (cap reached)`,
-                                {duration: 3000, icon: '⚠️'}
-                            );
-                        }, 4000);
-                    }
-                }
-
-                // Final success
-                setTimeout(() => {
-                    toast.success('💪 Workout complete! Great job!', {duration: 3000});
-                }, 4500);
-            }
-
-        } catch (error) {
-            console.error('Error completing workout:', error);
-            toast.error('Error saving workout. Please try again.');
-        }
-
-        setTimeout(() => {
-            navigate('/calendar');
-        }, 6000);
-    };
 
     // Workout control handlers
     const handlePauseWorkout = () => {

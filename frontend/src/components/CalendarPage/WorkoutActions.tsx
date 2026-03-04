@@ -6,6 +6,7 @@ import {Card, CardContent} from '../ui/card';
 interface WorkoutActionsProps {
     isToday: boolean;
     hasExercises: boolean;
+    hasUncompletedExercises: boolean;
     exerciseCount: number;
     onStartFullWorkout: () => void;
     onAddExercise: () => void;
@@ -15,13 +16,14 @@ interface WorkoutActionsProps {
 const WorkoutActions: React.FC<WorkoutActionsProps> = ({
                                                            isToday,
                                                            hasExercises,
+                                                           hasUncompletedExercises,
                                                            exerciseCount,
                                                            onStartFullWorkout,
                                                            onAddExercise,
                                                            onAddWorkoutPlan
                                                        }) => {
     // Start Workout Button (only show if today and has exercises)
-    const startWorkoutButton = isToday && hasExercises && (
+    const startWorkoutButton = isToday && hasUncompletedExercises && (
         <Button
             className="w-full bg-green-600 hover:bg-green-700 text-white py-3 sm:py-4 lg:py-6 text-base sm:text-lg lg:text-xl font-bold flex items-center justify-center gap-2 sm:gap-3 shadow-lg rounded-xl sm:rounded-2xl"
             onClick={onStartFullWorkout}

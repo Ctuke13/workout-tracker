@@ -164,11 +164,11 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
                 </div>
             )}
 
-            {/* Main FAB Button */}
+            {/* Main FAB Button - ✨ ADDED floating-action-button CLASS ✨ */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={actionLoading}
-                className={`fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-2xl z-50 flex items-center justify-center transition-all duration-300 ${
+                className={`floating-action-button fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-2xl z-50 flex items-center justify-center transition-all duration-300 ${
                     isOpen
                         ? 'bg-gray-500 rotate-45'
                         : 'bg-gradient-to-br from-purple-500 to-pink-500 hover:scale-110'

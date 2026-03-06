@@ -71,4 +71,12 @@ public class ProgressionUpdateRequest {
      */
     @Builder.Default
     private Integer exerciseCount = 0;
+
+    /**
+     * Whether the workout qualifies for a consistency bonus (15% XP boost).
+     * Calculated on the frontend based on duration and sets — rewards honest,
+     * realistic workout sessions.
+     */
+    @Builder.Default
+    private Boolean consistencyBonus = false;
 }

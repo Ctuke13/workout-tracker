@@ -3,7 +3,7 @@ package com.chidituke.workout_tracker.service.user;
 import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.model.user.UserRelationship;
 import com.chidituke.workout_tracker.repository.user.UserRelationshipRepository;
-import com.chidituke.workout_tracker.service.notification.NotificationService;
+import com.chidituke.workout_tracker.service.notifications.NotificationsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -23,7 +23,7 @@ public class UserRelationshipService {
 
     private final UserRelationshipRepository userRelationshipRepository;
     private final UserService userService;
-    private final NotificationService notificationService;
+    private final NotificationsService notificationsService;
 
     // ==================== FOLLOW OPERATIONS ====================
 
@@ -57,7 +57,7 @@ public class UserRelationshipService {
         userService.save(following);
 
         // Send notification
-        notificationService.notifyNewFollower(follower, following);
+        notificationsService.notifyNewFollower(follower, following);
 
         log.info("User {} started following {}", followerUsername, followingUsername);
 
@@ -126,7 +126,7 @@ public class UserRelationshipService {
         userRelationshipRepository.save(friendRequest);
 
         // Send notification
-        notificationService.notifyFriendRequest(requester, target);
+        notificationsService.notifyFriendRequest(requester, target);
 
         log.info("Friend request sent from {} to {}", requesterUsername, targetUsername);
 
@@ -170,7 +170,7 @@ public class UserRelationshipService {
         userService.save(requester);
 
         // Send notification
-        notificationService.notifyFriendRequestAccepted(target, requester);
+        notificationsService.notifyFriendRequestAccepted(target, requester);
 
         log.info("Friend request accepted: {} and {} are now friends", targetUsername, requesterUsername);
 

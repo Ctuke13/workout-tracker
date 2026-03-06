@@ -107,6 +107,35 @@ public class User implements UserDetails {
     @Builder.Default
     private NotificationSettings notificationSettings = NotificationSettings.ALL;
 
+    // ── Granular notification preferences (V019) ───────────────────────────────
+    @Column(name = "notif_pet_health")
+    @Builder.Default
+    private Boolean notifPetHealth = true;
+
+    @Column(name = "notif_streak_reminders")
+    @Builder.Default
+    private Boolean notifStreakReminders = true;
+
+    @Column(name = "notif_achievements")
+    @Builder.Default
+    private Boolean notifAchievements = true;
+
+    @Column(name = "notif_rank_season")
+    @Builder.Default
+    private Boolean notifRankSeason = true;
+
+    @Column(name = "notif_weekly_summary")
+    @Builder.Default
+    private Boolean notifWeeklySummary = true;
+
+    @Column(name = "notif_social_leaderboard")
+    @Builder.Default
+    private Boolean notifSocialLeaderboard = false;
+
+    @Column(name = "notif_reengagement")
+    @Builder.Default
+    private Boolean notifReengagement = true;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "measurement_system")
     @Builder.Default
@@ -264,9 +293,11 @@ public class User implements UserDetails {
         return Boolean.TRUE.equals(onboardingCompleted);
     }
 
+    @Builder.Default
     @Column(name = "pet_tutorial_completed", nullable = false)
     private Boolean petTutorialCompleted = false;
 
+    @Builder.Default
     @Column(name = "calendar_tutorial_completed", nullable = false)
     private Boolean calendarTutorialCompleted = false;
 

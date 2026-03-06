@@ -5,6 +5,7 @@ import com.chidituke.workout_tracker.dto.request.user.UserSearchRequest;
 import com.chidituke.workout_tracker.dto.request.user.PasswordChangeRequest;
 import com.chidituke.workout_tracker.dto.request.user.NicknameUpdateRequest;
 import com.chidituke.workout_tracker.dto.request.user.PetNameUpdateRequest;
+import com.chidituke.workout_tracker.dto.request.user.NotificationsPreferencesRequest;
 import com.chidituke.workout_tracker.dto.response.user.UserProfileResponse;
 import com.chidituke.workout_tracker.dto.response.user.UserSearchResponse;
 import com.chidituke.workout_tracker.dto.response.user.UserDataExportResponse;
@@ -14,6 +15,7 @@ import com.chidituke.workout_tracker.model.pet.PetStats;
 import com.chidituke.workout_tracker.security.CurrentUser;
 import com.chidituke.workout_tracker.security.UserPrincipal;
 import com.chidituke.workout_tracker.service.user.UserService;
+import com.chidituke.workout_tracker.service.user.ProfilePhotoService;
 import com.chidituke.workout_tracker.service.workout.WorkoutSessionService;
 import com.chidituke.workout_tracker.service.progress.AchievementService;
 import com.chidituke.workout_tracker.service.pet.PetStatsService;
@@ -30,7 +32,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,6 +49,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
+    private final ProfilePhotoService profilePhotoService;
     private final WorkoutSessionService workoutSessionService;
     private final AchievementService achievementService;
     private final PetStatsService petStatsService;
@@ -84,6 +89,37 @@ public class UserController {
     }
 
     /**
+     * Upload profile photo — awards 2 crystals on first upload
+     * POST /api/users/profile-photo
+     */
+    @PostMapping(value = "/profile-photo", consumes = "multipart/form-data")
+    @Operation(summary = "Upload profile photo", description = "Upload a profile photo. Awards 2 crystals on first upload.")
+    public ResponseEntity<?> uploadProfilePhoto(
+            @RequestParam("photo") MultipartFile photo,
+            @CurrentUser UserPrincipal currentUser) {
+
+        if (photo.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No file provided"));
+        }
+
+        try {
+            ProfilePhotoService.ProfilePhotoResult result =
+                    profilePhotoService.uploadProfilePhoto(currentUser.getId(), photo);
+
+            return ResponseEntity.ok(Map.of(
+                    "imageUrl", result.imageUrl(),
+                    "crystalsAwarded", result.crystalsAwarded(),
+                    "firstUpload", result.firstUpload()
+            ));
+
+        } catch (IOException e) {
+            log.error("❌ Profile photo upload failed for user {}: {}", currentUser.getId(), e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Upload failed. Please try again."));
+        }
+    }
+
+    /**
      * Update current user's profile
      */
     @PutMapping("/profile")
@@ -94,6 +130,25 @@ public class UserController {
 
         UserProfileResponse updated = userService.updateUserProfile(currentUser.getId(), request);
         return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Update notification preferences for the current user.
+     * Only non-null fields in the request body are applied.
+     * <p>
+     * PATCH /api/users/notification-preferences
+     */
+    @PatchMapping("/notification-preferences")
+    @Operation(summary = "Update notification preferences", description = "Toggle individual notification categories on or off")
+    public ResponseEntity<Map<String, Object>> updateNotificationPreferences(
+            @RequestBody NotificationsPreferencesRequest request,
+            @CurrentUser UserPrincipal currentUser) {
+
+        userService.updateNotificationPreferences(currentUser.getId(), request);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Notification preferences updated"
+        ));
     }
 
     // ==================== USER DISCOVERY & SEARCH ====================

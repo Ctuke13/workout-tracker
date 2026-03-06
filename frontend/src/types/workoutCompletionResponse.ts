@@ -35,6 +35,9 @@ export interface WorkoutCompletionResponse {
     // Summary message
     summaryMessage?: string;
 
+    // Consistency bonus indicator — true when backend applied the 15% XP boost
+    consistencyBonusApplied?: boolean;
+
     // 🆕 PET STATS UPDATE
     petUpdate?: {
         crystalsEarned: number;

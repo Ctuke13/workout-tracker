@@ -60,6 +60,7 @@ public class UserProgressionService {
     private static final double STREAK_5_DAYS = 1.20;  // 20% bonus
     private static final double STREAK_6_DAYS = 1.35;  // 35% bonus
     private static final double STREAK_7_DAYS = 1.50;  // 50% bonus
+    private static final double CONSISTENCY_BONUS_MULTIPLIER = 1.15; // 15% XP boost for honest workouts
 
     // ========== CORE OPERATIONS ==========
 
@@ -151,7 +152,8 @@ public class UserProgressionService {
             BigDecimal distanceKm,
             int holdSeconds,
             int uniqueExercisesCount,
-            String workoutType) {
+            String workoutType,
+            boolean consistencyBonus) {
 
         UserProgression progression = getOrCreateUserProgression(userId);
         LocalDate today = LocalDate.now();
@@ -187,7 +189,7 @@ public class UserProgressionService {
         updateWeeklyTracking(progression, today);
 
         // 8. Calculate and award XP
-        int xpAwarded = calculateWorkoutXp(progression, workoutDurationMinutes, setsCompleted, volumeLifted);
+        int xpAwarded = calculateWorkoutXp(progression, workoutDurationMinutes, setsCompleted, volumeLifted, consistencyBonus);
         progression.addXp(xpAwarded);
         log.info("Awarded {} XP to user {} (seasonal: {}, lifetime: {})",
                 xpAwarded, userId, progression.getSeasonalXp(), progression.getLifetimeXp());
@@ -231,7 +233,8 @@ public class UserProgressionService {
             UserProgression progression,
             int durationMinutes,
             int setsCompleted,
-            BigDecimal volumeLifted) {
+            BigDecimal volumeLifted,
+            boolean consistencyBonus) {
 
         // 1. Base XP
         int xp = BASE_WORKOUT_XP;
@@ -275,8 +278,15 @@ public class UserProgressionService {
             }
         }
 
-        log.info("Total XP calculated: {} (base: {}, sets: {}, volume: {}, duration: {}, multiplier: {}×)",
-                xp, BASE_WORKOUT_XP, setBonus, volumeBonus, durationBonus, multiplier);
+        // 7. Consistency bonus: +15% for honest, realistic workouts
+        if (consistencyBonus) {
+            int xpBeforeConsistency = xp;
+            xp = (int) (xp * CONSISTENCY_BONUS_MULTIPLIER);
+            log.debug("Consistency bonus applied: {}× (+{} XP)", CONSISTENCY_BONUS_MULTIPLIER, xp - xpBeforeConsistency);
+        }
+
+        log.info("Total XP calculated: {} (base: {}, sets: {}, volume: {}, duration: {}, multiplier: {}×, consistencyBonus: {})",
+                xp, BASE_WORKOUT_XP, setBonus, volumeBonus, durationBonus, multiplier, consistencyBonus);
 
         return xp;
     }

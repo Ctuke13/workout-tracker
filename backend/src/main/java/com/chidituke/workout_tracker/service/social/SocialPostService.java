@@ -6,7 +6,7 @@ import com.chidituke.workout_tracker.model.user.UserRelationship;
 import com.chidituke.workout_tracker.repository.social.SocialPostRepository;
 import com.chidituke.workout_tracker.repository.user.UserRelationshipRepository;
 import com.chidituke.workout_tracker.exceptions.common.ResourceNotFoundException;
-import com.chidituke.workout_tracker.service.notification.NotificationService;
+import com.chidituke.workout_tracker.service.notifications.NotificationsService;
 import com.chidituke.workout_tracker.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +30,7 @@ public class SocialPostService {
     private final SocialPostRepository socialPostRepository;
     private final UserRelationshipRepository userRelationshipRepository;
     private final UserService userService;
-    private final NotificationService notificationService;
+    private final NotificationsService notificationsService;
 
     // ==================== POST CREATION & MANAGEMENT ====================
 
@@ -62,7 +62,7 @@ public class SocialPostService {
 
         // Send notifications to followers if public post
         if (savedPost.getPrivacyLevel() == SocialPost.PrivacyLevel.PUBLIC) {
-            notificationService.notifyFollowersOfNewPost(author, savedPost);
+//            notificationsService.notifyFollowersOfNewPost(author, savedPost);
         }
 
         log.info("Post created: {} by user {}", savedPost.getId(), username);

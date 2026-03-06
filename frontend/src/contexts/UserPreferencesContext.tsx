@@ -1,5 +1,6 @@
 import React, {createContext, useContext, useState, useEffect, ReactNode} from 'react';
 import {userPreferencesApi, UserPreferences} from '../services/userPreferencesApi';
+import {useAuth} from './AuthContext';
 import {
     convertDistance,
     convertWeight,
@@ -49,6 +50,8 @@ interface UserPreferencesProviderProps {
 }
 
 export const UserPreferencesProvider: React.FC<UserPreferencesProviderProps> = ({children}) => {
+    const {isAuthenticated} = useAuth();
+
     const [preferences, setPreferences] = useState<UserPreferences>({
         preferredDistanceUnit: 'miles',
         preferredWeightUnit: 'lbs'
@@ -56,10 +59,15 @@ export const UserPreferencesProvider: React.FC<UserPreferencesProviderProps> = (
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Load preferences from backend on mount
+    // Load preferences from backend only when authenticated
     useEffect(() => {
-        loadPreferences();
-    }, []);
+        if (isAuthenticated) {
+            loadPreferences();
+        } else {
+            // Not authenticated - use defaults
+            setLoading(false);
+        }
+    }, [isAuthenticated]);
 
     const loadPreferences = async () => {
         try {
@@ -68,9 +76,15 @@ export const UserPreferencesProvider: React.FC<UserPreferencesProviderProps> = (
             const prefs = await userPreferencesApi.getPreferences();
             setPreferences(prefs);
             console.log('✅ Loaded user preferences:', prefs);
-        } catch (err) {
-            console.error('Failed to load user preferences:', err);
-            setError('Failed to load preferences');
+        } catch (err: any) {
+            // If 403 Forbidden, user is not authenticated - use defaults silently
+            if (err?.response?.status === 403 || err?.status === 403) {
+                console.log('ℹ️ User preferences require authentication - using defaults');
+                setError(null); // Don't show error for expected 403
+            } else {
+                console.error('Failed to load user preferences:', err);
+                setError('Failed to load preferences');
+            }
             // Keep default values on error
         } finally {
             setLoading(false);

@@ -136,6 +136,20 @@ class ApiClient {
     }
 
     /**
+     * Multipart form-data POST (used for file uploads)
+     */
+    public async postForm<T>(endpoint: string, formData: FormData): Promise<T> {
+        try {
+            const response = await this.client.post<ApiResponse<T> | T>(endpoint, formData, {
+                headers: {'Content-Type': 'multipart/form-data'},
+            });
+            return this.extractData<T>(response.data);
+        } catch (error) {
+            throw this.handleError(error, 'POST (multipart)', endpoint);
+        }
+    }
+
+    /**
      * Generic PUT request
      */
     public async put<T>(endpoint: string, data?: any): Promise<T> {

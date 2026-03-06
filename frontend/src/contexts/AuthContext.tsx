@@ -13,6 +13,7 @@ import {
     OnboardingStatusResponse,
 } from '../types/auth';
 import authService from '../services/authService';
+import { useNotifications } from '../hooks/useNotifications';
 
 // ==================== AUTH REDUCER ====================
 
@@ -126,6 +127,7 @@ export function AuthProvider({children}: AuthProviderProps) {
     const [state, dispatch] = useReducer(authReducer, initialState);
     const navigate = useNavigate();
     const location = useLocation();
+    const { requestPermission, revokePermission } = useNotifications();
 
     // ==================== COMPUTED VALUES ====================
 
@@ -138,6 +140,11 @@ export function AuthProvider({children}: AuthProviderProps) {
         try {
             const response = await authService.login(credentials);
             dispatch({type: 'LOGIN_SUCCESS', payload: response});
+
+            // Register device for push notifications
+            requestPermission().catch(err =>
+                console.warn('Push notification registration failed:', err)
+            );
 
             // Redirect based on onboarding status
             if (!response.onboardingCompleted) {
@@ -160,6 +167,11 @@ export function AuthProvider({children}: AuthProviderProps) {
             const response = await authService.register(userData);
             dispatch({type: 'REGISTER_SUCCESS', payload: response});
 
+            // Register device for push notifications
+            requestPermission().catch(err =>
+                console.warn('Push notification registration failed:', err)
+            );
+
             // New users always go to onboarding
             console.log('🐺 New registration, starting onboarding...');
             navigate('/onboarding/nickname');
@@ -171,6 +183,10 @@ export function AuthProvider({children}: AuthProviderProps) {
     };
 
     const logout = (): void => {
+        // Deactivate FCM token before clearing auth state
+        revokePermission().catch(err =>
+            console.warn('Push notification revocation failed:', err)
+        );
         authService.logout();
         dispatch({type: 'LOGOUT'});
         navigate('/');
@@ -211,6 +227,7 @@ export function AuthProvider({children}: AuthProviderProps) {
                 subscriptionTier: user.subscriptionTier || 'FREE',
                 nickname: user.nickname,
                 petName: user.petName,
+                profileImageUrl: user.profileImageUrl,
                 onboardingCompleted: user.onboardingCompleted,
                 petTutorialCompleted: user.petTutorialCompleted,
                 calendarTutorialCompleted: user.calendarTutorialCompleted,
@@ -314,6 +331,7 @@ export function AuthProvider({children}: AuthProviderProps) {
                     // Onboarding fields
                     nickname: user.nickname,
                     petName: user.petName,
+                    profileImageUrl: user.profileImageUrl,
                     onboardingCompleted: user.onboardingCompleted,
                     // Tutorial fields
                     petTutorialCompleted: user.petTutorialCompleted,
@@ -322,6 +340,11 @@ export function AuthProvider({children}: AuthProviderProps) {
 
                 dispatch({type: 'LOGIN_SUCCESS', payload: jwtResponse});
                 console.log('✅ Auth initialization successful');
+
+                // Re-register push notifications for returning users
+                requestPermission().catch(err =>
+                    console.warn('Push notification registration failed on init:', err)
+                );
             } catch (error) {
                 console.error('❌ Auth initialization failed:', error);
                 authService.removeToken();

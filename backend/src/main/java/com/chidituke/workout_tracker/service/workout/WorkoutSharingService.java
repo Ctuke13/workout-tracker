@@ -4,7 +4,7 @@ import com.chidituke.workout_tracker.model.social.SocialPost;
 import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession;
 import com.chidituke.workout_tracker.repository.social.SocialPostRepository;
-import com.chidituke.workout_tracker.service.notification.NotificationService;
+import com.chidituke.workout_tracker.service.notifications.NotificationsService;
 import com.chidituke.workout_tracker.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ public class WorkoutSharingService {
 
     private final SocialPostRepository socialPostRepository;
     private final UserService userService;
-    private final NotificationService notificationService; // Assume this exists
+    private final NotificationsService notificationsService; // Assume this exists
 
     // ==================== AUTO-SHARING WORKFLOW ====================
 
@@ -105,7 +105,7 @@ public class WorkoutSharingService {
 
         // Send notifications to followers if public post
         if (privacy == SocialPost.PrivacyLevel.PUBLIC) {
-            notificationService.notifyFollowersOfNewPost(user, post);
+//            notificationsService.notifyFollowersOfNewPost(user, post);
         }
 
         log.info("Successfully created workout post {} for user {}", post.getId(), user.getId());

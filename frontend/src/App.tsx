@@ -9,8 +9,10 @@ import WorkoutCompletePage from './pages/WorkoutCompletePage';
 
 import MobileLayout from './components/layout/MobileLayout';
 
+import EntryPage from './pages/EntryPage';
+
 // Auth Pages (no layout)
-import LandingPage from './pages/LandingPage';
+
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
@@ -60,7 +62,7 @@ const App: React.FC = () => {
                             <PetProvider>
                                 <Routes>
                                     {/* ==================== PUBLIC ROUTES ==================== */}
-                                    <Route path="/" element={<LandingPage/>}/>
+                                    <Route path="/" element={<EntryPage/>}/>
                                     <Route path="/login" element={<LoginPage/>}/>
                                     <Route path="/register" element={<RegisterPage/>}/>
 

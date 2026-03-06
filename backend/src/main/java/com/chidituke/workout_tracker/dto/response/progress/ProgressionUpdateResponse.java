@@ -47,12 +47,22 @@ public class ProgressionUpdateResponse {
     private PetStatsUpdateDTO petUpdate;
 
     /**
+     * Whether a consistency bonus (15% XP boost) was applied to this workout.
+     * Set when the frontend flags the workout as meeting honest-effort thresholds.
+     */
+    private Boolean consistencyBonusApplied;
+
+    /**
      * Build a summary message based on the progression update
      */
     public String buildSummaryMessage() {
         StringBuilder message = new StringBuilder();
 
         message.append("Earned ").append(xpGained).append(" XP");
+
+        if (Boolean.TRUE.equals(consistencyBonusApplied)) {
+            message.append(" (including 15% consistency bonus)");
+        }
 
         if (rankedUp) {
             message.append(" and ranked up to ").append(newRank).append("!");
@@ -94,7 +104,7 @@ public class ProgressionUpdateResponse {
         private Integer newFatigue;
         private Boolean isSleeping;
 
-        // ✨ XP and Leveling info ✨
+        // XP and Leveling info
         private Integer xpGained;
         private Integer newXp;
         private Integer newLevel;

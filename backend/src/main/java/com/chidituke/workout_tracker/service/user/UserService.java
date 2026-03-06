@@ -1,10 +1,12 @@
 package com.chidituke.workout_tracker.service.user;
 
+import com.chidituke.workout_tracker.dto.request.user.NotificationsPreferencesRequest;
 import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.model.user.enums.UserType;
 import com.chidituke.workout_tracker.dto.request.auth.RegisterRequest;
 import com.chidituke.workout_tracker.dto.request.user.UserUpdateRequest;
 import com.chidituke.workout_tracker.dto.request.user.UserSearchRequest;
+import com.chidituke.workout_tracker.dto.request.user.NotificationsPreferencesRequest;
 import com.chidituke.workout_tracker.dto.response.user.UserProfileResponse;
 import com.chidituke.workout_tracker.dto.response.user.UserSearchResponse;
 import com.chidituke.workout_tracker.repository.user.UserRepository;
@@ -429,5 +431,37 @@ public class UserService {
 
     public UserSearchResponse convertToUserSearchResponse(User user) {
         return userMapper.mapEntityToSearchResponse(user);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🔔 NOTIFICATION PREFERENCES
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Update granular notification preferences for a user.
+     * Only non-null fields in the request are applied.
+     */
+    @Transactional
+    public void updateNotificationPreferences(Long userId, NotificationsPreferencesRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        if (request.getNotifPetHealth() != null)
+            user.setNotifPetHealth(request.getNotifPetHealth());
+        if (request.getNotifStreakReminders() != null)
+            user.setNotifStreakReminders(request.getNotifStreakReminders());
+        if (request.getNotifAchievements() != null)
+            user.setNotifAchievements(request.getNotifAchievements());
+        if (request.getNotifRankSeason() != null)
+            user.setNotifRankSeason(request.getNotifRankSeason());
+        if (request.getNotifWeeklySummary() != null)
+            user.setNotifWeeklySummary(request.getNotifWeeklySummary());
+        if (request.getNotifSocialLeaderboard() != null)
+            user.setNotifSocialLeaderboard(request.getNotifSocialLeaderboard());
+        if (request.getNotifReengagement() != null)
+            user.setNotifReengagement(request.getNotifReengagement());
+
+        userRepository.save(user);
+        log.info("✅ Notification preferences updated for user {}", userId);
     }
 }

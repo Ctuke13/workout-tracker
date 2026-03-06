@@ -22,6 +22,7 @@ public class JwtResponse {
     private SubscriptionTier subscriptionTier;
     private String nickname;
     private String petName;
+    private String profileImageUrl;
     private Boolean onboardingCompleted;
     private Boolean petTutorialCompleted;
     private Boolean calendarTutorialCompleted;

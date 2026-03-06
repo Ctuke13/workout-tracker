@@ -8,7 +8,7 @@ import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.model.workout.WorkoutPlan;
 import com.chidituke.workout_tracker.model.workout.WorkoutSession;
 import com.chidituke.workout_tracker.repository.messaging.MessageRepository;
-import com.chidituke.workout_tracker.service.notification.NotificationService;
+import com.chidituke.workout_tracker.service.notifications.NotificationsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -35,7 +34,7 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final ConversationService conversationService;
-    private final NotificationService notificationService;
+    private final NotificationsService notificationsService;
 
     // Constants for content validation
     private static final int MAX_MESSAGE_LENGTH = 2000;
@@ -457,7 +456,7 @@ public class MessageService {
         message = messageRepository.save(message);
 
         // Send special notification for workout assignments
-        notificationService.notifyWorkoutAssignment(trainer, client, workoutPlan);
+        notificationsService.notifyWorkoutAssignment(trainer, client, workoutPlan);
 
         // Mark conversation as updated and send notifications
         handlePostMessageActions(conversation, message, trainer);
@@ -585,7 +584,7 @@ public class MessageService {
                 .toList();
 
         for (ConversationParticipant participant : notificationTargets) {
-            notificationService.notifyNewMessage(sender, participant.getUser(), conversation, message);
+            //      notificationsService.notifyNewMessage(sender, participant.getUser(), conversation, message);
         }
     }
 

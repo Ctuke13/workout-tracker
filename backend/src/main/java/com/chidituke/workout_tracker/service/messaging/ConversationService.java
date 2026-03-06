@@ -5,15 +5,13 @@ import com.chidituke.workout_tracker.model.messaging.ConversationParticipant;
 import com.chidituke.workout_tracker.model.messaging.enums.ConversationType;
 import com.chidituke.workout_tracker.model.messaging.enums.ParticipantRole;
 import com.chidituke.workout_tracker.model.user.User;
-import com.chidituke.workout_tracker.model.user.UserRelationship;
 import com.chidituke.workout_tracker.repository.messaging.ConversationRepository;
 import com.chidituke.workout_tracker.repository.messaging.ConversationParticipantRepository;
 import com.chidituke.workout_tracker.service.user.UserRelationshipService;
-import com.chidituke.workout_tracker.service.notification.NotificationService;
+import com.chidituke.workout_tracker.service.notifications.NotificationsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +33,7 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
     private final UserRelationshipService userRelationshipService;
-    private final NotificationService notificationService;
+    private final NotificationsService notificationsService;
 
     // ==================== CONVERSATION CREATION ====================
 

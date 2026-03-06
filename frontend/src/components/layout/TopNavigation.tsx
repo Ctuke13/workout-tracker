@@ -6,11 +6,11 @@ import {useNavigate, useLocation} from 'react-router-dom';
 import {
     Bars3Icon,
     BellIcon,
-    UserCircleIcon,
     Cog6ToothIcon,
     ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import {MiniProgressWidget} from '../gamification/MiniProgressWidget';
+import {useNotifications} from '../../hooks/useNotifications';
 
 interface TopNavigationProps {
     scrollContainerRef?: React.RefObject<HTMLElement | null>;
@@ -58,6 +58,10 @@ const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
     const location = useLocation();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const isWidgetVisible = useScrollDirection(scrollContainerRef);
+    const {permissionStatus, requestPermission} = useNotifications();
+
+    const browserPermission = 'Notification' in window ? Notification.permission : 'unsupported';
+    const notificationsEnabled = browserPermission === 'granted' && permissionStatus !== 'unsupported';
 
     // Hide top nav on auth pages
     const hideOnPages = ['/login', '/register', '/'];
@@ -152,12 +156,15 @@ const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
                         {/* Notifications - Desktop only */}
                         <div className="hidden sm:block">
                             <button
+                                onClick={() => !notificationsEnabled && requestPermission()}
                                 className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg transition-colors relative"
-                                title="Notifications"
+                                title={notificationsEnabled ? 'Notifications enabled' : 'Click to enable notifications'}
                             >
-                                <BellIcon className="w-5 h-5"/>
-                                {/* Notification badge */}
-                                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                                <BellIcon className={`w-5 h-5 ${notificationsEnabled ? 'text-purple-500' : 'text-gray-400'}`}/>
+                                {/* Red dot only when notifications are NOT enabled */}
+                                {!notificationsEnabled && browserPermission !== 'denied' && (
+                                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"/>
+                                )}
                             </button>
                         </div>
 
@@ -204,16 +211,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
 
                                         {/* Menu Items */}
                                         <div className="py-1">
-                                            <button
-                                                onClick={() => {
-                                                    setShowUserMenu(false);
-                                                    navigate('/profile');
-                                                }}
-                                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                                            >
-                                                <UserCircleIcon className="w-4 h-4 mr-3"/>
-                                                Profile
-                                            </button>
 
                                             <button
                                                 onClick={() => {

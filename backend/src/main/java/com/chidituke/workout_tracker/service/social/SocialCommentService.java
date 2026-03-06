@@ -6,7 +6,7 @@ import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.repository.social.SocialCommentRepository;
 import com.chidituke.workout_tracker.repository.social.SocialPostRepository;
 import com.chidituke.workout_tracker.exceptions.common.ResourceNotFoundException;
-import com.chidituke.workout_tracker.service.notification.NotificationService;
+import com.chidituke.workout_tracker.service.notifications.NotificationsService;
 import com.chidituke.workout_tracker.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ public class SocialCommentService {
     private final SocialCommentRepository socialCommentRepository;
     private final SocialPostRepository socialPostRepository;
     private final UserService userService;
-    private final NotificationService notificationService;
+    private final NotificationsService notificationsService;
 
     // ==================== COMMENT CREATION & MANAGEMENT ====================
 
@@ -204,7 +204,7 @@ public class SocialCommentService {
 
         // Send notification to comment author
         if (!comment.getAuthor().equals(user)) {
-            notificationService.notifyCommentLiked(comment, user);
+//            notificationsService.notifyCommentLiked(comment, user);
         }
 
         log.info("Comment liked: {} by user {}", commentId, username);
@@ -395,13 +395,13 @@ public class SocialCommentService {
 
         // Notify post author (if different from comment author)
         if (!comment.getPost().getAuthor().equals(commentAuthor)) {
-            notificationService.notifyWorkoutCommented(comment, commentAuthor);
+//            notificationsService.notifyWorkoutCommented(comment, commentAuthor);
         }
 
         // Notify parent comment author (if this is a reply and different from comment author)
         if (comment.getParentComment() != null &&
                 !comment.getParentComment().getAuthor().equals(commentAuthor)) {
-            notificationService.notifyCommentReply(comment, commentAuthor);
+//            notificationsService.notifyCommentReply(comment, commentAuthor);
         }
 
         // TODO: Notify mentioned users

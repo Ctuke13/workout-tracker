@@ -9,6 +9,7 @@ import PreferencesSection from '../components/SettingsPage/PreferencesSection';
 import SubscriptionSection from '../components/SettingsPage/SubscriptionSection';
 import DataPrivacySection from '../components/SettingsPage/DataPrivacySection';
 import AboutSection from '../components/SettingsPage/AboutSection';
+import NotificationsSection from '../components/SettingsPage/NotificationsSection';
 
 const SettingsPage: React.FC = () => {
     const {logout} = useAuth();
@@ -45,6 +46,9 @@ const SettingsPage: React.FC = () => {
 
                 {/* Preferences */}
                 <PreferencesSection/>
+
+                {/* Notifications */}
+                <NotificationsSection/>
 
                 {/* Subscription */}
                 <SubscriptionSection/>

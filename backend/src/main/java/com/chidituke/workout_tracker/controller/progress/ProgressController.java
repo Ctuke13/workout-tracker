@@ -261,6 +261,8 @@ public class ProgressController {
         int oldSeasonalXp = progressionBefore.getSeasonalXp();
 
         // 🆕 STEP 2: Update user progression (this awards XP and updates rank)
+        boolean consistencyBonus = Boolean.TRUE.equals(request.getConsistencyBonus());
+
         UserProgression progression = userProgressionService.handleWorkoutCompletion(
                 userId,
                 request.getDurationMinutes(),
@@ -269,7 +271,8 @@ public class ProgressController {
                 request.getDistanceKm(),
                 request.getHoldSeconds(),
                 request.getUniqueExercisesCount(),
-                request.getWorkoutType()
+                request.getWorkoutType(),
+                consistencyBonus
         );
 
         // 🆕 STEP 3: Calculate XP gained and check if ranked up
@@ -341,6 +344,7 @@ public class ProgressController {
                         .map(UserAchievementDTO::fromEntity)
                         .collect(Collectors.toList()))
                 .petUpdate(petUpdate)
+                .consistencyBonusApplied(consistencyBonus)
                 .build();
 
         log.info("Workout completion processed: +{} XP, {} achievements unlocked, ranked up: {}",

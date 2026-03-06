@@ -6,7 +6,7 @@ import com.chidituke.workout_tracker.model.user.User;
 import com.chidituke.workout_tracker.repository.social.PostLikeRepository;
 import com.chidituke.workout_tracker.repository.social.SocialPostRepository;
 import com.chidituke.workout_tracker.exceptions.common.ResourceNotFoundException;
-import com.chidituke.workout_tracker.service.notification.NotificationService;
+import com.chidituke.workout_tracker.service.notifications.NotificationsService;
 import com.chidituke.workout_tracker.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +28,7 @@ public class PostLikeService {
     private final PostLikeRepository postLikeRepository;
     private final SocialPostRepository socialPostRepository;
     private final UserService userService;
-    private final NotificationService notificationService;
+    private final NotificationsService notificationsService;
 
     // ==================== CORE LIKE/UNLIKE OPERATIONS ====================
 
@@ -64,7 +64,7 @@ public class PostLikeService {
 
         // Send notification to post author (if different from liker)
         if (!post.getAuthor().equals(user)) {
-            notificationService.notifyWorkoutLiked(post, user);
+//            notificationsService.notifyWorkoutLiked(post, user);
         }
 
         log.info("Post liked: {} by user {}", postId, username);

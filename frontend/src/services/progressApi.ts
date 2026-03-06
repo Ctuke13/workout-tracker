@@ -11,14 +11,19 @@ export interface WorkoutCompletionRequest {
     holdSeconds?: number;
     uniqueExercisesCount: number;
     workoutType: 'STRENGTH' | 'CARDIO' | 'ISOMETRIC';
-    exerciseCount?: number;  // 🆕 ADD THIS
+    exerciseCount?: number;
+    /**
+     * Whether the workout qualifies for a 15% XP consistency bonus.
+     * Calculated on the frontend based on duration + sets thresholds.
+     */
+    consistencyBonus?: boolean;
 }
 
 class ProgressApi {
 
     /**
-     * Submit workout completion to progression system
-     * Awards XP, checks achievements, updates streaks, updates pet stats
+     * Submit workout completion to progression system.
+     * Awards XP, checks achievements, updates streaks, updates pet stats.
      */
     async completeWorkout(data: WorkoutCompletionRequest): Promise<WorkoutCompletionResponse> {
         return apiClient.post<WorkoutCompletionResponse>('/api/progress/workout-completion', data);

@@ -34,6 +34,7 @@ export interface JwtResponse {
     // ==================== ONBOARDING FIELDS ====================
     nickname: string | null;
     petName: string | null;
+    profileImageUrl?: string;
     onboardingCompleted: boolean;
     // ==================== TUTORIAL FIELDS ====================
     petTutorialCompleted: boolean;
@@ -60,6 +61,7 @@ export interface UserSummary {
     // ==================== ONBOARDING FIELDS ====================
     nickname: string | null;
     petName: string | null;
+    profileImageUrl?: string;
     onboardingCompleted: boolean;
     // ==================== TUTORIAL FIELDS ====================
     petTutorialCompleted: boolean;

@@ -10,16 +10,10 @@ import org.springframework.core.io.Resource;
 
 import jakarta.annotation.PostConstruct;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Base64;
 
-/**
- * Initializes the Firebase Admin SDK on startup.
- * Reads credentials from the service account JSON file.
- * <p>
- * The service account file must NOT be committed to git.
- * It is loaded from src/main/resources/firebase-service-account.json
- * and excluded via .gitignore.
- */
 @Configuration
 @Slf4j
 public class FirebaseConfig {
@@ -27,17 +21,29 @@ public class FirebaseConfig {
     @Value("${firebase.service-account-path}")
     private Resource serviceAccountResource;
 
+    @Value("${FIREBASE_SERVICE_ACCOUNT_BASE64:}")
+    private String serviceAccountBase64;
+
     @PostConstruct
     public void initializeFirebase() {
-        // Avoid re-initializing if already done (e.g. hot reload)
         if (!FirebaseApp.getApps().isEmpty()) {
             log.info("🔥 Firebase already initialized — skipping");
             return;
         }
 
         try {
-            GoogleCredentials credentials = GoogleCredentials
-                    .fromStream(serviceAccountResource.getInputStream());
+            GoogleCredentials credentials;
+
+            if (serviceAccountBase64 != null && !serviceAccountBase64.isBlank()) {
+                // Production: decode from base64 env var
+                log.info("🔥 Loading Firebase credentials from environment variable");
+                byte[] decoded = Base64.getDecoder().decode(serviceAccountBase64);
+                credentials = GoogleCredentials.fromStream(new ByteArrayInputStream(decoded));
+            } else {
+                // Local dev: read from file
+                log.info("🔥 Loading Firebase credentials from file");
+                credentials = GoogleCredentials.fromStream(serviceAccountResource.getInputStream());
+            }
 
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(credentials)
@@ -48,7 +54,6 @@ public class FirebaseConfig {
 
         } catch (IOException e) {
             log.error("❌ Failed to initialize Firebase Admin SDK: {}", e.getMessage());
-            log.error("Make sure firebase-service-account.json exists in src/main/resources/");
             throw new RuntimeException("Firebase initialization failed", e);
         }
     }

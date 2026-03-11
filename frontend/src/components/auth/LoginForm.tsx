@@ -49,15 +49,12 @@ export const LoginForm: React.FC = () => {
     return (
         <div className="w-full max-w-md mx-auto px-4 sm:px-0">
             {/* Mobile-optimized header */}
-            <div className="text-center mb-6 sm:mb-8">
-                <div className="mb-4">
-                    <span className="text-3xl sm:text-4xl">💪</span>
-                </div>
+            <div className="text-center mb-6 sm:mb-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                     Welcome Back
                 </h1>
                 <p className="text-sm sm:text-base text-gray-600">
-                    Sign in to continue your fitness journey
+                    Sign in to continue your journey with your pet
                 </p>
             </div>
 
@@ -81,7 +78,7 @@ export const LoginForm: React.FC = () => {
                         type="text"
                         value={formData.emailOrUsername}
                         onChange={handleInputChange}
-                        className="w-11/12 px-3 sm:px-4 py-3 sm:py-3.5 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
+                        className="w-full px-3 sm:px-4 py-3 sm:py-3.5 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
                         placeholder="Enter your email or username"
                         autoComplete="username"
                     />
@@ -102,14 +99,15 @@ export const LoginForm: React.FC = () => {
                             type={showPassword ? 'text' : 'password'}
                             value={formData.password}
                             onChange={handleInputChange}
-                            className="w-11/12 px-3 sm:px-4 py-3 sm:py-3.5 pr-10 sm:pr-12 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
+                            className="w-full px-3 sm:px-4 py-3 sm:py-3.5 pr-12 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
                             placeholder="Enter your password"
                             autoComplete="current-password"
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none bg-transparent border-none p-0 leading-none"
+                            tabIndex={-1}
                         >
                             {showPassword ? '👁️' : '👁️‍🗨️'}
                         </button>
@@ -127,13 +125,13 @@ export const LoginForm: React.FC = () => {
                             name="rememberMe"
                             checked={formData.rememberMe}
                             onChange={handleInputChange}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            className="h-4 w-4 text-blue-600 focus:ring-purple-500 border-gray-300 rounded"
                         />
                         <span className="ml-2 text-sm text-gray-600">Remember me</span>
                     </label>
                     <button
                         type="button"
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-sm text-purple-600 hover:text-purple-800 font-medium"
                     >
                         Forgot password?
                     </button>
@@ -143,7 +141,7 @@ export const LoginForm: React.FC = () => {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-blue-600 to-green-500 text-white py-3 sm:py-3.5 px-6 rounded-lg font-semibold text-base hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 sm:py-3.5 px-6 rounded-lg font-semibold text-base hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                     {loading ? (
                         <div className="flex items-center justify-center">
@@ -161,7 +159,7 @@ export const LoginForm: React.FC = () => {
                         <div className="w-full border-t border-gray-300"></div>
                     </div>
                     <div className="relative flex justify-center text-sm">
-                        <span className="px-2 bg-gray-50 text-gray-500">New to WorkoutTracker?</span>
+                        <span className="px-2 bg-white text-gray-500">New to EvoPet?</span>
                     </div>
                 </div>
 
@@ -170,7 +168,7 @@ export const LoginForm: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => window.location.href = '/register'}
-                        className="w-full sm:w-auto px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-semibold hover:bg-blue-600 hover:text-white transition-all duration-200"
+                        className="w-full sm:w-auto px-6 py-3 border-2 border-purple-600 text-purple-600 rounded-lg font-semibold hover:bg-purple-600 hover:text-white transition-all duration-200"
                     >
                         Create Account
                     </button>

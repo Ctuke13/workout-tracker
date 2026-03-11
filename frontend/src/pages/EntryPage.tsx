@@ -242,6 +242,7 @@ interface SplashStepProps {
 
 const SplashStep: React.FC<SplashStepProps> = ({ onContinue, RiveComponent }) => {
     const [show, setShow] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         setTimeout(() => setShow(true), 100);
@@ -268,48 +269,55 @@ const SplashStep: React.FC<SplashStepProps> = ({ onContinue, RiveComponent }) =>
             </div>
 
             {/* Wolf Animation */}
-            <div className="relative w-64 h-64 mx-auto mb-6">
+            <div className="relative w-56 h-56 mx-auto mb-4">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-200/50 to-blue-200/50 rounded-full blur-3xl animate-pulse" />
                 <div className="relative w-full h-full scale-[1.8] origin-center">
                     <RiveComponent />
                 </div>
             </div>
 
-            {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
-                Meet Your Wolf 🐺
+            {/* Core Hook - the concept in one line */}
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+                Work out. Your wolf evolves.
             </h1>
-            <p className="text-xl text-gray-700 mb-2">Your companion is waiting.</p>
-            <p className="text-lg text-gray-600 mb-8">
-                Ready to begin your journey together?
+            <p className="text-base text-gray-600 mb-6 max-w-xs mx-auto">
+                EvoPet is a fitness tracker where every workout feeds, levels up, and evolves your virtual companion.
             </p>
 
-            {/* Features */}
-            <div className="grid grid-cols-3 gap-3 mb-8 max-w-sm mx-auto">
+            {/* Feature tiles — pet-specific */}
+            <div className="grid grid-cols-3 gap-3 mb-6 max-w-sm mx-auto">
                 <div className="bg-white/60 backdrop-blur-sm rounded-xl p-3 text-center">
-                    <span className="text-3xl block mb-1">💪</span>
-                    <p className="text-xs font-medium text-gray-700">Train Together</p>
+                    <span className="text-2xl block mb-1">🏋️</span>
+                    <p className="text-xs font-medium text-gray-700">Log Workouts</p>
                 </div>
                 <div className="bg-white/60 backdrop-blur-sm rounded-xl p-3 text-center">
-                    <span className="text-3xl block mb-1">📈</span>
-                    <p className="text-xs font-medium text-gray-700">Grow Stronger</p>
+                    <span className="text-2xl block mb-1">🐺</span>
+                    <p className="text-xs font-medium text-gray-700">Feed Your Pet</p>
                 </div>
                 <div className="bg-white/60 backdrop-blur-sm rounded-xl p-3 text-center">
-                    <span className="text-3xl block mb-1">🎉</span>
-                    <p className="text-xs font-medium text-gray-700">Level Up</p>
+                    <span className="text-2xl block mb-1">⚡</span>
+                    <p className="text-xs font-medium text-gray-700">Rank Up</p>
                 </div>
             </div>
 
-            {/* CTA Button */}
+            {/* Primary CTA */}
             <button
                 onClick={onContinue}
-                className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-lg font-bold rounded-2xl shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white text-lg font-bold rounded-2xl shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 mb-3"
             >
-                Start Your Journey
+                Get Started — It's Free
                 <ChevronRight className="w-6 h-6" />
             </button>
 
-            <p className="mt-4 text-sm text-gray-500">3 minutes to begin</p>
+            {/* Sign in path for returning users */}
+            <button
+                onClick={() => navigate('/login')}
+                className="w-full py-3 text-purple-600 font-semibold text-sm hover:text-purple-800 transition-colors"
+            >
+                Already have an account? <span className="underline">Sign in</span>
+            </button>
+
+            <p className="mt-2 text-xs text-gray-400">Takes about 3 minutes to set up</p>
         </div>
     );
 };
@@ -340,7 +348,7 @@ const NameStep: React.FC<NameStepProps> = ({ value, onChange, onContinue, error 
                 <p className="text-gray-600">Just your first name</p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl overflow-hidden">
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
                         {error}
@@ -348,7 +356,7 @@ const NameStep: React.FC<NameStepProps> = ({ value, onChange, onContinue, error 
                 )}
 
                 <div className="relative mb-6">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                         <User className="w-5 h-5 text-gray-400" />
                     </div>
                     <input
@@ -357,7 +365,7 @@ const NameStep: React.FC<NameStepProps> = ({ value, onChange, onContinue, error 
                         onChange={(e) => onChange(e.target.value)}
                         onKeyPress={handleKeyPress}
                         placeholder="Your name..."
-                        className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-xl text-lg focus:outline-none focus:border-purple-500 transition-colors"
+                        className="w-10/12 pl-11 pr-4 py-2.5 border border-gray-200 rounded-lg text-base focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
                         autoFocus
                     />
                 </div>
@@ -365,7 +373,7 @@ const NameStep: React.FC<NameStepProps> = ({ value, onChange, onContinue, error 
                 <button
                     onClick={onContinue}
                     disabled={!value.trim()}
-                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-500 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95 shadow-md"
                 >
                     Continue
                 </button>
@@ -405,7 +413,7 @@ const AccountStep: React.FC<AccountStepProps> = ({
                 <p className="text-gray-600">Create your account</p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl space-y-4 overflow-hidden">
                 {error && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
                         {error}
@@ -414,7 +422,7 @@ const AccountStep: React.FC<AccountStepProps> = ({
 
                 {/* Email */}
                 <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                         <Mail className="w-5 h-5 text-gray-400" />
                     </div>
                     <input
@@ -422,13 +430,13 @@ const AccountStep: React.FC<AccountStepProps> = ({
                         value={email}
                         onChange={(e) => onChange('email', e.target.value)}
                         placeholder="Email address..."
-                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
+                        className="w-10/12 pl-11 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
                     />
                 </div>
 
                 {/* Password */}
                 <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                         <Lock className="w-5 h-5 text-gray-400" />
                     </div>
                     <input
@@ -436,13 +444,13 @@ const AccountStep: React.FC<AccountStepProps> = ({
                         value={password}
                         onChange={(e) => onChange('password', e.target.value)}
                         placeholder="Password (8+ characters)..."
-                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
+                        className="w-10/12 pl-11 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
                     />
                 </div>
 
                 {/* Confirm Password */}
                 <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                         <Lock className="w-5 h-5 text-gray-400" />
                     </div>
                     <input
@@ -450,14 +458,14 @@ const AccountStep: React.FC<AccountStepProps> = ({
                         value={confirmPassword}
                         onChange={(e) => onChange('confirmPassword', e.target.value)}
                         placeholder="Confirm password..."
-                        className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
+                        className="w-10/12 pl-11 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
                     />
                 </div>
 
                 <button
                     onClick={onContinue}
                     disabled={!isValid}
-                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-500 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
                 >
                     Continue
                 </button>
@@ -510,7 +518,7 @@ const PersonalInfoStep: React.FC<PersonalInfoStepProps> = ({
                 <p className="text-gray-600">Helps us personalize your experience</p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl space-y-4 overflow-hidden">
                 {error && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
                         {error}
@@ -529,7 +537,7 @@ const PersonalInfoStep: React.FC<PersonalInfoStepProps> = ({
                         onChange={(e) => onChange('dateOfBirth', e.target.value)}
                         min={minDate}
                         max={maxDate}
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
+                        className="w-10/12 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
                     />
                     <p className="mt-1 text-xs text-gray-500">Must be at least 13 years old</p>
                 </div>
@@ -549,7 +557,7 @@ const PersonalInfoStep: React.FC<PersonalInfoStepProps> = ({
                         }}
                         placeholder="12345"
                         maxLength={5}
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
+                        className="w-10/12 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all text-gray-900 placeholder-gray-400"
                     />
                     <p className="mt-1 text-xs text-gray-500">
                         {zipcode.length}/5 digits
@@ -573,7 +581,7 @@ const PersonalInfoStep: React.FC<PersonalInfoStepProps> = ({
                 <button
                     onClick={onContinue}
                     disabled={!isValid}
-                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
+                    className="w-10/12 py-4 bg-gradient-to-r from-purple-600 to-pink-500 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
                 >
                     Continue
                 </button>
@@ -627,7 +635,7 @@ const PetNameStep: React.FC<PetNameStepProps> = ({
                 )}
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl overflow-hidden">
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
                         {error}
@@ -642,7 +650,7 @@ const PetNameStep: React.FC<PetNameStepProps> = ({
                         onChange={(e) => onChange(e.target.value)}
                         placeholder="Enter a name..."
                         maxLength={50}
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl text-lg focus:outline-none focus:border-purple-500 transition-colors"
+                        className="w-11/12 px-4 py-3 border-2 border-gray-300 rounded-xl text-lg focus:outline-none focus:border-purple-500 transition-colors"
                     />
                 </div>
 

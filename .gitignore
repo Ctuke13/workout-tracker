@@ -85,6 +85,8 @@ docker-compose.override.yml
 *.log
 logs/
 application.log
+*.log.*.gz
+*.gz
 
 ### Claude Artifacts (Optional) ###
 .claude/

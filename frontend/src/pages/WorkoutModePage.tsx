@@ -30,12 +30,14 @@ const WorkoutModePage: React.FC = () => {
     const modalState = useModalState();
     const [showSetCompletionDialog, setShowSetCompletionDialog] = useState(false);
     const [completedLastSet, setCompletedLastSet] = useState(false);
+    const [isNavigatingToComplete, setIsNavigatingToComplete] = useState(false);
 
     useEffect(() => {
-        if (!workoutMode.isWorkoutActive) {
+        // Don't redirect if we're in the middle of navigating to workout-complete
+        if (!workoutMode.isWorkoutActive && !isNavigatingToComplete) {
             navigate('/calendar');
         }
-    }, [workoutMode.isWorkoutActive, navigate]);
+    }, [workoutMode.isWorkoutActive, isNavigatingToComplete, navigate]);
 
     // Get current exercise and workout state
     const currentExercise = workoutMode.currentExercise;
@@ -264,6 +266,9 @@ const WorkoutModePage: React.FC = () => {
                 });
 
                 console.log('🎉 Progression response:', progressResponse);
+
+                                // Set flag first so the isWorkoutActive guard doesn't redirect to /calendar
+                                setIsNavigatingToComplete(true);
 
                                 // Navigate immediately to workout complete page
                                 navigate('/workout-complete', {

@@ -1,496 +1,339 @@
 import React, {useEffect, useState} from 'react';
-import {useNavigate} from 'react-router-dom';
-import {useWorkoutMode, SetData} from '../hooks/useWorkoutMode';
-import {useModalState} from '../hooks/useModalState';
-import ExerciseSelector from '../components/CalendarPage/ExerciseSelector';
-import {
-    CardioConfiguration,
-    Exercise,
-    ExerciseConfiguration,
-    IsometricConfiguration,
-    StrengthConfiguration
-} from '../types/exercise';
-import {Button} from '../components/ui/button';
-import {Card, CardContent} from '../components/ui/card';
-import {Badge} from '../components/ui/badge';
-import toast from 'react-hot-toast';
-import {progressApi, WorkoutCompletionRequest} from '../services/progressApi';
+import {useNavigate, useLocation} from 'react-router-dom';
+import {WorkoutCompletionResponse} from '../types/workoutCompletionResponse';
+import {Trophy, Zap, Target, Clock, Dumbbell, TrendingUp, Flame, Award, ChevronRight} from 'lucide-react';
+import {usePet} from '../contexts/PetContext';
 
-// Extracted Components
-import {WorkoutHeader} from '../components/WorkoutModePage/WorkoutHeader';
-import {ExerciseNavigation} from '../components/WorkoutModePage/ExerciseNavigation';
-import {SetCompletionDialog} from '../components/WorkoutModePage/SetCompletionDialog';
-import {ConfettiEffect} from '../components/WorkoutModePage/ConfettiEffect';
-import {ExerciseTracker} from '../components/WorkoutModePage/ExerciseTracker';
-import {WorkoutSet} from "@/types";
+interface WorkoutStats {
+    durationMinutes: number;
+    setsCompleted: number;
+    exerciseCount: number;
+    volumeLifted?: number;
+    distanceKm?: number;
+    holdSeconds?: number;
+    workoutType: 'STRENGTH' | 'CARDIO' | 'ISOMETRIC';
+}
 
-const WorkoutModePage: React.FC = () => {
+const WorkoutCompletePage: React.FC = () => {
     const navigate = useNavigate();
-    const workoutMode = useWorkoutMode();
-    const modalState = useModalState();
-    const [showSetCompletionDialog, setShowSetCompletionDialog] = useState(false);
-    const [completedLastSet, setCompletedLastSet] = useState(false);
+    const location = useLocation();
+    const {stats: petStats} = usePet();
+    const [showConfetti, setShowConfetti] = useState(true);
+
+    // Get data from navigation state
+    const progressResponse = location.state?.progressResponse as WorkoutCompletionResponse;
+    const workoutStats = location.state?.workoutStats as WorkoutStats;
 
     useEffect(() => {
-        if (!workoutMode.isWorkoutActive) {
-            navigate('/calendar');
+        // Hide confetti after 3 seconds
+        const timer = setTimeout(() => setShowConfetti(false), 3000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    // If no data, redirect to home
+    useEffect(() => {
+        if (!progressResponse || !workoutStats) {
+            navigate('/');
         }
-    }, [workoutMode.isWorkoutActive, navigate]);
+    }, [progressResponse, workoutStats, navigate]);
 
-    // Get current exercise and workout state
-    const currentExercise = workoutMode.currentExercise;
-    const currentWorkout = workoutMode.currentWorkout;
-
-    if (!currentWorkout || !currentExercise) {
+    if (!progressResponse || !workoutStats) {
         return null;
     }
 
-    const isLastExercise = workoutMode.currentWorkout?.exercises.length === 1 || !workoutMode.canGoNext;
-    const isLastSet = currentExercise?.sets.filter(set => !set.completed).length === 1;
-
-    // Exercise type detection - using actual exercise properties
-    const exerciseType = currentExercise.scheduledExercise?.exercise?.isCardio ? 'cardio' :
-        currentExercise.scheduledExercise?.exercise?.isIsometric ? 'isometric' : 'strength';
-    const isCardio = exerciseType === 'cardio';
-    const isIsometric = exerciseType === 'isometric';
-
-    // Type-based styling
-    const getTypeStyle = () => {
-        if (isCardio) {
-            return {
-                bg: 'from-red-900/20 to-pink-900/20',
-                border: 'border-red-500/30',
-                button: 'bg-red-600 hover:bg-red-700',
-                text: 'text-red-400',
-                gradient: 'from-red-600 to-pink-600'
-            };
-        } else if (isIsometric) {
-            return {
-                bg: 'from-purple-900/20 to-indigo-900/20',
-                border: 'border-purple-500/30',
-                button: 'bg-purple-600 hover:bg-purple-700',
-                text: 'text-purple-400',
-                gradient: 'from-purple-600 to-indigo-600'
-            };
-        } else {
-            return {
-                bg: 'from-blue-900/20 to-cyan-900/20',
-                border: 'border-blue-500/30',
-                button: 'bg-blue-600 hover:bg-blue-700',
-                text: 'text-blue-400',
-                gradient: 'from-blue-600 to-cyan-600'
-            };
-        }
+    const handleContinue = () => {
+        navigate('/pet');
     };
-
-    const typeStyle = getTypeStyle();
-
-    // Helper function to get current exercise index safely
-    const getCurrentExerciseIndex = () => {
-        if (!workoutMode.currentWorkout || !currentExercise) return 0;
-        const index = workoutMode.currentWorkout.exercises.findIndex(ex => ex.id === currentExercise.id);
-        return index >= 0 ? index : 0;
-    };
-
-    // Helper function to get current set number safely
-    const getCurrentSetNumber = () => {
-        if (!currentExercise || !workoutMode.currentSet) return 1;
-        const index = currentExercise.sets.findIndex(set => set.id === workoutMode.currentSet?.id);
-        return index >= 0 ? index + 1 : 1;
-    };
-
-    // Exercise selector handlers
-    const handleAddExerciseToWorkout = async (exercise: Exercise, config: ExerciseConfiguration) => {
-        try {
-            modalState.closeExerciseSelector();
-            toast.loading(`Adding ${exercise.name}...`);
-
-            await workoutMode.addExerciseToCurrentWorkout(exercise, config);
-
-            toast.dismiss();
-            toast.success(`${exercise.name} added to workout!`);
-        } catch (error) {
-            toast.dismiss();
-            console.error('Failed to add exercise to workout:', error);
-            toast.error(`Failed to add ${exercise.name}. Please try again.`);
-            modalState.openExerciseSelector();
-        }
-    };
-
-    // Set completion handlers
-    const handleSetComplete = (setData: SetData) => {
-        const currentSetId = workoutMode.currentSet?.id;
-
-        if (!currentSetId) return;
-
-        // Calculate if this is the last set BEFORE completing
-        const remainingUncompletedSets = currentExercise?.sets.filter(set =>
-            !set.completed && set.id !== currentSetId
-        ).length || 0;
-
-        const wasLastSet = remainingUncompletedSets === 0;
-
-        // ✅ Get the rest time that was stored for THIS set
-        const restTimeForThisSet = workoutMode.getRestTimeForNextSet();
-        console.log('🔥 RETRIEVING rest time for this set:', restTimeForThisSet);
-
-        // Complete the set
-        const workoutSetData: Partial<WorkoutSet> = {
-            actualReps: setData.actualReps,
-            actualWeight: setData.actualWeight,
-            actualRpe: setData.actualRpe,
-            actualDurationMinutes: setData.actualDurationMinutes,
-            actualHoldSeconds: setData.actualHoldSeconds,
-            actualRestSeconds: restTimeForThisSet, // ✅ Use stored rest time
-            notes: setData.notes
-        };
-
-        workoutMode.completeSet(currentSetId, workoutSetData);
-
-        // ✅ Clear the stored rest time after using it
-        workoutMode.clearRestTimeForNextSet();
-
-        if (wasLastSet) {
-            setCompletedLastSet(true);
-            setTimeout(() => {
-                setShowSetCompletionDialog(true);
-            }, 100);
-        }
-    };
-
-    const handleUpdateSetData = (setData: SetData) => {
-        // Update current set data in real-time
-        workoutMode.setSetData(setData);
-    };
-
-    // Navigation handlers
-    const handlePreviousExercise = () => {
-        workoutMode.goToPreviousExercise();
-    };
-
-    const handleNextExercise = () => {
-        workoutMode.goToNextExercise();
-        setShowSetCompletionDialog(false);
-    };
-
-    const handleAddSet = () => {
-        // The addSet function from context expects a string (exerciseId)
-        const currentExerciseId = currentExercise?.id;
-        if (currentExerciseId && typeof currentExerciseId === 'string') {
-            workoutMode.addSet(currentExerciseId);
-        }
-        setShowSetCompletionDialog(false);
-    };
-
-    const handleCompleteWorkout = async () => {
-        workoutMode.setShowConfetti(true);
-        setShowSetCompletionDialog(false);
-
-        try {
-            const workoutData = await workoutMode.completeWorkout();
-
-            if (workoutData) {
-                console.log('✅ Completed workout:', workoutData);
-
-                // 🆕 USE workoutMode.workoutDuration (it's already being tracked!)
-                const durationMinutes = Math.round(workoutMode.workoutDuration / 60) || 30;
-
-                console.log('⏱️ Workout duration:', {
-                    durationSeconds: workoutMode.workoutDuration,
-                    durationMinutes: durationMinutes
-                });
-
-                // Calculate statistics
-                const totalSets = workoutData.exercises?.reduce((sum, ex) =>
-                    sum + (ex.sets?.length || 0), 0
-                ) || 0;
-
-                const totalVolume = workoutData.exercises?.reduce((sum, ex) =>
-                        sum + (ex.sets?.reduce((setSum: number, set: any) =>
-                            setSum + ((set.actualWeight || 0) * (set.actualReps || 0)), 0
-                        ) || 0), 0
-                ) || 0;
-
-                const totalDistance = workoutData.exercises?.reduce((sum, ex) =>
-                        sum + (ex.sets?.reduce((setSum: number, set: any) =>
-                            setSum + (set.actualDistanceKm || 0), 0
-                        ) || 0), 0
-                ) || 0;
-
-                const totalHoldTime = workoutData.exercises?.reduce((sum, ex) =>
-                        sum + (ex.sets?.reduce((setSum: number, set: any) =>
-                            setSum + (set.actualHoldSeconds || 0), 0
-                        ) || 0), 0
-                ) || 0;
-
-                const uniqueExercises = new Set(
-                    workoutData.exercises?.map(ex => ex.scheduledExercise?.exercise?.exerciseId)
-                ).size;
-
-                const exerciseCount = workoutData.exercises?.length || 1;
-
-                // Determine workout type
-                const hasCardio = workoutData.exercises?.some(ex =>
-                    ex.scheduledExercise?.exercise?.isCardio
-                );
-                const hasIsometric = workoutData.exercises?.some(ex =>
-                    ex.scheduledExercise?.exercise?.isIsometric
-                );
-
-                const workoutType: 'CARDIO' | 'ISOMETRIC' | 'STRENGTH' = hasCardio
-                    ? 'CARDIO'
-                    : hasIsometric
-                        ? 'ISOMETRIC'
-                        : 'STRENGTH';
-
-                console.log('📊 Workout stats:', {
-                    duration: durationMinutes,
-                    sets: totalSets,
-                    volume: totalVolume,
-                    exerciseCount,
-                    workoutType
-                });
-
-                // Consistency bonus: reward honest, realistic workouts with +15% XP.
-                // Thresholds are intentionally lenient — rewarding effort, not punishing short sessions.
-                const isTimeBased = workoutType === 'CARDIO' || workoutType === 'ISOMETRIC';
-                const consistencyBonus = isTimeBased
-                    ? durationMinutes >= 10                        // cardio/isometric: 10+ min
-                    : durationMinutes >= 20 && totalSets >= 3;     // strength: 20+ min AND 3+ sets
-
-                console.log('💪 Consistency bonus:', consistencyBonus, { durationMinutes, totalSets, workoutType });
-
-                // Submit to progression API
-                const progressResponse = await progressApi.completeWorkout({
-                    durationMinutes,
-                    setsCompleted: totalSets,
-                    volumeLifted: totalVolume,
-                    distanceKm: totalDistance > 0 ? totalDistance : undefined,
-                    holdSeconds: totalHoldTime > 0 ? totalHoldTime : undefined,
-                    uniqueExercisesCount: uniqueExercises,
-                    workoutType,
-                    exerciseCount,
-                    consistencyBonus
-                });
-
-                console.log('🎉 Progression response:', progressResponse);
-
-                                // Navigate immediately to workout complete page
-                                navigate('/workout-complete', {
-                                    state: {
-                                        progressResponse,
-                                        workoutStats: {
-                                            durationMinutes,
-                                            setsCompleted: totalSets,
-                                            exerciseCount,
-                                            volumeLifted: totalVolume > 0 ? totalVolume : undefined,
-                                            distanceKm: totalDistance > 0 ? totalDistance : undefined,
-                                            holdSeconds: totalHoldTime > 0 ? totalHoldTime : undefined,
-                                            workoutType,
-                                            consistencyBonus
-                                        }
-                                    }
-                                });
-                            }
-
-          } catch (error) {
-              console.error('Error completing workout:', error);
-              toast.error('Error saving workout. Please try again.');
-              setTimeout(() => {
-                  navigate('/calendar');
-              }, 3000);
-          }
-      };
-
-
-
-    // Workout control handlers
-    const handlePauseWorkout = () => {
-        workoutMode.pauseWorkout();
-        navigate('/');
-    };
-
-    const handleCancelWorkout = () => {
-        if (window.confirm('Are you sure you want to cancel this workout? All progress will be lost.')) {
-            workoutMode.cancelWorkout();
-            navigate('/');
-        }
-    };
-
-    // Current set data
-    const currentSetData = workoutMode.currentSet || workoutMode.setData || {};
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
+        <div className="min-h-screen bg-gradient-to-b from-purple-50 to-blue-50 pb-20">
             {/* Confetti Effect */}
-            <ConfettiEffect
-                show={workoutMode.showConfetti}
-                onComplete={() => workoutMode.setShowConfetti(false)}
-                mode="workout-complete"
-            />
-
-            {/* Set Completion Dialog */}
-            <SetCompletionDialog
-                show={showSetCompletionDialog}
-                isLastSet={completedLastSet}
-                isLastExercise={isLastExercise}
-                exerciseName={currentExercise.scheduledExercise?.exercise?.name || 'Exercise'}
-                onNextExercise={handleNextExercise}
-                onAddSet={handleAddSet}
-                onCompleteWorkout={handleCompleteWorkout}
-                onClose={() => {
-                    setShowSetCompletionDialog(false);
-                    setCompletedLastSet(false);
-                }}
-            />
-
-            {/* Exercise Selector Modal */}
-            {modalState.showExerciseSelector && (
-                <div className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
-                        <ExerciseSelector
-                            open={modalState.showExerciseSelector}
-                            onExerciseSelect={(exercise: Exercise) => {
-                                let defaultConfig: ExerciseConfiguration;
-
-                                if (exercise.isCardio) {
-                                    defaultConfig = {
-                                        trackingMode: 'cardio',
-                                        targetDurationMinutes: exercise.estimatedDurationMinutes || 20,
-                                        targetDistanceUnit: 'miles',
-                                        sessionType: 'single_session'
-                                    } as CardioConfiguration;
-                                } else if (exercise.isIsometric) {
-                                    defaultConfig = {
-                                        trackingMode: 'isometric',
-                                        targetSets: 3,
-                                        holdDurationSeconds: 30,
-                                        restSeconds: 60
-                                    } as IsometricConfiguration;
-                                } else {
-                                    defaultConfig = {
-                                        trackingMode: 'strength',
-                                        targetSets: 3,
-                                        targetReps: 10,
-                                        targetWeightUnit: 'lbs',
-                                        restSeconds: 90,
-                                        targetRpe: 7
-                                    } as StrengthConfiguration;
-                                }
-
-                                handleAddExerciseToWorkout(exercise, defaultConfig);
-                            }}
-                            onWorkoutPlanSelect={() => {
-                            }} // Not used in workout mode
-                            onWorkoutPlanConfigure={() => {
-                            }} // Not used in workout mode
-                            onClose={modalState.closeExerciseSelector}
-                            mode="workout"
-                        />
+            {showConfetti && (
+                <div className="fixed inset-0 pointer-events-none z-50">
+                    <div className="absolute inset-0 overflow-hidden">
+                        {[...Array(50)].map((_, i) => (
+                            <div
+                                key={i}
+                                className="absolute animate-confetti"
+                                style={{
+                                    left: `${Math.random() * 100}%`,
+                                    top: '-10%',
+                                    animationDelay: `${Math.random() * 3}s`,
+                                    animationDuration: `${3 + Math.random() * 2}s`
+                                }}
+                            >
+                                {['🎉', '⭐', '💪', '🔥', '✨'][Math.floor(Math.random() * 5)]}
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
 
-            <div className="container mx-auto p-4 space-y-6">
-                {/* Workout Header */}
-                <WorkoutHeader
-                    exerciseName={currentExercise.scheduledExercise?.exercise?.name || 'Exercise'}
-                    exerciseIcon={currentExercise.scheduledExercise?.exercise?.emoji || '💪'}
-                    currentExerciseIndex={getCurrentExerciseIndex()}
-                    totalExercises={workoutMode.currentWorkout?.exercises.length || 1}
-                    completionPercentage={workoutMode.getCompletionPercentage()}
-                    gradientClass={typeStyle.gradient}
-                    workoutDuration={workoutMode.workoutDuration}
-                />
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 text-center">
+                <h1 className="text-3xl font-bold mb-2">🎉 Workout Complete!</h1>
+                <p className="text-purple-100">Amazing effort! Here's your summary</p>
+            </div>
 
-                {/* Exercise Navigation */}
-                <ExerciseNavigation
-                    currentSetNumber={getCurrentSetNumber()}
-                    totalSets={currentExercise?.sets.length || 1}
-                    canGoPrevious={workoutMode.canGoPrevious}
-                    canGoNext={workoutMode.canGoNext}
-                    onPreviousExercise={handlePreviousExercise}
-                    onNextExercise={handleNextExercise}
-                />
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+                {/* Pet Reward Card */}
+                {progressResponse.petUpdate && (
+                    <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-purple-200">
+                        <div className="text-center">
+                            {/* Pet Image/Animation Placeholder */}
+                            <div className="w-32 h-32 mx-auto mb-4 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center text-6xl">
+                                🐺
+                            </div>
 
-                {/* Exercise Tracker */}
-                <ExerciseTracker
-                    exerciseType={exerciseType}
-                    isActive={workoutMode.isWorkoutActive}
-                    currentSetData={currentSetData}
-                    isLastSet={isLastSet}
-                    onSetComplete={handleSetComplete}
-                    onUpdateSetData={handleUpdateSetData}
-                    typeStyle={typeStyle}
-                />
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                                {petStats?.petName || 'Your Pet'}
+                            </h2>
 
-                {/* Workout Controls */}
-                <Card className="bg-gray-800 border-gray-700">
-                    <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Button
-                                onClick={handlePauseWorkout}
-                                variant="outline"
-                                className="bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
-                            >
-                                Pause Workout
-                            </Button>
-
-                            <Button
-                                onClick={() => modalState.openExerciseSelector()}
-                                variant="outline"
-                                className="bg-gray-700 border-gray-600 hover:bg-gray-600 text-white"
-                            >
-                                Add Exercise
-                            </Button>
-
-                            <Button
-                                onClick={handleCancelWorkout}
-                                variant="outline"
-                                className="bg-red-600/20 border-red-500/30 hover:bg-red-600/30 text-red-300"
-                            >
-                                Cancel Workout
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Workout Overview */}
-                <Card className="bg-gray-800 border-gray-700">
-                    <CardContent className="p-6">
-                        <h3 className="text-xl font-bold mb-4">Workout Overview</h3>
-                        <div className="space-y-3">
-                            {workoutMode.currentWorkout?.exercises.map((exercise, index) => (
-                                <div
-                                    key={exercise.id || index}
-                                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                                        exercise.id === currentExercise?.id
-                                            ? 'bg-blue-900/20 border-blue-500/30'
-                                            : 'bg-gray-700/50 border-gray-600/50'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <span
-                                            className="text-2xl">{exercise.scheduledExercise?.exercise?.emoji || '💪'}</span>
-                                        <span
-                                            className="font-medium">{exercise.scheduledExercise?.exercise?.name || 'Exercise'}</span>
-                                        {exercise.id === currentExercise?.id && (
-                                            <Badge variant="secondary" className="bg-blue-600 text-white">
-                                                Current
-                                            </Badge>
-                                        )}
+                            {/* Crystals Earned - Big Highlight */}
+                            <div className="bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl p-6 mb-4 border-2 border-amber-300">
+                                <div className="flex items-center justify-center gap-3">
+                                    <span className="text-5xl">💎</span>
+                                    <div className="text-left">
+                                        <div className="text-4xl font-bold text-amber-700">
+                                            +{progressResponse.petUpdate.crystalsEarned}
+                                        </div>
+                                        <div className="text-sm text-amber-600">Crystals Earned!</div>
                                     </div>
-                                    <div className="text-sm text-gray-400">
-                                        {exercise.sets?.length || 0} sets
+                                </div>
+                                <div className="text-xs text-amber-600 mt-2">
+                                    Balance: {progressResponse.petUpdate.newCrystalBalance} 💎
+                                </div>
+                            </div>
+
+                            {/* Pet Message */}
+                            {progressResponse.petUpdate.message && (
+                                <p className="text-gray-600 text-sm italic">
+                                    "{progressResponse.petUpdate.message}"
+                                </p>
+                            )}
+
+                            {/* Fatigue Warning */}
+                            {progressResponse.petUpdate.isSleeping && (
+                                <div className="mt-4 bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                                    <div className="flex items-center gap-2 text-red-700">
+                                        <span className="text-2xl">💤</span>
+                                        <div className="text-left">
+                                            <div className="font-bold">Pet is Exhausted!</div>
+                                            <div className="text-sm">Needs 24 hours of rest</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Wasted Crystals Warning */}
+                            {progressResponse.petUpdate.wastedCrystals > 0 && (
+                                <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    <div className="text-yellow-700 text-sm">
+                                        ⚠️ {progressResponse.petUpdate.wastedCrystals} crystals wasted (cap reached)
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* XP & Rank Card */}
+                <div className="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-yellow-500"/>
+                        Progression Rewards
+                    </h3>
+
+                    {/* XP Gained */}
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 mb-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                                    <Zap className="w-6 h-6 text-white"/>
+                                </div>
+                                <div>
+                                    <div className="text-2xl font-bold text-blue-600">
+                                        +{progressResponse.xpGained} XP
+                                    </div>
+                                    <div className="text-xs text-gray-600">
+                                        Total: {progressResponse.newLifetimeXp} XP
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Current Rank */}
+                    <div className="bg-purple-50 rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Trophy className="w-8 h-8 text-purple-600"/>
+                                <div>
+                                    <div className="text-sm text-gray-600">Current Rank</div>
+                                    <div className="text-xl font-bold text-purple-600">
+                                        {progressResponse.seasonalRank}
+                                    </div>
+                                </div>
+                            </div>
+                            {progressResponse.rankedUp && (
+                                <div className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold border-2 border-yellow-300">
+                                    RANK UP! 🎉
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Streak Info */}
+                    {progressResponse.currentStreak > 0 && (
+                        <div className="mt-3 bg-orange-50 rounded-xl p-4">
+                            <div className="flex items-center gap-3">
+                                <Flame className="w-8 h-8 text-orange-500"/>
+                                <div>
+                                    <div className="text-sm text-gray-600">Workout Streak</div>
+                                    <div className="text-xl font-bold text-orange-600">
+                                        {progressResponse.currentStreak} {progressResponse.currentStreak === 1 ? 'day' : 'days'}
+                                    </div>
+                                    {progressResponse.streakMilestone && (
+                                        <div className="text-xs text-orange-600 font-semibold">
+                                            🔥 {progressResponse.streakMessage}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Achievements */}
+                {progressResponse.achievementsUnlocked && progressResponse.achievementsUnlocked.length > 0 && (
+                    <div className="bg-white rounded-2xl shadow-lg p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <Award className="w-5 h-5 text-yellow-500"/>
+                            Achievements Unlocked!
+                        </h3>
+                        <div className="space-y-3">
+                            {progressResponse.achievementsUnlocked.map((achievement) => (
+                                <div
+                                    key={achievement.achievementId}
+                                    className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl p-4 border-2 border-yellow-200"
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-3xl">{achievement.icon}</div>
+                                        <div className="flex-1">
+                                            <div className="font-bold text-gray-900">{achievement.name}</div>
+                                            <div className="text-sm text-gray-600">{achievement.description}</div>
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full font-semibold">
+                                                    {achievement.rarity}
+                                                </span>
+                                                <span className="text-xs text-green-600 font-semibold">
+                                                    +{achievement.bonusXp} XP
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                )}
+
+                {/* Workout Stats */}
+                <div className="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <Target className="w-5 h-5 text-blue-500"/>
+                        Workout Summary
+                    </h3>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        {/* Duration */}
+                        <div className="bg-blue-50 rounded-xl p-4 text-center">
+                            <Clock className="w-6 h-6 text-blue-600 mx-auto mb-2"/>
+                            <div className="text-2xl font-bold text-blue-600">
+                                {workoutStats.durationMinutes}
+                            </div>
+                            <div className="text-xs text-gray-600">Minutes</div>
+                        </div>
+
+                        {/* Sets */}
+                        <div className="bg-green-50 rounded-xl p-4 text-center">
+                            <Dumbbell className="w-6 h-6 text-green-600 mx-auto mb-2"/>
+                            <div className="text-2xl font-bold text-green-600">
+                                {workoutStats.setsCompleted}
+                            </div>
+                            <div className="text-xs text-gray-600">Sets</div>
+                        </div>
+
+                        {/* Exercises */}
+                        <div className="bg-purple-50 rounded-xl p-4 text-center">
+                            <TrendingUp className="w-6 h-6 text-purple-600 mx-auto mb-2"/>
+                            <div className="text-2xl font-bold text-purple-600">
+                                {workoutStats.exerciseCount}
+                            </div>
+                            <div className="text-xs text-gray-600">Exercises</div>
+                        </div>
+
+                        {/* Type-specific stat */}
+                        {workoutStats.workoutType === 'STRENGTH' && workoutStats.volumeLifted && workoutStats.volumeLifted > 0 && (
+                            <div className="bg-orange-50 rounded-xl p-4 text-center">
+                                <span className="text-2xl mb-2 block">💪</span>
+                                <div className="text-2xl font-bold text-orange-600">
+                                    {Math.round(workoutStats.volumeLifted)}
+                                </div>
+                                <div className="text-xs text-gray-600">Volume (lbs)</div>
+                            </div>
+                        )}
+
+                        {workoutStats.workoutType === 'CARDIO' && workoutStats.distanceKm && workoutStats.distanceKm > 0 && (
+                            <div className="bg-red-50 rounded-xl p-4 text-center">
+                                <span className="text-2xl mb-2 block">🏃</span>
+                                <div className="text-2xl font-bold text-red-600">
+                                    {workoutStats.distanceKm.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-gray-600">Kilometers</div>
+                            </div>
+                        )}
+
+                        {workoutStats.workoutType === 'ISOMETRIC' && workoutStats.holdSeconds && workoutStats.holdSeconds > 0 && (
+                            <div className="bg-indigo-50 rounded-xl p-4 text-center">
+                                <span className="text-2xl mb-2 block">⏱️</span>
+                                <div className="text-2xl font-bold text-indigo-600">
+                                    {workoutStats.holdSeconds}
+                                </div>
+                                <div className="text-xs text-gray-600">Hold Time (s)</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Continue Button */}
+                <button
+                    onClick={handleContinue}
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                >
+                    Continue to Home
+                    <ChevronRight className="w-5 h-5"/>
+                </button>
             </div>
+
+            {/* Confetti Animation CSS */}
+            <style>{`
+                @keyframes confetti {
+                    0% {
+                        transform: translateY(0) rotate(0deg);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: translateY(100vh) rotate(720deg);
+                        opacity: 0;
+                    }
+                }
+                .animate-confetti {
+                    animation: confetti linear forwards;
+                }
+            `}</style>
         </div>
     );
 };
 
-export default WorkoutModePage;
+export default WorkoutCompletePage;

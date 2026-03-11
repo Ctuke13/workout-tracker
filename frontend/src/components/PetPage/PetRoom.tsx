@@ -3,6 +3,7 @@ import {useRive, useStateMachineInput} from '@rive-app/react-canvas';
 import {getCurrentSeason, Season, SEASONAL_ASSETS} from '../../types/pet';
 import {useAuth} from '../../contexts/AuthContext';
 import {usePet} from '../../contexts/PetContext';
+import {useSeason} from '../../contexts/SeasonContext';
 
 interface PetRoomProps {
     season?: Season;
@@ -13,7 +14,22 @@ const STATE_MACHINE_NAME = 'Pet State Machine';
 const PetRoom: React.FC<PetRoomProps> = ({season: overrideSeason}) => {
     const {user} = useAuth();
     const {stats, currentAnimation} = usePet();
-    const currentSeason = overrideSeason || getCurrentSeason();
+    const {season: gameSeason} = useSeason();
+
+    // Derive Season type from the game season name (e.g. "Spring 2026" → "spring")
+    // Falls back to real calendar season if game season isn't loaded yet
+    const getGameSeason = (): Season => {
+        if (gameSeason?.seasonName) {
+            const name = gameSeason.seasonName.toLowerCase();
+            if (name.includes('winter')) return 'winter';
+            if (name.includes('spring')) return 'spring';
+            if (name.includes('summer')) return 'summer';
+            if (name.includes('fall') || name.includes('autumn')) return 'fall';
+        }
+        return getCurrentSeason();
+    };
+
+    const currentSeason = overrideSeason || getGameSeason();
     const seasonalAssets = SEASONAL_ASSETS[currentSeason];
     const prevCleanlinessRef = useRef<number | null>(null);
 

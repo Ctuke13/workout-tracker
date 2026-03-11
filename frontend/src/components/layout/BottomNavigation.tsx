@@ -11,20 +11,20 @@ const BottomNavigation: React.FC = () => {
         {
             path: '/pet',
             icon: HomeIcon,
-            label: 'Pet',
+            label: 'Home',
             activeColor: 'text-amber-600'
-        },
-        {
-            path: '/progress',
-            icon: ChartBarIcon,
-            label: 'Progress',
-            activeColor: 'text-green-600'
         },
         {
             path: '/calendar',
             icon: CalendarIcon,
             label: 'Calendar',
             activeColor: 'text-purple-600'
+        },
+        {
+            path: '/progress',
+            icon: ChartBarIcon,
+            label: 'Progress',
+            activeColor: 'text-green-600'
         }
     ];
 

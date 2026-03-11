@@ -253,6 +253,20 @@ const SplashStep: React.FC<SplashStepProps> = ({ onContinue, RiveComponent }) =>
                 show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
             }`}
         >
+            {/* EvoPet Logo */}
+            <div className="flex items-center justify-center gap-3 mb-6">
+                <img
+                    src="/assets/branding/EvoPet_icon.png"
+                    alt="EvoPet"
+                    className="w-12 h-12 rounded-2xl object-contain shadow-lg"
+                />
+                <img
+                    src="/assets/branding/EvoPet_txt_lg.png"
+                    alt="EvoPet"
+                    className="h-10 w-auto object-contain"
+                />
+            </div>
+
             {/* Wolf Animation */}
             <div className="relative w-64 h-64 mx-auto mb-6">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-200/50 to-blue-200/50 rounded-full blur-3xl animate-pulse" />

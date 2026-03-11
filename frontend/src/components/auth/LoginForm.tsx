@@ -81,7 +81,7 @@ export const LoginForm: React.FC = () => {
                         type="text"
                         value={formData.emailOrUsername}
                         onChange={handleInputChange}
-                        className="w-full px-3 sm:px-4 py-3 sm:py-3.5 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
+                        className="w-11/12 px-3 sm:px-4 py-3 sm:py-3.5 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
                         placeholder="Enter your email or username"
                         autoComplete="username"
                     />
@@ -102,7 +102,7 @@ export const LoginForm: React.FC = () => {
                             type={showPassword ? 'text' : 'password'}
                             value={formData.password}
                             onChange={handleInputChange}
-                            className="w-full px-3 sm:px-4 py-3 sm:py-3.5 pr-10 sm:pr-12 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
+                            className="w-11/12 px-3 sm:px-4 py-3 sm:py-3.5 pr-10 sm:pr-12 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
                             placeholder="Enter your password"
                             autoComplete="current-password"
                         />

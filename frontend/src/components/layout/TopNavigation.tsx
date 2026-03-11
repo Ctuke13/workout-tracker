@@ -120,19 +120,26 @@ const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
 
                         {/* Logo/Brand */}
                         <div className="flex items-center space-x-2 sm:space-x-3">
-                            <div
-                                className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-600 to-green-500 rounded-lg flex items-center justify-center">
-                                <span className="text-white font-bold text-sm sm:text-base">W</span>
-                            </div>
+                            {/* EvoPet Icon */}
+                            <img
+                                src="/assets/branding/EvoPet_icon.png"
+                                alt="EvoPet"
+                                className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-xl object-contain"
+                            />
                             <div className="min-w-0">
-                                <h1 className="text-base sm:text-lg font-bold text-gray-900 truncate">
-                                    <span className="sm:hidden">{getPageTitle()}</span>
-                                    <span className="hidden sm:inline">Workout Tracker</span>
-                                </h1>
+                                {/* Mobile: small text logo */}
+                                <img
+                                    src="/assets/branding/EvoPet_txt_lg.png"
+                                    alt="EvoPet"
+                                    className="sm:hidden h-12 w-auto object-contain"
+                                />
+                                {/* Desktop: larger text logo */}
                                 <div className="hidden sm:block">
-                                    <p className="text-xs text-gray-500">
-                                        {getPageTitle()}
-                                    </p>
+                                    <img
+                                        src="/assets/branding/EvoPet_txt_lg.png"
+                                        alt="EvoPet"
+                                        className="h-14 w-auto object-contain"
+                                    />
                                 </div>
                             </div>
                         </div>

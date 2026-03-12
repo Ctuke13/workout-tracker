@@ -17,5 +17,7 @@ ENTRYPOINT ["java", \
   "-XX:+UseG1GC", \
   "-XX:G1HeapRegionSize=4m", \
   "-XX:+UseStringDeduplication", \
+  "-Dhibernate.query.plan_cache_max_size=32", \
+  "-Dhibernate.query.plan_parameter_metadata_max_size=8", \
   "-Dspring.profiles.active=prod", \
   "-jar", "app.jar"]

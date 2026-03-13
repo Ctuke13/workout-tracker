@@ -138,6 +138,9 @@ public class GlobalExceptionHandler {
 
         log.warn("Constraint violation for request: {} with {} violations",
                 request.getRequestURI(), ex.getConstraintViolations().size());
+        ex.getConstraintViolations().forEach(v ->
+                log.warn("  ❌ Field: {}, Value: {}, Message: {}",
+                        v.getPropertyPath(), v.getInvalidValue(), v.getMessage()));
 
         List<ErrorResponse.ValidationError> validationErrors = new ArrayList<>();
 

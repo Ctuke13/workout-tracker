@@ -57,22 +57,22 @@ public class Exercise {
     @Column(name = "estimated_calories")
     private Integer estimatedCalories;
 
-    @ElementCollection(fetch = FetchType.LAZY)
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "exercise_muscle_groups", joinColumns = @JoinColumn(name = "exercise_id"))
     @Column(name = "muscle_group", length = 50)
-    private List<String> targetMuscleGroups; // ["CHEST", "SHOULDERS", "TRICEPS"]
+    private List<String> targetMuscleGroups;
 
-    @ElementCollection(fetch = FetchType.LAZY)
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "exercise_equipment", joinColumns = @JoinColumn(name = "exercise_id"))
     @Column(name = "equipment", length = 50)
     private List<String> equipmentRequired;
 
-    @ElementCollection(fetch = FetchType.LAZY)
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "exercise_benefits", joinColumns = @JoinColumn(name = "exercise_id"))
     @Column(name = "benefit", length = 100)
     private List<String> benefits;
 
-    @ElementCollection(fetch = FetchType.LAZY)
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "exercise_tips", joinColumns = @JoinColumn(name = "exercise_id"))
     @Column(name = "tip", length = 200)
     private List<String> tips;

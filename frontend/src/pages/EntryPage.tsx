@@ -96,8 +96,8 @@ const EntryPage: React.FC = () => {
 
             // Clean email prefix for username (remove special characters)
             const emailPrefix = formData.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-            const randomDigits = Math.floor(1000 + Math.random() * 9000);
-            const username = `${emailPrefix}${randomDigits}`;
+            const randomDigits = Math.floor(100 + Math.random() * 900);
+            const username = `${emailPrefix}${randomDigits}`.slice(0, 20);
 
             console.log('🔍 Registration data:', {
                 email: formData.email,

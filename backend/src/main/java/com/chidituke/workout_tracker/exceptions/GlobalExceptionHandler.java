@@ -101,6 +101,12 @@ public class GlobalExceptionHandler {
 
         log.warn("Validation failed for request: {} with {} errors",
                 request.getRequestURI(), ex.getBindingResult().getErrorCount());
+        ex.getBindingResult().getAllErrors().forEach(error -> {
+            if (error instanceof FieldError fieldError) {
+                log.warn("  ❌ Field: {}, Value: {}, Message: {}",
+                        fieldError.getField(), fieldError.getRejectedValue(), fieldError.getDefaultMessage());
+            }
+        });
 
         List<ErrorResponse.ValidationError> validationErrors = new ArrayList<>();
 

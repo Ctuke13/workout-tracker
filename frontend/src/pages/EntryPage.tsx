@@ -261,11 +261,14 @@ const SplashStep: React.FC<SplashStepProps> = ({ onContinue, RiveComponent }) =>
                     alt="EvoPet"
                     className="w-12 h-12 rounded-2xl object-contain shadow-lg"
                 />
-                <img
-                    src="/assets/branding/EvoPet_txt_lg.png"
-                    alt="EvoPet"
-                    className="h-10 w-auto object-contain"
-                />
+              <img
+                  src="/assets/branding/EvoPet_txt_lg.png"
+                  alt="EvoPet"
+                  className="h-10 w-auto object-contain"
+              />
+              <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full border border-purple-200 uppercase tracking-wide">
+                  Beta
+              </span>
             </div>
 
             {/* Wolf Animation */}

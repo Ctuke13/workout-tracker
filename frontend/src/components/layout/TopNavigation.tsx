@@ -128,18 +128,28 @@ const TopNavigation: React.FC<TopNavigationProps> = ({scrollContainerRef}) => {
                             />
                             <div className="min-w-0">
                                 {/* Mobile: small text logo */}
-                                <img
-                                    src="/assets/branding/EvoPet_txt_lg.png"
-                                    alt="EvoPet"
-                                    className="sm:hidden h-12 w-auto object-contain"
-                                />
-                                {/* Desktop: larger text logo */}
-                                <div className="hidden sm:block">
+                                <div className="sm:hidden flex items-center gap-1.5">
                                     <img
                                         src="/assets/branding/EvoPet_txt_lg.png"
                                         alt="EvoPet"
-                                        className="h-14 w-auto object-contain"
+                                        className="h-12 w-auto object-contain"
                                     />
+                                    <span className="bg-purple-100 text-purple-700 text-xs font-bold px-1.5 py-0.5 rounded-full border border-purple-200 uppercase tracking-wide">
+                                        Beta
+                                    </span>
+                                </div>
+                                {/* Desktop: larger text logo */}
+                                <div className="hidden sm:block">
+                                    <div className="flex items-center gap-2">
+                                        <img
+                                            src="/assets/branding/EvoPet_txt_lg.png"
+                                            alt="EvoPet"
+                                            className="h-14 w-auto object-contain"
+                                        />
+                                        <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full border border-purple-200 uppercase tracking-wide">
+                                            Beta
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

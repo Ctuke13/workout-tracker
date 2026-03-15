@@ -284,6 +284,10 @@ public class AuthController {
     // 🔄 TOKEN REFRESH
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@CurrentUser UserPrincipal userPrincipal) {
+        if (userPrincipal == null) {
+            return ResponseEntity.status(401)
+                    .body(new ApiResponse(false, "Token expired or invalid. Please log in again."));
+        }
         User user = userService.getUserById(userPrincipal.getId());
 
         // Check if account is still active

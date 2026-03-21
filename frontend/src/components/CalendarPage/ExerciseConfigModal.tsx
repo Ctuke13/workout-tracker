@@ -1,20 +1,16 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     ScheduledExercise,
     Exercise,
     ExerciseConfiguration,
 } from '../../types/exercise';
-import {StrengthConfigSection} from '../ExerciseConfig/StrengthConfigSection';
-import {CardioConfigSection} from '../ExerciseConfig/CardioConfigSection';
-import {IsometricConfigSection} from '../ExerciseConfig/IsometricConfigSection';
-import {useExerciseConfig} from '../../hooks/useExerciseConfig';
-import {WorkoutPlanInfo} from '../../types/api';
-import {StarIcon} from "@heroicons/react/24/outline";
-import {StarIcon as StarIconSolid} from "@heroicons/react/24/solid";
-
-// =============================================================================
-// COMPONENT PROPS INTERFACE
-// =============================================================================
+import { StrengthConfigSection } from '../ExerciseConfig/StrengthConfigSection';
+import { CardioConfigSection } from '../ExerciseConfig/CardioConfigSection';
+import { IsometricConfigSection } from '../ExerciseConfig/IsometricConfigSection';
+import { useExerciseConfig } from '../../hooks/useExerciseConfig';
+import { WorkoutPlanInfo } from '../../types/api';
+import { StarIcon } from "@heroicons/react/24/outline";
+import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
 interface ExerciseConfigModalProps {
     isOpen: boolean;
@@ -34,301 +30,274 @@ interface ExerciseConfigModalProps {
     onFavoriteToggle?: (exercise: Exercise) => void;
 }
 
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
+const trackingModeColor = {
+    strength: 'from-violet-600 to-purple-600',
+    cardio: 'from-rose-500 to-orange-500',
+    isometric: 'from-blue-500 to-cyan-500',
+};
 
 const ExerciseConfigModal: React.FC<ExerciseConfigModalProps> = ({
-                                                                     isOpen,
-                                                                     onClose,
-                                                                     exercise,
-                                                                     config,
-                                                                     onConfigChange,
-                                                                     onSave,
-                                                                     selectedDate,
-                                                                     loading,
-                                                                     mode,
-                                                                     onModeChange,
-                                                                     onWorkoutPlanSelect,
-                                                                     selectedWorkoutPlan,
-                                                                     isEditMode,
-                                                                     editingExercise,
-                                                                     onFavoriteToggle
-                                                                 }) => {
-    // =============================================================================
-    // STATE MANAGEMENT
-    // =============================================================================
+    isOpen, onClose, exercise, config, onConfigChange, onSave,
+    selectedDate, loading, mode, onModeChange, onWorkoutPlanSelect,
+    selectedWorkoutPlan, isEditMode, editingExercise, onFavoriteToggle
+}) => {
+    const [visible, setVisible] = useState(false);
 
     const configData = useExerciseConfig({
-        exercise,
-        config,
-        onConfigChange,
-        onFavoriteToggle
+        exercise, config, onConfigChange, onFavoriteToggle
     });
 
-    // =============================================================================
-    // RENDER GUARD
-    // =============================================================================
+    useEffect(() => {
+        if (isOpen) {
+            requestAnimationFrame(() => setVisible(true));
+        } else {
+            setVisible(false);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
-    // =============================================================================
-    // RENDER COMPONENT
-    // =============================================================================
+    const trackingMode = configData.trackingMode as 'strength' | 'cardio' | 'isometric';
+    const gradientClass = trackingModeColor[trackingMode] || 'from-violet-600 to-purple-600';
+
+    const saveLabel = loading
+        ? 'Saving...'
+        : isEditMode
+            ? 'Update Exercise'
+            : mode === 'workout-plan'
+                ? 'Schedule Plan'
+                : 'Add Exercise';
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                {/* =============================================================================
-                    HEADER
-                    ============================================================================= */}
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">
-                        {isEditMode ? 'Edit Exercise' : mode === 'workout-plan' ? 'Schedule Workout Plan' : 'Configure Exercise'}
-                    </h2>
-                    <div className="flex items-center gap-3">
-                        {/* ✅ NEW: Favorite Button in Header */}
-                        {exercise && mode === 'exercise' && (
+        <div
+            className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center transition-all duration-300 ${
+                visible ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/0'
+            }`}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        >
+            <div
+                className={`
+                    bg-white w-full sm:max-w-lg flex flex-col
+                    rounded-t-3xl sm:rounded-3xl
+                    shadow-2xl
+                    transition-transform duration-300 ease-out
+                    ${visible ? 'translate-y-0' : 'translate-y-full sm:translate-y-4'}
+                `}
+                style={{ maxHeight: 'calc(92vh - env(safe-area-inset-bottom, 0px))' }}
+            >
+                {/* ── HEADER ── */}
+                <div className={`bg-gradient-to-r ${gradientClass} rounded-t-3xl sm:rounded-t-3xl px-5 pt-5 pb-4 flex-shrink-0`}>
+                    {/* Drag handle — mobile only */}
+                    <div className="flex justify-center mb-3 sm:hidden">
+                        <div className="w-10 h-1 bg-white/40 rounded-full" />
+                    </div>
+
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-white/70 text-xs font-medium uppercase tracking-widest mb-0.5">
+                                {isEditMode ? 'Editing' : 'Configure'}
+                            </p>
+                            <h2 className="text-white text-xl font-bold leading-tight truncate">
+                                {exercise?.name ?? (mode === 'workout-plan' ? 'Workout Plan' : 'Exercise')}
+                            </h2>
+                            {exercise && (
+                                <div className="flex gap-2 mt-2 flex-wrap">
+                                    <span className="bg-white/20 text-white text-xs px-2.5 py-1 rounded-full font-medium">
+                                        {exercise.exerciseType}
+                                    </span>
+                                    {exercise.targetMuscleGroups?.[0] && (
+                                        <span className="bg-white/20 text-white text-xs px-2.5 py-1 rounded-full font-medium">
+                                            {exercise.targetMuscleGroups[0]}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {exercise && mode === 'exercise' && (
+                                <button
+                                    onClick={configData.handleToggleFavorite}
+                                    className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                                    title={configData.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                                >
+                                    {configData.isFavorited
+                                        ? <StarIconSolid className="w-5 h-5 text-yellow-300" />
+                                        : <StarIcon className="w-5 h-5 text-white" />
+                                    }
+                                </button>
+                            )}
                             <button
-                                onClick={configData.handleToggleFavorite}
-                                className={`
-            p-2 rounded-full transition-all duration-200
-            active:scale-95 shadow-sm hover:shadow-md border
-            ${configData.isFavorited
-                                    ? 'text-yellow-500 bg-yellow-100 hover:bg-yellow-200 border-yellow-300'
-                                    : 'text-gray-400 bg-gray-100 hover:bg-yellow-100 border-gray-300'
-                                }
-        `}
-                                title={configData.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                                onClick={onClose}
+                                className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors text-lg font-bold"
+                                aria-label="Close"
                             >
-                                {configData.isFavorited ? (
-                                    <StarIconSolid className="w-5 h-5 text-yellow-500"/> // ✅ Use solid star when favorited
-                                ) : (
-                                    <StarIcon className="w-5 h-5"/> // ✅ Use outline star when not favorited
-                                )}
+                                ×
                             </button>
-                        )}
-                        <button
-                            onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
-                            aria-label="Close modal"
-                        >
-                            ×
-                        </button>
+                        </div>
                     </div>
                 </div>
 
-                {/* =============================================================================
-                    MODE SELECTION
-                    ============================================================================= */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Scheduling Mode
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                        <button
-                            type="button"
-                            onClick={() => onModeChange('exercise')}
-                            className={`p-3 text-sm font-medium rounded-lg border transition-colors ${
-                                mode === 'exercise'
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                            }`}
-                        >
-                            💪 Individual Exercise
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onModeChange('workout-plan')}
-                            className={`p-3 text-sm font-medium rounded-lg border transition-colors ${
-                                mode === 'workout-plan'
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                            }`}
-                        >
-                            📋 Workout Plan
-                        </button>
+                {/* ── MODE TABS ── */}
+                <div className="flex-shrink-0 px-5 pt-4 pb-2">
+                    <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
+                        {(['exercise', 'workout-plan'] as const).map((m) => (
+                            <button
+                                key={m}
+                                type="button"
+                                onClick={() => onModeChange(m)}
+                                className={`flex-1 py-2 text-sm font-semibold rounded-xl transition-all duration-200 ${
+                                    mode === m
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                {m === 'exercise' ? '💪 Exercise' : '📋 Workout Plan'}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
-                {/* =============================================================================
-                    WORKOUT PLAN MODE
-                    ============================================================================= */}
-                {mode === 'workout-plan' && (
-                    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Workout Plan</h3>
-                        <div className="space-y-3">
+                {/* ── SCROLLABLE BODY ── */}
+                <div className="flex-1 overflow-y-auto px-5 pb-2 overscroll-contain">
+
+                    {/* Workout Plan Mode */}
+                    {mode === 'workout-plan' && (
+                        <div className="py-4">
                             {selectedWorkoutPlan ? (
-                                <div className="p-3 bg-white rounded-lg border border-blue-200">
-                                    <h4 className="font-semibold text-blue-900">{selectedWorkoutPlan.name}</h4>
-                                    <p className="text-sm text-gray-600">{selectedWorkoutPlan.description}</p>
-                                    <div className="flex gap-2 mt-2">
-                                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-100">
+                                    <h4 className="font-bold text-blue-900 text-base">{selectedWorkoutPlan.name}</h4>
+                                    <p className="text-sm text-gray-600 mt-1">{selectedWorkoutPlan.description}</p>
+                                    <div className="flex flex-wrap gap-2 mt-3">
+                                        <span className="text-xs bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full font-medium">
                                             {selectedWorkoutPlan.difficulty}
                                         </span>
-                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                        <span className="text-xs bg-green-100 text-green-800 px-2.5 py-1 rounded-full font-medium">
                                             {selectedWorkoutPlan.exerciseCount} exercises
                                         </span>
-                                        <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                                        <span className="text-xs bg-orange-100 text-orange-800 px-2.5 py-1 rounded-full font-medium">
                                             {selectedWorkoutPlan.estimatedDurationMinutes} min
                                         </span>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="text-center py-8">
-                                    <p className="text-gray-500 mb-4">No workout plan selected</p>
+                                <div className="text-center py-12">
+                                    <div className="text-5xl mb-4">📋</div>
+                                    <p className="text-gray-500 text-sm mb-4">No workout plan selected yet</p>
                                     <button
                                         type="button"
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                        onClick={() => {
-                                            // This would typically open a workout plan selector
-                                            console.log('Open workout plan selector');
-                                        }}
+                                        className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+                                        onClick={() => console.log('Open workout plan selector')}
                                     >
                                         Browse Workout Plans
                                     </button>
                                 </div>
                             )}
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* =============================================================================
-                    EXERCISE MODE
-                    ============================================================================= */}
-                {mode === 'exercise' && exercise && (
-                    <>
-                        {/* Exercise Info */}
-                        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">{exercise.name}</h3>
-                            <div className="flex gap-4 text-sm text-gray-600">
-                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                    {exercise.exerciseType}
-                                </span>
-                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                                    {exercise.targetMuscleGroups?.[0] || 'General'}
-                                </span>
+                    {/* Exercise Mode */}
+                    {mode === 'exercise' && exercise && (
+                        <>
+                            {configData.trackingMode === 'strength' && (
+                                <StrengthConfigSection
+                                    targetSets={configData.targetSets}
+                                    targetReps={configData.targetReps}
+                                    targetWeight={configData.targetWeight}
+                                    targetWeightUnit={configData.targetWeightUnit}
+                                    targetRpe={configData.targetRpe}
+                                    restSeconds={configData.restSeconds}
+                                    tempo={configData.tempo}
+                                    onSetsChange={configData.setTargetSets}
+                                    onRepsChange={configData.setTargetReps}
+                                    onWeightChange={configData.setTargetWeight}
+                                    onWeightUnitToggle={configData.handleWeightUnitToggle}
+                                    onRpeChange={configData.setTargetRpe}
+                                    onRestChange={configData.setRestSeconds}
+                                    onTempoChange={configData.setTempo}
+                                    onWeightPresetClick={configData.handleWeightPresetClick}
+                                    onRpePresetClick={configData.handleRpePresetClick}
+                                    getWeightPresets={configData.getWeightPresets}
+                                    getRpePresets={configData.getRpePresets}
+                                />
+                            )}
+
+                            {configData.trackingMode === 'cardio' && (
+                                <CardioConfigSection
+                                    exercise={exercise}
+                                    targetDurationMinutes={configData.targetDurationMinutes}
+                                    targetDistance={configData.targetDistance}
+                                    targetDistanceUnit={configData.targetDistanceUnit}
+                                    targetPace={configData.targetPace}
+                                    targetSets={configData.targetSets}
+                                    isometricRestSeconds={configData.isometricRestSeconds}
+                                    onDurationChange={configData.setTargetDurationMinutes}
+                                    onDistanceChange={configData.setTargetDistance}
+                                    onDistanceUnitToggle={configData.handleDistanceUnitToggle}
+                                    onPaceChange={configData.setTargetPace}
+                                    onSetsChange={configData.setTargetSets}
+                                    onRestChange={configData.setIsometricRestSeconds}
+                                    onDistancePresetClick={configData.handleDistancePresetClick}
+                                />
+                            )}
+
+                            {configData.trackingMode === 'isometric' && (
+                                <IsometricConfigSection
+                                    targetHoldSeconds={configData.targetHoldSeconds}
+                                    isometricSets={configData.isometricSets}
+                                    isometricRestSeconds={configData.isometricRestSeconds}
+                                    onHoldSecondsChange={configData.setTargetHoldSeconds}
+                                    onSetsChange={configData.setIsometricSets}
+                                    onRestChange={configData.setIsometricRestSeconds}
+                                />
+                            )}
+
+                            {/* Notes */}
+                            <div className="mt-2 mb-4">
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                    Notes <span className="normal-case font-normal text-gray-400">(optional)</span>
+                                </label>
+                                <textarea
+                                    value={configData.notes}
+                                    onChange={(e) => configData.setNotes(e.target.value)}
+                                    placeholder="Any notes about this exercise..."
+                                    rows={2}
+                                    className="w-full p-3 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none transition resize-none"
+                                />
                             </div>
-                        </div>
+                        </>
+                    )}
+                </div>
 
-                        {/* =============================================================================
-                        STRENGTH CONFIGURATION
-                        ============================================================================= */}
-
-                        {configData.trackingMode === 'strength' && (
-                            <StrengthConfigSection
-                                targetSets={configData.targetSets}
-                                targetReps={configData.targetReps}
-                                targetWeight={configData.targetWeight}
-                                targetWeightUnit={configData.targetWeightUnit}
-                                targetRpe={configData.targetRpe}
-                                restSeconds={configData.restSeconds}
-                                tempo={configData.tempo}
-                                onSetsChange={configData.setTargetSets}
-                                onRepsChange={configData.setTargetReps}
-                                onWeightChange={configData.setTargetWeight}
-                                onWeightUnitToggle={configData.handleWeightUnitToggle}
-                                onRpeChange={configData.setTargetRpe}
-                                onRestChange={configData.setRestSeconds}
-                                onTempoChange={configData.setTempo}
-                                onWeightPresetClick={configData.handleWeightPresetClick}
-                                onRpePresetClick={configData.handleRpePresetClick}
-                                getWeightPresets={configData.getWeightPresets}
-                                getRpePresets={configData.getRpePresets}
-                            />
-                        )}
-
-                        {/* =============================================================================
-                            CARDIO CONFIGURATION
-                            ============================================================================= */}
-                        {configData.trackingMode === 'cardio' && (
-                            <CardioConfigSection
-                                exercise={exercise}
-                                targetDurationMinutes={configData.targetDurationMinutes}
-                                targetDistance={configData.targetDistance}
-                                targetDistanceUnit={configData.targetDistanceUnit}
-                                targetPace={configData.targetPace}
-                                targetSets={configData.targetSets}
-                                isometricRestSeconds={configData.isometricRestSeconds}
-                                onDurationChange={configData.setTargetDurationMinutes}
-                                onDistanceChange={configData.setTargetDistance}
-                                onDistanceUnitToggle={configData.handleDistanceUnitToggle}
-                                onPaceChange={configData.setTargetPace}
-                                onSetsChange={configData.setTargetSets}
-                                onRestChange={configData.setIsometricRestSeconds}
-                                onDistancePresetClick={configData.handleDistancePresetClick}
-                            />
-                        )}
-
-                        {/* =============================================================================
-                            ISOMETRIC CONFIGURATION
-                            ============================================================================= */}
-                        {configData.trackingMode === 'isometric' && (
-                            <IsometricConfigSection
-                                targetHoldSeconds={configData.targetHoldSeconds}
-                                isometricSets={configData.isometricSets}
-                                isometricRestSeconds={configData.isometricRestSeconds}
-                                onHoldSecondsChange={configData.setTargetHoldSeconds}
-                                onSetsChange={configData.setIsometricSets}
-                                onRestChange={configData.setIsometricRestSeconds}
-                            />
-                        )}
-
-                        {/* =============================================================================
-                            NOTES SECTION
-                            ============================================================================= */}
-                        <div className="mt-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Notes (Optional)
-                            </label>
-                            <textarea
-                                value={configData.notes}
-                                onChange={(e) => configData.setNotes(e.target.value)}
-                                placeholder="Add any notes about this exercise..."
-                                rows={3}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                            />
-                        </div>
-                    </>
-                )}
-
-                {/* =============================================================================
-                    ACTION BUTTONS
-                    ============================================================================= */}
-                <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        disabled={loading}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onSave}
-                        disabled={loading || (mode === 'exercise' && !exercise) || (mode === 'workout-plan' && !selectedWorkoutPlan)}
-                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loading ? (
-                            <>
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline"
-                                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                            strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor"
-                                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                {/* ── STICKY FOOTER ── */}
+                <div
+                    className="flex-shrink-0 px-5 pt-3 pb-5 bg-white border-t border-gray-100 rounded-b-3xl sm:rounded-b-3xl"
+                    style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom, 1.25rem))' }}
+                >
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={loading}
+                            className="flex-1 py-3.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onSave}
+                            disabled={loading || (mode === 'exercise' && !exercise) || (mode === 'workout-plan' && !selectedWorkoutPlan)}
+                            className={`flex-2 flex-grow py-3.5 text-sm font-bold text-white bg-gradient-to-r ${gradientClass} rounded-2xl shadow-lg hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                        >
+                            {loading && (
+                                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
-                                Saving...
-                            </>
-                        ) : (
-                            <>
-                                {isEditMode ? 'Update Exercise' :
-                                    mode === 'workout-plan' ? 'Schedule Workout Plan' :
-                                        'Add Exercise'}
-                            </>
-                        )}
-                    </button>
+                            )}
+                            {saveLabel}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

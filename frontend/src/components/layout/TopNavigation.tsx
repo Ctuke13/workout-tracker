@@ -29,11 +29,19 @@ const useScrollDirection = (scrollContainerRef?: React.RefObject<HTMLElement | n
                 ? scrollContainerRef.current.scrollTop
                 : window.scrollY;
 
-            const scrollThreshold = 30;
+            const scrollThreshold = 50; // increase from 30 to 50
 
-            if (Math.abs(currentScrollY - lastScrollY) < scrollThreshold) {
+            // Don't hide if near bottom of page
+            const nearBottom = scrollContainerRef?.current
+                ? scrollContainerRef.current.scrollHeight - scrollContainerRef.current.scrollTop - scrollContainerRef.current.clientHeight < 60
+                : document.documentElement.scrollHeight - window.scrollY - window.innerHeight < 60;
+
+            if (nearBottom) {
+                setIsVisible(true);
                 return;
             }
+
+            if (Math.abs(currentScrollY - lastScrollY) < scrollThreshold) return;
 
             if (currentScrollY > lastScrollY && currentScrollY > 80) {
                 setIsVisible(false);

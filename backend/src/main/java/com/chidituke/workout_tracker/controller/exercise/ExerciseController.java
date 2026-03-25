@@ -333,7 +333,7 @@ public class ExerciseController extends BaseApiController {
         }
 
         searchRequest.setPage(0);
-        searchRequest.setSize(100);
+        searchRequest.setSize(500);
         searchRequest.setSortBy("usageCount");
         searchRequest.setSortDirection("desc");
 

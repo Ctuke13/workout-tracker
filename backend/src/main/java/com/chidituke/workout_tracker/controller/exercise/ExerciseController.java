@@ -168,6 +168,20 @@ public class ExerciseController extends BaseApiController {
     // 🎯 CORE EXERCISE ENDPOINTS (Existing functionality)
     // ===================================================================
 
+    @GetMapping("/goals")
+    @Operation(summary = "Get fitness goals", description = "Get available fitness goals for filtering")
+    public ResponseEntity<List<Map<String, Object>>> getFitnessGoals() {
+        List<Map<String, Object>> goals = List.of(
+                Map.of("code", "fat-burn", "label", "Fat Burn", "emoji", "🔥"),
+                Map.of("code", "muscle-building", "label", "Muscle Building", "emoji", "💪"),
+                Map.of("code", "endurance", "label", "Endurance", "emoji", "🏃"),
+                Map.of("code", "flexibility", "label", "Flexibility", "emoji", "🤸"),
+                Map.of("code", "sport-specific", "label", "Sport Specific", "emoji", "🏅"),
+                Map.of("code", "recovery", "label", "Recovery", "emoji", "🏥")
+        );
+        return ResponseEntity.ok(goals);
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get exercise by ID", description = "Get detailed exercise information")
     public ResponseEntity<Map<String, Object>> getExerciseById(@PathVariable Long id) {

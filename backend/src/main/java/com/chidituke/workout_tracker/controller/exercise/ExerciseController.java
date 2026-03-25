@@ -172,12 +172,12 @@ public class ExerciseController extends BaseApiController {
     @Operation(summary = "Get fitness goals", description = "Get available fitness goals for filtering")
     public ResponseEntity<List<Map<String, Object>>> getFitnessGoals() {
         List<Map<String, Object>> goals = List.of(
-                Map.of("code", "fat-burn", "label", "Fat Burn", "emoji", "🔥"),
-                Map.of("code", "muscle-building", "label", "Muscle Building", "emoji", "💪"),
-                Map.of("code", "endurance", "label", "Endurance", "emoji", "🏃"),
-                Map.of("code", "flexibility", "label", "Flexibility", "emoji", "🤸"),
-                Map.of("code", "sport-specific", "label", "Sport Specific", "emoji", "🏅"),
-                Map.of("code", "recovery", "label", "Recovery", "emoji", "🏥")
+                Map.of("goal", "fat-burn", "label", "Fat Burn", "emoji", "🔥", "count", 0),
+                Map.of("goal", "muscle-building", "label", "Muscle Building", "emoji", "💪", "count", 0),
+                Map.of("goal", "endurance", "label", "Endurance", "emoji", "🏃", "count", 0),
+                Map.of("goal", "flexibility", "label", "Flexibility", "emoji", "🤸", "count", 0),
+                Map.of("goal", "sport-specific", "label", "Sport Specific", "emoji", "🏅", "count", 0),
+                Map.of("goal", "recovery", "label", "Recovery", "emoji", "🏥", "count", 0)
         );
         return ResponseEntity.ok(goals);
     }

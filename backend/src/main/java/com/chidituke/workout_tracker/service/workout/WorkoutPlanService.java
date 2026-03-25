@@ -239,15 +239,6 @@ public class WorkoutPlanService {
     // POPULAR & RECOMMENDED
     // =======================
 
-    @Cacheable(value = "popular-workout-plans", key = "#limit")
-    public List<WorkoutPlanResponse> getMostPopularWorkoutPlans(int limit) {
-        List<WorkoutPlan> workoutPlans = workoutPlanRepository.findTop10ByIsPublicTrueOrderByTimesUsedDesc();
-        return workoutPlans.stream()
-                .limit(limit)
-                .map(workoutPlanMapper::toResponse)
-                .toList();
-    }
-
     @Cacheable(value = "highly-rated-workout-plans", key = "#minRating")
     public List<WorkoutPlanResponse> getHighlyRatedWorkoutPlans(Double minRating) {
         List<WorkoutPlan> workoutPlans = workoutPlanRepository.findHighlyRatedWorkouts(minRating);
@@ -283,7 +274,7 @@ public class WorkoutPlanService {
     // =======================
 
     @Transactional
-    @CacheEvict(value = {"public-workout-plans", "popular-workout-plans"}, allEntries = true)
+    @CacheEvict(value = {"public-workout-plans"}, allEntries = true)
     public WorkoutPlanResponse createWorkoutPlan(String username, WorkoutTemplateRequestDTO request) {
         User user = findUserByUsername(username);
 
@@ -301,7 +292,7 @@ public class WorkoutPlanService {
     }
 
     @Transactional
-    @CacheEvict(value = {"public-workout-plans", "popular-workout-plans"}, allEntries = true)
+    @CacheEvict(value = {"public-workout-plans"}, allEntries = true)
     public WorkoutPlanResponse updateWorkoutPlan(Long id, String username, WorkoutTemplateRequestDTO request) {
         WorkoutPlan workoutPlan = findWorkoutPlanById(id);
         validateOwnership(workoutPlan, username);
@@ -317,7 +308,7 @@ public class WorkoutPlanService {
     }
 
     @Transactional
-    @CacheEvict(value = {"public-workout-plans", "popular-workout-plans"}, allEntries = true)
+    @CacheEvict(value = {"public-workout-plans"}, allEntries = true)
     public void deleteWorkoutPlan(Long id, String username) {
         WorkoutPlan workoutPlan = findWorkoutPlanById(id);
         validateOwnership(workoutPlan, username);
@@ -514,7 +505,7 @@ public class WorkoutPlanService {
     }
 
     @Transactional
-    @CacheEvict(value = {"public-workout-plans", "popular-workout-plans"}, allEntries = true)
+    @CacheEvict(value = {"public-workout-plans"}, allEntries = true)
     public void makeWorkoutPlanPublic(Long id, String username) {
         WorkoutPlan workoutPlan = findWorkoutPlanById(id);
         validateOwnership(workoutPlan, username);
@@ -526,7 +517,7 @@ public class WorkoutPlanService {
     }
 
     @Transactional
-    @CacheEvict(value = {"public-workout-plans", "popular-workout-plans"}, allEntries = true)
+    @CacheEvict(value = {"public-workout-plans"}, allEntries = true)
     public void makeWorkoutPlanPrivate(Long id, String username) {
         WorkoutPlan workoutPlan = findWorkoutPlanById(id);
         validateOwnership(workoutPlan, username);

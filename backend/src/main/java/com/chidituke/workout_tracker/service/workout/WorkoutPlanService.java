@@ -238,6 +238,14 @@ public class WorkoutPlanService {
     // =======================
     // POPULAR & RECOMMENDED
     // =======================
+    
+    public List<WorkoutPlanResponse> getMostPopularWorkoutPlans(int limit) {
+        List<WorkoutPlan> workoutPlans = workoutPlanRepository.findTop10ByIsPublicTrueOrderByTimesUsedDesc();
+        return workoutPlans.stream()
+                .limit(limit)
+                .map(workoutPlanMapper::toResponse)
+                .toList();
+    }
 
     @Cacheable(value = "highly-rated-workout-plans", key = "#minRating")
     public List<WorkoutPlanResponse> getHighlyRatedWorkoutPlans(Double minRating) {

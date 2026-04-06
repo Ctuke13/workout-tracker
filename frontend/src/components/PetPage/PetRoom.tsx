@@ -1,4 +1,4 @@
-import React, {useMemo, useEffect, useCallback, useRef} from 'react';
+import React, {useMemo, useEffect, useCallback, useRef, useState} from 'react';
 import {useRive, useStateMachineInput} from '@rive-app/react-canvas';
 import {getCurrentSeason, Season, SEASONAL_ASSETS} from '../../types/pet';
 import {useAuth} from '../../contexts/AuthContext';
@@ -32,6 +32,10 @@ const PetRoom: React.FC<PetRoomProps> = ({season: overrideSeason}) => {
     const currentSeason = overrideSeason || getGameSeason();
     const seasonalAssets = SEASONAL_ASSETS[currentSeason];
     const prevCleanlinessRef = useRef<number | null>(null);
+    const bathingInProgressRef = useRef(false);
+    const bathingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [bathingComplete, setBathingComplete] = useState(0);
+
 
     // ============ RIVE STATE MACHINE ============
     const {rive, RiveComponent} = useRive({
@@ -96,20 +100,37 @@ const PetRoom: React.FC<PetRoomProps> = ({season: overrideSeason}) => {
         requestAnimationFrame(tick);
     }, [dirtLevelInput]);
 
+    // ============ TRACK BATHING INDEPENDENTLY OF currentAnimation ============
+    useEffect(() => {
+        if (currentAnimation === 'bathe') {
+            bathingInProgressRef.current = true;
+            if (bathingTimerRef.current) clearTimeout(bathingTimerRef.current);
+            bathingTimerRef.current = setTimeout(() => {
+                bathingInProgressRef.current = false;
+                setBathingComplete(prev => prev + 1); // force dirt effect to re-run with clean stats
+            }, 12000);
+        }
+        return () => {
+            if (bathingTimerRef.current) clearTimeout(bathingTimerRef.current);
+        };
+    }, [currentAnimation]);
+
     // ============ UPDATE DIRT LEVEL FROM STATS ============
     useEffect(() => {
         if (dirtLevelInput && stats?.cleanliness != null) {
+            if (bathingInProgressRef.current) return; // Block all dirt updates during full bathe duration
+
             const newDirt = Math.round(((100 - stats.cleanliness) / 100) * 60);
 
             if (prevCleanlinessRef.current === null) {
                 dirtLevelInput.value = newDirt;
-            } else if (currentAnimation !== 'bathe') {
+            } else {
                 dirtLevelInput.value = newDirt;
             }
 
             prevCleanlinessRef.current = stats.cleanliness;
         }
-    }, [dirtLevelInput, stats?.cleanliness, currentAnimation]);
+    }, [dirtLevelInput, stats?.cleanliness, currentAnimation, bathingComplete]);
 
     // ============ RESET MOOD BEFORE ACTIONS ============
     useEffect(() => {
